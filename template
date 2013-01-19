@@ -23,11 +23,26 @@
 # Here comes the documentation
 #
 # Parameters:
-# $1 Home directory of the instance. Usually it is /home/db2inst1
-# -h || --help : Showw the help of this script.
+# -d | --directory : Home directory of the instance. Usually it is 
+#   /home/db2inst1
+# -h | --help : Show the help of this script.
+# -V | --version : Show the current version of this script.
+# -v | --verbose : Execute the program in verbose mode.
 #
-# Exit codes:
-# -1 Command not executed, help showed.
+# The exit codes are the standard for Nagios.
+#
+# 0 The plugin was able to check the service and it appeared to be functioning
+#   properly.
+# 1 The plugin was able to check the service, but it appeared to be above some 
+#   "warning" threshold or did not appear to be working properly.
+# 2 The plugin detected that either the service was not running or it was above
+#   some "critical" threshold.
+# 3 Invalid command line arguments were supplied to the plugin or low-level
+#   failures internal to the plugin (such as unable to fork, or open a tcp
+#   socket) that prevent it from performing the specified operation. 
+#   Higher-level errors (such as name resolution errors, socket timeouts, etc)
+#   are outside of the control of plugins and should generally NOT be reported
+#   as UNKNOWN states. 
 #
 # Author: Andres Gomez Casanova
 # Version: v1.0 2013-01-18
@@ -54,40 +69,81 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  # TODO
-  echo "Usage: $1 [instanceHomeDirectory|-h|--help]"
+  # TODO	
+  echo "Usage: $1 { -d instanceHomeDirectory | -h | -V } [ -v ]"
 }
 
 function print_help {
   print_revision
-  print_usage
+  print_usage $1
   # Max 80 chars width.
-  # TODO
-  echo Full documentation.
+  echo "-d | --directory : Instance home directory. It is usually \
+/home/db2inst1"
+  # TODO Full documentation.
+  echo "-h | --help : Shows the current documentation."
+  echo "-v | --verbose : Executes the script in verbose mode."
+  echo "-V | --version : Shows the current version of this script."
 }
 
-# FIXME Remove positional arguments.
-# It could be done with getopts or getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+APPL_NAME=$0
 
-# Show the help if required.
-if [[ $# -ne 1 ]] ; then
-  print_usage $0
-  exit $UNKNOWN
-elif [[ ($1 == "-h") || ($1 == "--help") ]] ; then
-  print_help $0
-  exit $UNKNOWN
-elif [[ ($1 == "-V") || ($1 == "--version") ]] ; then
-  print_revision
-  exit $UNKNOWN
-elif [[ $1 == -* ]] ; then
-  print_usage $0
+if [ $# == 0 ] ; then
+  print_usage $APPL_NAME
   exit $UNKNOWN
 fi
 
-# TODO add more options if necessary
+# The following requieres GNU getopt. See the following discusion.
+# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+
+# TODO Add the arguments here. One char in -o, multiple char in -long.
+TEMP=`getopt -o hVvd: --long help,version,verbose,directory \
+             -n '$APPL_NAME' -- "$@"`
+
+if [ $? != 0 ] ; then
+  print_usage $APPL_NAME
+  exit $UNKNOWN
+fi
+
+# Note the quotes around `$TEMP': they are essential!
+eval set -- "$TEMP"
+
+HELP=false
+VERSION=false
+VERBOSE=false
+INSTANCE_HOME=
+while true; do
+  case "$1" in
+    -h | --help ) HELP=true; shift ;;
+    -V | --version ) VERSION=true; shift ;;
+    -v | --verbose ) VERBOSE=true; shift ;;
+    -d | --directory ) INSTANCE_HOME="$2"; shift 2 ;;
+    # TODO Validate any new argument.
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
+done
+
+if [[ $VERBOSE = true ]] ; then
+  echo help:$HELP, version:$VERSION, verbose:$VERBOSE, directory:$INSTANCE_HOME
+fi
+
+if [[ $HELP = true ]] ; then
+  print_help $APPL_NAME
+  exit $UNKNOWN
+fi
+
+if [[ $VERSION = true ]] ; then
+  print_revision $APPL_NAME
+  exit $UNKNOWN
+fi
+
+if [[ $INSTANCE_HOME == "" ]] ; then
+  print_usage $APPL_NAME
+  exit $UNKNOWN
+fi
 
 # Load the DB2 profile.
-. $1/sqllib/db2profile
+. $INSTANCE_HOME/sqllib/db2profile
 
 # TODO add the logic
+
