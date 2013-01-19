@@ -57,7 +57,7 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  # TODO
+  # TODO Add arguments.
   echo "Usage: $1 { -d instanceHomeDirectory | -h | -V } [ -v ]"
 }
 
@@ -65,9 +65,10 @@ function print_help {
   print_revision
   print_usage $1
   # Max 80 chars width.
+  # TODO  Add a global description.
   echo "-i | --instance : Instance home directory. It is usually \
 /home/db2inst1"
-  # TODO Full documentation.
+  # TODO Add arguments in detail.
   echo "-h | --help : Shows the current documentation."
   echo "-v | --verbose : Executes the script in verbose mode."
   echo "-V | --version : Shows the current version of this script."
