@@ -23,6 +23,8 @@
 #
 # Here comes the documentation
 #
+# TODO Nagios usage.
+#
 # Parameters:
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
