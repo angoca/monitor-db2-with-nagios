@@ -22,6 +22,23 @@
 # service name from the configuration, and then querying netstat to check if
 # there is an associated service with that port.
 #
+# This script was based on the plugins written by Felipe Alkain de Souza.
+# http://www.dbatodba.com/db2/scripts-db2/nagios-plugins/checking-if-a-database-is-available/
+#
+# In order to be used in Nagios, you have to configure the following.
+#
+# # 'check_instance_up' command definition
+# define command {
+#         command_name    check_instance_up
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_instance_up '$ARG1$'"
+# }
+# define service{
+#         host_name               db2server
+#         service_description     Check if instance is up
+#         check_command           check_instance_up!-i /home/db2inst1
+#         use                     generic-service
+# }
+#
 # FIXME: The regular expression to check the service name does not work, and
 # if the file has tabs instead of spaces, it could fail to find the instance
 # name.
@@ -174,10 +191,10 @@ if [[ $CONTINUE == true ]] ; then
     PROC=`netstat -na | grep $PORTNUM | wc -l`
 
     if [[ $PROC -eq "0" ]] ; then
-      OUTPUT="DB2 - Instance is down."
+      OUTPUT="DB2 - Instance at $INSTANCE_HOME is down."
       RETURN=$STATE_CRITICAL
     else
-      OUTPUT="DB2 - Instance is up."
+      OUTPUT="DB2 - Instance at $INSTANCE_HOME is up."
       RETURN=$STATE_OK
     fi
   fi
