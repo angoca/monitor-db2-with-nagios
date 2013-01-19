@@ -1,0 +1,93 @@
+#! /usr/bin/env bash
+
+###############################################################################
+# Monitor DB2 with Nagios
+# Copyright 2013 Andres Gomez Casanova
+# https://github.com/angoca/monitor-db2-with-nagios
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+###############################################################################
+
+# TODO This is a template for script.
+#
+# Here comes the documentation
+#
+# Parameters:
+# $1 Home directory of the instance. Usually it is /home/db2inst1
+# -h || --help : Showw the help of this script.
+#
+# Exit codes:
+# -1 Command not executed, help showed.
+#
+# Author: Andres Gomez Casanova
+# Version: v1.0 2013-01-18
+
+# Flag for debugging.
+#set -xv
+
+# Nagios return codes
+OK=0
+WARNING=1
+CRITICAL=2
+UNKNOWN=3
+
+# Nagios Output
+# Text output 80 chars | Optional Perf Data Line 1
+# Long text Line 1
+# Long text Line 2 | Optional Perf Data Line 2
+# Optional Perf Data Line 3
+OUTPUT=
+
+# Version of this script.
+function print_revision {
+  echo v1.0 2013-01-18
+}
+# Function to show the help
+function print_usage {
+  # TODO
+  echo "Usage: $1 [instanceHomeDirectory|-h|--help]"
+}
+
+function print_help {
+  print_revision
+  print_usage
+  # Max 80 chars width.
+  # TODO
+  echo Full documentation.
+}
+
+# FIXME Remove positional arguments.
+# It could be done with getopts or getopt. See the following discusion.
+# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+
+# Show the help if required.
+if [[ $# -ne 1 ]] ; then
+  print_usage $0
+  exit $UNKNOWN
+elif [[ ($1 == "-h") || ($1 == "--help") ]] ; then
+  print_help $0
+  exit $UNKNOWN
+elif [[ ($1 == "-V") || ($1 == "--version") ]] ; then
+  print_revision
+  exit $UNKNOWN
+elif [[ $1 == -* ]] ; then
+  print_usage $0
+  exit $UNKNOWN
+fi
+
+# TODO add more options if necessary
+
+# Load the DB2 profile.
+. $1/sqllib/db2profile
+
+# TODO add the logic
