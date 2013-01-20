@@ -20,8 +20,7 @@
 
 # This script checks for long lock waits in the database.
 #
-# NOTE:In order to run this script successfully, it is necessary to activate
-# the LOCK monitor switch.
+# NOTE: This script activates the monitor switches for lock automatically.
 #   db2 update monitor switches using lock on
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
@@ -197,7 +196,7 @@ if [[ $CONTINUE == true ]] ; then
         echo LOCKS:\'$LOCKS\'
       fi
 
-      LOCK_WAIT=`db2 get snapshot for locks on $DATABASE_NAME | grep "Total wait time (ms)" | sort -rn | awk -F"= " '{print $2}' | head -1`
+      LOCK_WAIT=`db2 update monitor switches using lock on > /dev/null ; db2 get snapshot for locks on $DATABASE_NAME | grep "Total wait time (ms)" | sort -rn | awk -F"= " '{print $2}' | head -1`
 
       if [[ $VERBOSE == true ]] ; then
         echo LOCK_WAIT:\'$LOCK_WAIT\'
