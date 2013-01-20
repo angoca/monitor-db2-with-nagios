@@ -182,6 +182,10 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   if [[ $CONTINUE == true ]] ; then
+    # Trims the characters.
+    INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
+    DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
+
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
 
