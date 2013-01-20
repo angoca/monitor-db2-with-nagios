@@ -20,6 +20,10 @@
 
 # This script checks for long lock waits in the database.
 #
+# NOTE:In order to run this script successfully, it is necessary to activate
+# the LOCK monitor switch.
+#   db2 update monitor switches using lock on
+#
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
 #
@@ -169,13 +173,13 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
     print_usage $APPL_NAME
     RETURN=$UNKNOWN
-	CONTINUE=false
+    CONTINUE=false
   fi
 
   if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
     print_usage $APPL_NAME
     RETURN=$UNKNOWN
-	CONTINUE=false
+    CONTINUE=false
   fi
 
   if [[ $CONTINUE == true ]] ; then
@@ -183,24 +187,35 @@ if [[ $CONTINUE == true ]] ; then
     . $INSTANCE_HOME/sqllib/db2profile
 
     db2 connect to $DATABASE_NAME > /dev/null
-
     if [[ $? -eq 0 ]] ; then
-      LOCKS=`db2 -x "select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database"`
+
+      LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; db2 -x "select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database" | awk '{print $1}' ; db2 connect reset > /dev/null`
 
       db2 connect reset > /dev/null
 
+      if [[ $VERBOSE == true ]] ; then
+        echo LOCKS:\'$LOCKS\'
+      fi
+
       LOCK_WAIT=`db2 get snapshot for locks on $DATABASE_NAME | grep "Total wait time (ms)" | sort -rn | awk -F"= " '{print $2}' | head -1`
 
-      if [[ $LOCKS == "Not Collected" ]] ; then
+      if [[ $VERBOSE == true ]] ; then
+        echo LOCK_WAIT:\'$LOCK_WAIT\'
+      fi
+
+      if [[ $LOCK_WAIT != "Not Collected" ]] ; then
+
+        if [[ $LOCKS -ne 0 && $LOCK_WAIT -gt 60000 ]] ; then
+          LOCK_IDS=`db2 get snapshot for locks on $DATABASE_NAME | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
+          OUTPUT="DB2 - There are $LOCKS lock(s). The application handles are: $LOCK_IDS."
+          RETURN=$CRITICAL
+        else
+          OUTPUT="DB2 - There is not any application in lock-wait state."
+          RETURN=$OK
+        fi
+      else
         OUTPUT="DB2 - There are lock-waits, but the monitor switches are off."
         RETURN=$UNKNOWN
-      elif [[ $LOCKS -ne 0 && $LOCK_WAIT -gt 60000 ]] ; then
-        LOCK_IDS=`db2 get snapshot for locks on $DATABASE_NAME | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
-        OUTPUT="DB2 - There are $LOCKS lock(s). The application handles are: $LOCK_IDS."
-        RETURN=$CRITICAL
-      else
-        OUTPUT="DB2 - There is not any application in lock-wait state."
-        RETURN=$OK
       fi
     else
       OUTPUT="DB2 - Problem with the connection."
