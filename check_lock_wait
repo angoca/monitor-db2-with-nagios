@@ -216,7 +216,7 @@ if [[ $CONTINUE == true ]] ; then
       || $WARNING_THRES -eq 0 || $CRITICAL_THRES -eq 0
       || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
     print_usage $APPL_NAME
-    echo "Warning threshold should be less thatn critical threshold."
+    echo "Warning threshold should be less than critical threshold."
     echo "Threshold should be greater than 0."    
     RETURN=$UNKNOWN
     CONTINUE=false
