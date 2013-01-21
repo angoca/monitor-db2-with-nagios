@@ -44,12 +44,14 @@
 #
 #
 # Parameters:
-# -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1
+# -c | --critical : Critical threshold in milliseconds.
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
+# -i | --instance : Home directory of the instance. Usually it is
+#   /home/db2inst1
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
+# -w | --warning : Warning threshold in milliseconds.
 # --update : Update monitor switch before executing the command. It means that
 #   it does not inherit values from DBM configuration.
 #
@@ -80,8 +82,8 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [--update] | -h 
-| -V } [ -v ]"
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w][--update]
+| -h | -V } [ -v ]"
 }
 
 function print_help {
@@ -89,12 +91,16 @@ function print_help {
   print_usage $1
   # Max 80 chars width.
   echo "This script checks for long lock waits in the database."
-  echo "-i | --instance : Instance home directory. It is usually \
-/home/db2inst1"
+  echo "-c | --critical : Quantity of milliseconds to consider a lock-wait as \
+critical. (Default 60000)"
   echo "-d | --database : Database name."
   echo "-h | --help : Shows the current documentation."
+  echo "-i | --instance : Instance home directory. It is usually \
+/home/db2inst1"
   echo "-v | --verbose : Executes the script in verbose mode."
   echo "-V | --version : Shows the current version of this script."
+  echo "-w | --warning : Quantity of milliseconds to consider a lock-wait as \
+warning. (Default 10000)"
   echo "--update : Update the monitor switch for lock before query."
 }
 
@@ -130,7 +136,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d: --long help,version,verbose,instance:,datbase:,update \
+TEMP=`getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,datbase:,update,critical:,warning: \
              -n $APPL_NAME -- "$@"`
 
 if [ $? != 0 ] ; then
@@ -149,13 +155,17 @@ if [[ $CONTINUE == true ]] ; then
   INSTANCE_HOME=
   DATABASE_NAME=
   UPDATE_MON=false
+  WARNING_THRES=10000
+  CRITICAL_THRES=60000
   while true; do
     case "$1" in
+      -c | --critical ) CRITICAL_THRES="$2"; shift 2 ;;
+      -d | --database ) DATABASE_NAME="$2"; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
+      -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=true; shift ;;
-      -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
-      -d | --database ) DATABASE_NAME="$2"; shift 2 ;;
+      -w | --warning ) WARNING_THRES="$2"; shift 2 ;;
       --update ) UPDATE_MON=true; shift ;;
       -- ) shift; break ;;
       * ) break ;;
@@ -165,7 +175,8 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $CONTINUE == true && $VERBOSE == true ]] ; then
     ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
     ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-    ECHO=$ECHO"update:$UPDATE_MON"
+    ECHO=$ECHO"update:$UPDATE_MON, warning:$WARNING_THRES, "
+    ECHO=$ECHO"critical:$CRITICAL_THRES"
     echo $ECHO
   fi
 
@@ -189,6 +200,17 @@ if [[ $CONTINUE == true ]] ; then
 
   if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
     print_usage $APPL_NAME
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+
+  if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
+      || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
+      || $WARNING_THRES -eq 0 || $CRITICAL_THRES -eq 0
+      || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
+    print_usage $APPL_NAME
+    echo "Warning threshold should be less thatn critical threshold."
+    echo "Threshold should be greater than 0."    
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
