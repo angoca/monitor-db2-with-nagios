@@ -33,7 +33,7 @@
 # define service{
 #         host_name               db2server
 #         service_description     Database conectivity
-#         check_command           check_database_connection!-i /home/db2inst1!-d wfscpd
+#         check_command           check_database_connection!-i /home/db2inst1!-d sample
 #         use                     generic-service
 # }
 #

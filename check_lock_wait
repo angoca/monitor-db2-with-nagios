@@ -36,7 +36,7 @@
 # define service{
 #         host_name               db2server
 #         service_description     Long lock wait
-#         check_command           check_lock_wait!-i /home/db2inst1!-d wfscpd
+#         check_command           check_lock_wait!-i /home/db2inst1!-d sample
 #         use                     generic-service
 # }
 #

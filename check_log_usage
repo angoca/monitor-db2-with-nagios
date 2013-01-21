@@ -36,7 +36,7 @@
 # define service{
 #         host_name               db2server
 #         service_description     Log usage
-#         check_command           check_log_usage!-i /home/db2inst1!-d wfscpd
+#         check_command           check_log_usage!-i /home/db2inst1!-d sample
 #         use                     generic-service
 # }
 #
