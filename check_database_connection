@@ -106,6 +106,9 @@ RETURN=$UNKNOWN
 # Long text Line 2 | Optional Perf Data Line 2
 # Optional Perf Data Line 3
 OUTPUT=
+PERFORMANCE=
+LONG_OUTPUT=
+LONG_PERFORMANCE=
 
 APPL_NAME=$0
 
@@ -149,8 +152,8 @@ if [[ $CONTINUE == true ]] ; then
   done
 
   if [[ $CONTINUE == true && $VERBOSE == true ]] ; then
-    echo help:$HELP, version:$VERSION, verbose:$VERBOSE
-    echo directory:$INSTANCE_HOME, database:$DATABASE_NAME
+    echo "help:$HELP, version:$VERSION, verbose:$VERBOSE,
+ directory:$INSTANCE_HOME, database:$DATABASE_NAME"
   fi
 
   if [[ $CONTINUE == true && $HELP == true ]] ; then
@@ -168,16 +171,20 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
     print_usage $APPL_NAME
     RETURN=$UNKNOWN
-	CONTINUE=false
+    CONTINUE=false
   fi
 
   if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
     print_usage $APPL_NAME
     RETURN=$UNKNOWN
-	CONTINUE=false
+    CONTINUE=false
   fi
 
   if [[ $CONTINUE == true ]] ; then
+    # Trims the characters.
+    INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
+    DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
+
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
 
@@ -198,7 +205,8 @@ fi
 if [[ $OUTPUT == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
-echo $OUTPUT
+# Builds the output.
+echo "$OUTPUT|$PERFORMANCE\n$LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
 if [[ $VERBOSE == true ]] ; then
   echo Return code: $RETURN

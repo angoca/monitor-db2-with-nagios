@@ -177,6 +177,7 @@ fi
 if [[ $OUTPUT == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
+# Builds the output.
 echo "$OUTPUT|$PERFORMANCE\n$LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
 if [[ $VERBOSE == true ]] ; then
