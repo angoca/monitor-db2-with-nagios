@@ -192,10 +192,10 @@ if [[ $CONTINUE == true ]] ; then
 
     if [[ $PROC -eq "0" ]] ; then
       OUTPUT="DB2 - Instance at $INSTANCE_HOME is down."
-      RETURN=$STATE_CRITICAL
+      RETURN=$CRITICAL
     else
       OUTPUT="DB2 - Instance at $INSTANCE_HOME is up."
-      RETURN=$STATE_OK
+      RETURN=$OK
     fi
   fi
 fi
