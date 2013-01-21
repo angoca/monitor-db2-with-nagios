@@ -22,6 +22,9 @@
 #
 # NOTE: This script activates the monitor switches for lock automatically.
 #   db2 update monitor switches using lock on
+# TODO: Several verbose levels
+# TODO: Criterion for warning and creterion for error
+# TODO: Do not update monito all the times
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
@@ -194,15 +197,17 @@ if [[ $CONTINUE == true ]] ; then
 
       LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; db2 -x "select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database" | awk '{print $1}' ; db2 connect reset > /dev/null`
 
-      db2 connect reset > /dev/null
-
       if [[ $VERBOSE == true ]] ; then
+        db2 -x "select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database" | awk '{print $1}'
         echo LOCKS:\'$LOCKS\'
       fi
+
+      db2 connect reset > /dev/null
 
       LOCK_WAIT=`db2 update monitor switches using lock on > /dev/null ; db2 get snapshot for locks on $DATABASE_NAME | grep "Total wait time (ms)" | sort -rn | awk -F"= " '{print $2}' | head -1`
 
       if [[ $VERBOSE == true ]] ; then
+        db2 get snapshot for locks on $DATABASE_NAME
         echo LOCK_WAIT:\'$LOCK_WAIT\'
       fi
 
@@ -210,6 +215,12 @@ if [[ $CONTINUE == true ]] ; then
 
         if [[ $LOCKS -ne 0 && $LOCK_WAIT -gt 60000 ]] ; then
           LOCK_IDS=`db2 get snapshot for locks on $DATABASE_NAME | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
+
+          if [[ $VERBOSE == true ]] ; then
+            db2 get snapshot for locks on $DATABASE_NAME
+            echo LOCK_WAIT:\'$LOCK_WAIT\'
+          fi
+
           OUTPUT="DB2 - There are $LOCKS lock(s). The application handles are: $LOCK_IDS."
           RETURN=$CRITICAL
         else
