@@ -51,6 +51,8 @@
 # -h | --help : Show the help of this script.
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
+# --update : Update monitor switch before executing the command. It means that
+#   it does not inherit values from DBM configuration.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -79,7 +81,8 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName | -h | -V } [ -v ]"
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [--update] | -h 
+| -V } [ -v ]"
 }
 
 function print_help {
@@ -93,6 +96,7 @@ function print_help {
   echo "-h | --help : Shows the current documentation."
   echo "-v | --verbose : Executes the script in verbose mode."
   echo "-V | --version : Shows the current version of this script."
+  echo "--update : Update the monitor switch for lock before query."
 }
 
 # Variable to control the flow execution. Prevent Spaghetti code.
@@ -127,7 +131,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d: --long help,version,verbose,instance:,datbase: \
+TEMP=`getopt -o hVvi:d: --long help,version,verbose,instance:,datbase:,update \
              -n $APPL_NAME -- "$@"`
 
 if [ $? != 0 ] ; then
@@ -145,6 +149,7 @@ if [[ $CONTINUE == true ]] ; then
   VERBOSE=false
   INSTANCE_HOME=
   DATABASE_NAME=
+  UPDATE_MON=false
   while true; do
     case "$1" in
       -h | --help ) HELP=true; shift ;;
@@ -152,6 +157,7 @@ if [[ $CONTINUE == true ]] ; then
       -v | --verbose ) VERBOSE=true; shift ;;
       -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
       -d | --database ) DATABASE_NAME="$2"; shift 2 ;;
+      --update ) UPDATE_MON=true; shift ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
@@ -208,7 +214,12 @@ if [[ $CONTINUE == true ]] ; then
 
         db2 connect reset > /dev/null
 
-        LOCK_WAIT=`db2 update monitor switches using lock on > /dev/null ; db2 get snapshot for locks on $DATABASE_NAME | grep "Total wait time (ms)" | sort -rn | awk -F"= " '{print $2}' | head -1`
+        if [[ $UPDATE_MON == true ]] ; then
+          COMMAND_LOCK_WAIT="db2 update monitor switches using lock on > /dev/null ; db2 get snapshot for locks on $DATABASE_NAME"
+        else
+          COMMAND_LOCK_WAIT="db2 get snapshot for locks on $DATABASE_NAME"
+        fi
+        LOCK_WAIT=`$COMMAND_LOCK_WAIT | grep "Total wait time (ms)" | sort -rn | awk -F"= " '{print $2}' | head -1`
 
         if [[ $VERBOSE == true ]] ; then
           db2 get snapshot for locks on $DATABASE_NAME
