@@ -113,6 +113,9 @@ RETURN=$UNKNOWN
 # Long text Line 2 | Optional Perf Data Line 2
 # Optional Perf Data Line 3
 OUTPUT=
+PERFORMANCE=
+LONG_OUTPUT=
+LONG_PERFORMANCE=
 
 APPL_NAME=$0
 
@@ -156,8 +159,8 @@ if [[ $CONTINUE == true ]] ; then
   done
 
   if [[ $CONTINUE == true && $VERBOSE == true ]] ; then
-    echo help:$HELP, version:$VERSION, verbose:$VERBOSE
-    echo directory:$INSTANCE_HOME, database:$DATABASE_NAME
+    echo "help:$HELP, version:$VERSION, verbose:$VERBOSE,
+ directory:$INSTANCE_HOME, database:$DATABASE_NAME"
   fi
 
   if [[ $CONTINUE == true && $HELP == true ]] ; then
@@ -242,7 +245,8 @@ fi
 if [[ $OUTPUT == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
-echo $OUTPUT
+# Builds the output.
+echo "$OUTPUT|$PERFORMANCE\n$LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
 if [[ $VERBOSE == true ]] ; then
   echo Return code: $RETURN
