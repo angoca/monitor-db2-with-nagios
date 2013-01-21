@@ -18,8 +18,8 @@
 # limitations under the License.
 ###############################################################################
 
-# This query the status of the instance by retrieving the port number or
-# service name from the configuration, and then querying netstat to check if
+# This script queries the status of the instance by retrieving the port number
+# or service name from the configuration, and then querying netstat to check if
 # there is an associated service with that port.
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
@@ -109,6 +109,9 @@ RETURN=$UNKNOWN
 # Long text Line 2 | Optional Perf Data Line 2
 # Optional Perf Data Line 3
 OUTPUT=
+PERFORMANCE=
+LONG_OUTPUT=
+LONG_PERFORMANCE=
 
 APPL_NAME=$0
 
@@ -150,7 +153,8 @@ if [[ $CONTINUE == true ]] ; then
   done
 
   if [[ $CONTINUE == true && $VERBOSE == true ]] ; then
-    echo help:$HELP, version:$VERSION, verbose:$VERBOSE, directory:$INSTANCE_HOME
+    echo "help:$HELP, version:$VERSION, verbose:$VERBOSE,
+ directory:$INSTANCE_HOME"
   fi
 
   if [[ $CONTINUE == true && $HELP == true ]] ; then
@@ -168,10 +172,14 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
     print_usage $APPL_NAME
     RETURN=$UNKNOWN
-	CONTINUE=false
+    CONTINUE=false
   fi
 
   if [[ $CONTINUE == true ]] ; then
+
+    # Trims the characters.
+    INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
+
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
 
@@ -204,7 +212,7 @@ fi
 if [[ $OUTPUT == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
-echo $OUTPUT
+echo "$OUTPUT|$PERFORMANCE\n$LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
 if [[ $VERBOSE == true ]] ; then
   echo Return code: $RETURN
