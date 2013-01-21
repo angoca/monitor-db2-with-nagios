@@ -67,13 +67,20 @@ function print_help {
   print_revision
   print_usage $1
   # Max 80 chars width.
-  # TODO  Add a global description.
-  echo "-i | --instance : Instance home directory. It is usually \
-/home/db2inst1"
-  # TODO Add arguments in detail.
-  echo "-h | --help : Shows the current documentation."
-  echo "-v | --verbose : Executes the script in verbose mode."
-  echo "-V | --version : Shows the current version of this script."
+  /bin/cat <<__EOT
+TODO  Add a global description.
+TODO Add arguments in detail.
+-c | --critical INTEGER
+   TODO What is critical
+-d | --database STRING
+   Database name.
+-h | --help : Shows the current documentation.
+-i | --instance : Instance home directory. It is usually /home/db2inst1
+-v | --verbose : Executes the script in verbose mode.
+-V | --version : Shows the current version of this script.
+-w | --warning INTEGER
+   TODO What is warning
+__EOT
 }
 
 # Variable to control the flow execution. Prevent Spaghetti code.
@@ -124,23 +131,32 @@ if [[ $CONTINUE == true ]] ; then
 
   HELP=false
   VERSION=false
-  VERBOSE=false
+  # Verbosity level
+  VERBOSE=0
   INSTANCE_HOME=
+  DATABASE_NAME=
+  WARNING_THRES=1
+  CRITICAL_THRES=2
   while true; do
     case "$1" in
+      -c | --critical ) CRITICAL_THRES="$2"; shift 2 ;;
+      -d | --database ) DATABASE_NAME="$2"; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
+      -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=true; shift ;;
-      -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
+      -w | --warning ) WARNING_THRES="$2"; shift 2 ;;
       # TODO Validate any new argument.
       -- ) shift; break ;;
       * ) break ;;
     esac
   done
 
-  if [[ $CONTINUE == true && $VERBOSE == true ]] ; then
-    echo "help:$HELP, version:$VERSION, verbose:$VERBOSE,
- directory:$INSTANCE_HOME"
+  if [[ $CONTINUE == true && $VERBOSE -ge 2 ]] ; then
+    ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
+    ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
+    ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
+    echo $ECHO
   fi
 
   if [[ $CONTINUE == true && $HELP == true ]] ; then
@@ -161,10 +177,28 @@ if [[ $CONTINUE == true ]] ; then
     CONTINUE=false
   fi
 
+  if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
+    print_usage $APPL_NAME
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+
+  if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
+      || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
+      || $WARNING_THRES -eq 0 || $CRITICAL_THRES -eq 0
+      || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
+    print_usage $APPL_NAME
+    echo "Warning threshold should be less than critical threshold."
+    echo "Threshold should be greater than 0."
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+
   if [[ $CONTINUE == true ]] ; then
 
     # Trims the characters.
     INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
+    DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
 
     if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
       # Load the DB2 profile.
@@ -186,7 +220,7 @@ fi
 echo "$OUTPUT|$PERFORMANCE
 $LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
-if [[ $VERBOSE == true ]] ; then
+if [[ $VERBOSE -ge 2 ]] ; then
   echo Return code: $RETURN
 fi
 exit $RETURN
