@@ -77,7 +77,7 @@
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-01-18
+  echo v1.0 2013-01-21
 }
 # Function to show the help
 function print_usage {
