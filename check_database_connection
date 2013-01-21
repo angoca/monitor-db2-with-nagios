@@ -185,18 +185,24 @@ if [[ $CONTINUE == true ]] ; then
     INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
     DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
 
-    # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
 
-    db2 connect to $DATABASE_NAME > /dev/null
+      # Load the DB2 profile.
+      . $INSTANCE_HOME/sqllib/db2profile
 
-    if [[ $? -ne 0 ]] ; then
-      OUTPUT="DB2 - The database $DATABASE_NAME did not connect."
-      RETURN=$CRITICAL
+      db2 connect to $DATABASE_NAME > /dev/null
+
+      if [[ $? -ne 0 ]] ; then
+        OUTPUT="DB2 - The database $DATABASE_NAME did not connect."
+        RETURN=$CRITICAL
+      else
+        OUTPUT="DB2 - The database $DATABASE_NAME is available."
+        db2 connect reset > /dev/null
+        RETURN=$OK
+      fi
     else
-      OUTPUT="DB2 - The database $DATABASE_NAME is available."
-      db2 connect reset > /dev/null
-      RETURN=$OK
+      OUTPUT="DB2 - Instance directory is invalid."
+      RETURN=$UNKNOWN
     fi
   fi
 fi

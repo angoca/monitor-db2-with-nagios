@@ -180,30 +180,36 @@ if [[ $CONTINUE == true ]] ; then
     # Trims the characters.
     INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
 
-    # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
 
-    # Gets the service name configure in the instance. It could be a text or a number.
-    SVCNAME=`db2 get dbm cfg | grep SVCENAME | awk -F= '{print $2}' | sed "s/^[ \t]*//"`
-    # Copies the value in portnum, but checks later.
-    PORTNUM=$SVCNAME
+      # Load the DB2 profile.
+      . $INSTANCE_HOME/sqllib/db2profile
 
-    if ! [[ $SVCNAME =~ ^[0-9]+$ ]] ; then
-      # SVCNAME is a text, thus replace portnum.
-      # FIXME Real Regular expression should be "^$SVCNAME[ \t]"
-      REGEXP="^$SVCNAME "
-      PORTNUM=`grep -P $REGEXP /etc/services | awk '{print $2}' | awk -F/ '{print $1}'`
-    fi
+      # Gets the service name configure in the instance. It could be a text or a number.
+      SVCNAME=`db2 get dbm cfg | grep SVCENAME | awk -F= '{print $2}' | sed "s/^[ \t]*//"`
+      # Copies the value in portnum, but checks later.
+      PORTNUM=$SVCNAME
 
-    # Checks if the port has a active service associated.
-    PROC=`netstat -na | grep $PORTNUM | wc -l`
+      if ! [[ $SVCNAME =~ ^[0-9]+$ ]] ; then
+        # SVCNAME is a text, thus replace portnum.
+        # FIXME Real Regular expression should be "^$SVCNAME[ \t]"
+        REGEXP="^$SVCNAME "
+        PORTNUM=`grep -P $REGEXP /etc/services | awk '{print $2}' | awk -F/ '{print $1}'`
+      fi
 
-    if [[ $PROC -eq "0" ]] ; then
-      OUTPUT="DB2 - Instance at $INSTANCE_HOME is down."
-      RETURN=$CRITICAL
+      # Checks if the port has a active service associated.
+      PROC=`netstat -na | grep $PORTNUM | wc -l`
+
+      if [[ $PROC -eq "0" ]] ; then
+        OUTPUT="DB2 - Instance at $INSTANCE_HOME is down."
+        RETURN=$CRITICAL
+      else
+        OUTPUT="DB2 - Instance at $INSTANCE_HOME is up."
+        RETURN=$OK
+      fi
     else
-      OUTPUT="DB2 - Instance at $INSTANCE_HOME is up."
-      RETURN=$OK
+      OUTPUT="DB2 - Instance directory is invalid."
+      RETURN=$UNKNOWN
     fi
   fi
 fi

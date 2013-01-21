@@ -166,10 +166,15 @@ if [[ $CONTINUE == true ]] ; then
     # Trims the characters.
     INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
 
-    # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+      # Load the DB2 profile.
+      . $INSTANCE_HOME/sqllib/db2profile
 
-    # TODO add the logic
+      # TODO add the logic
+    else
+      OUTPUT="DB2 - Instance directory is invalid."
+      RETURN=$UNKNOWN
+    fi
   fi
 fi
 

@@ -23,8 +23,8 @@
 # NOTE: This script activates the monitor switches for lock automatically.
 #   db2 update monitor switches using lock on
 # TODO: Several verbose levels
-# TODO: Criterion for warning and creterion for error
-# TODO: Do not update monito all the times
+# TODO: Criterion for warning and creterion for error. To add the time to consider a log wait as warning and as critical.
+# TODO: Do not update monito all the times. Monitor switch activated by parameter, not always
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
@@ -45,7 +45,6 @@
 #
 #
 # Parameters:
-# TODO To add the time to consider a log wait as warning and as critical.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
 # -d | --database : Database name.
@@ -192,50 +191,56 @@ if [[ $CONTINUE == true ]] ; then
     INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
     DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
 
-    # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
 
-    db2 connect to $DATABASE_NAME > /dev/null
-    if [[ $? -eq 0 ]] ; then
+      # Load the DB2 profile.
+      . $INSTANCE_HOME/sqllib/db2profile
 
-      LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; db2 -x "select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database" | awk '{print $1}' ; db2 connect reset > /dev/null`
+      db2 connect to $DATABASE_NAME > /dev/null
+      if [[ $? -eq 0 ]] ; then
 
-      if [[ $VERBOSE == true ]] ; then
-        db2 -x "select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database" | awk '{print $1}'
-        echo LOCKS:\'$LOCKS\'
-      fi
+        LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; db2 -x "select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database" | awk '{print $1}' ; db2 connect reset > /dev/null`
 
-      db2 connect reset > /dev/null
+        if [[ $VERBOSE == true ]] ; then
+          db2 -x "select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database" | awk '{print $1}'
+          echo LOCKS:\'$LOCKS\'
+        fi
 
-      LOCK_WAIT=`db2 update monitor switches using lock on > /dev/null ; db2 get snapshot for locks on $DATABASE_NAME | grep "Total wait time (ms)" | sort -rn | awk -F"= " '{print $2}' | head -1`
+        db2 connect reset > /dev/null
 
-      if [[ $VERBOSE == true ]] ; then
-        db2 get snapshot for locks on $DATABASE_NAME
-        echo LOCK_WAIT:\'$LOCK_WAIT\'
-      fi
+        LOCK_WAIT=`db2 update monitor switches using lock on > /dev/null ; db2 get snapshot for locks on $DATABASE_NAME | grep "Total wait time (ms)" | sort -rn | awk -F"= " '{print $2}' | head -1`
 
-      if [[ $LOCK_WAIT != "Not Collected" ]] ; then
+        if [[ $VERBOSE == true ]] ; then
+          db2 get snapshot for locks on $DATABASE_NAME
+          echo LOCK_WAIT:\'$LOCK_WAIT\'
+        fi
 
-        if [[ $LOCKS -ne 0 && $LOCK_WAIT -gt 60000 ]] ; then
-          LOCK_IDS=`db2 get snapshot for locks on $DATABASE_NAME | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
+        if [[ $LOCK_WAIT != "Not Collected" ]] ; then
 
-          if [[ $VERBOSE == true ]] ; then
-            db2 get snapshot for locks on $DATABASE_NAME
-            echo LOCK_WAIT:\'$LOCK_WAIT\'
+          if [[ $LOCKS -ne 0 && $LOCK_WAIT -gt 60000 ]] ; then
+            LOCK_IDS=`db2 get snapshot for locks on $DATABASE_NAME | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
+
+            if [[ $VERBOSE == true ]] ; then
+              db2 get snapshot for locks on $DATABASE_NAME
+              echo LOCK_WAIT:\'$LOCK_WAIT\'
+            fi
+
+            OUTPUT="DB2 - There are $LOCKS lock(s). The application handles are: $LOCK_IDS."
+            RETURN=$CRITICAL
+          else
+            OUTPUT="DB2 - There is not any application in lock-wait state."
+            RETURN=$OK
           fi
-
-          OUTPUT="DB2 - There are $LOCKS lock(s). The application handles are: $LOCK_IDS."
-          RETURN=$CRITICAL
         else
-          OUTPUT="DB2 - There is not any application in lock-wait state."
-          RETURN=$OK
+          OUTPUT="DB2 - There are lock-waits, but the monitor switches are off."
+          RETURN=$UNKNOWN
         fi
       else
-        OUTPUT="DB2 - There are lock-waits, but the monitor switches are off."
+        OUTPUT="DB2 - Problem with the connection."
         RETURN=$UNKNOWN
       fi
     else
-      OUTPUT="DB2 - Problem with the connection."
+      OUTPUT="DB2 - Instance directory is invalid."
       RETURN=$UNKNOWN
     fi
   fi
