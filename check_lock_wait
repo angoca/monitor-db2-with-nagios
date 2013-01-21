@@ -22,8 +22,6 @@
 #
 # NOTE: This script activates the monitor switches for lock automatically.
 #   db2 update monitor switches using lock on
-# TODO: Several verbose levels
-# TODO: Criterion for warning and creterion for error. To add the time to consider a log wait as warning and as critical.
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
@@ -78,6 +76,7 @@
 
 # Version of this script.
 function print_revision {
+  echo Andres Gomez Casanova - AngocA
   echo v1.0 2013-01-18
 }
 # Function to show the help
@@ -90,18 +89,25 @@ function print_help {
   print_revision
   print_usage $1
   # Max 80 chars width.
-  echo "This script checks for long lock waits in the database."
-  echo "-c | --critical : Quantity of milliseconds to consider a lock-wait as \
-critical. (Default 60000)"
-  echo "-d | --database : Database name."
-  echo "-h | --help : Shows the current documentation."
-  echo "-i | --instance : Instance home directory. It is usually \
-/home/db2inst1"
-  echo "-v | --verbose : Executes the script in verbose mode."
-  echo "-V | --version : Shows the current version of this script."
-  echo "-w | --warning : Quantity of milliseconds to consider a lock-wait as \
-warning. (Default 10000)"
-  echo "--update : Update the monitor switch for lock before query."
+  /bin/cat <<__EOT
+This script checks for long lock waits in the database.
+-c | --critical INTEGER
+   Quantity of milliseconds to consider a lock-wait as critical (Default 60000)
+-d | --database STRING
+   Database name.
+-h | --help
+   Shows the current documentation.
+-i | --instance STRING
+   Instance home directory. It is usually /home/db2inst1
+-v | --verbose
+   Executes the script in verbose mode (multiple times).
+-V | --version
+   Shows the current version of this script.
+-w | --warning INTEGER
+   Quantity of milliseconds to consider a lock-wait as warning. (Default 10000)
+--update
+   Update the monitor switch for lock before query.
+__EOT
 }
 
 # Variable to control the flow execution. Prevent Spaghetti code.
@@ -151,7 +157,8 @@ if [[ $CONTINUE == true ]] ; then
 
   HELP=false
   VERSION=false
-  VERBOSE=false
+  # Verbosity level
+  VERBOSE=0
   INSTANCE_HOME=
   DATABASE_NAME=
   UPDATE_MON=false
@@ -164,7 +171,7 @@ if [[ $CONTINUE == true ]] ; then
       -h | --help ) HELP=true; shift ;;
       -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=true; shift ;;
+      -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
       -w | --warning ) WARNING_THRES="$2"; shift 2 ;;
       --update ) UPDATE_MON=true; shift ;;
       -- ) shift; break ;;
@@ -172,7 +179,7 @@ if [[ $CONTINUE == true ]] ; then
     esac
   done
 
-  if [[ $CONTINUE == true && $VERBOSE == true ]] ; then
+  if [[ $CONTINUE == true && $VERBOSE -ge 2 ]] ; then
     ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
     ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
     ECHO=$ECHO"update:$UPDATE_MON, warning:$WARNING_THRES, "
@@ -231,8 +238,10 @@ if [[ $CONTINUE == true ]] ; then
         COMMAND_LOCKS="db2 -x select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database"
         LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_LOCKS | awk '{print $1}' ; db2 connect reset > /dev/null`
 
-        if [[ $VERBOSE == true ]] ; then
+        if [[ $VERBOSE -ge 2 ]] ; then
           echo "COMMAND: $COMMAND_LOCKS"
+        fi
+        if [[ $VERBOSE -ge 3 ]] ; then 
           echo RESULT:\'$LOCKS\'
         fi
 
@@ -248,6 +257,8 @@ if [[ $CONTINUE == true ]] ; then
 
         if [[ $VERBOSE == true ]] ; then
           echo "COMMAND: $COMMAND_LOCK_WAIT"
+        fi
+        if [[ $VERBOSE -ge 3 ]] ; then 
           echo RESULT:\'$LOCK_WAIT\'
         fi
 
@@ -263,9 +274,10 @@ if [[ $CONTINUE == true ]] ; then
             LOCK_IDS=`$COMMAND_LOCK_IDS | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
           fi
 
-
           if [[ $VERBOSE == true ]] ; then
             echo "COMMAND: $COMMAND_LOCK_IDS"
+          fi
+          if [[ $VERBOSE -ge 3 ]] ; then 
             echo RESULT:\'$LOCK_IDS\'
           fi
 
@@ -280,6 +292,9 @@ if [[ $CONTINUE == true ]] ; then
           else
             OUTPUT="DB2 - There are short time locks."
             RETURN=$OK
+          fi
+          if [[ $VERBOSE == true ]] ; then
+            OUTPUT="$OUTPUT - IDs $LOCK_IDS"
           fi
         else
           OUTPUT="DB2 - There are lock-waits, but the monitor switches are off."
@@ -304,7 +319,7 @@ fi
 echo "$OUTPUT|$PERFORMANCE
 $LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
-if [[ $VERBOSE == true ]] ; then
+if [[ $VERBOSE -ge 2 ]] ; then
   echo Return code: $RETURN
 fi
 exit $RETURN
