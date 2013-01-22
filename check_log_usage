@@ -176,130 +176,130 @@ if [[ $CONTINUE == true ]] ; then
       * ) break ;;
     esac
   done
+fi
 
-  if [[ $CONTINUE == true && $VERBOSE -ge 2 ]] ; then
-    ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-    ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-    ECHO=$ECHO"update:$UPDATE_MON, warning:$WARNING_THRES, "
-    ECHO=$ECHO"critical:$CRITICAL_THRES"
-    echo $ECHO
-  fi
+if [[ $VERBOSE -ge 2 ]] ; then
+  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
+  ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
+  ECHO=$ECHO"update:$UPDATE_MON, warning:$WARNING_THRES, "
+  ECHO=$ECHO"critical:$CRITICAL_THRES"
+  echo $ECHO
+fi
 
-  if [[ $CONTINUE == true && $HELP == true ]] ; then
-    print_help $APPL_NAME
+if [[ $CONTINUE == true && $HELP == true ]] ; then
+  print_help $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $VERSION == true ]] ; then
+  print_revision $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
+    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
+    || $CRITICAL_THRES -eq 0
+    || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
+  print_usage $APPL_NAME
+  echo "Warning threshold should be less than critical threshold."
+  echo "Threshold should be greater than 0."    
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  # Trims the characters.
+  INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
+  DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
+
+  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+
+    # Load the DB2 profile.
+    . $INSTANCE_HOME/sqllib/db2profile
+
+  else
+    OUTPUT="DB2 - Instance directory is invalid."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
+fi
 
-  if [[ $CONTINUE == true && $VERSION == true ]] ; then
-    print_revision $APPL_NAME
+if [[ $CONTINUE == true ]] ; then
+  COMMAND_DATABASE="db2 list db directory"
+  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_DATABASE"
+  fi
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo RESULT:\'$DATABASE\'
+  fi
+
+  if [[ $DATABASE == "" ]] ; then
+    OUTPUT="DB2 - The database $DATABASE_NAME is not cataloged."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
+fi
 
-  if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-    print_usage $APPL_NAME
-    RETURN=$UNKNOWN
-    CONTINUE=false
+if [[ $CONTINUE == true ]] ; then
+  COMMAND_DB_CFG="db2 get db cfg for $DATABASE_NAME"
+  LOG_PRI=`$COMMAND_DB_CFG | grep LOGPRIMARY | awk -F"= " '{print $2}' | tail -1`
+  LOG_SEC=`$COMMAND_DB_CFG | grep LOGSECOND | awk -F"= " '{print $2}' | tail -1`
+  LOG_PATH=`$COMMAND_DB_CFG | grep "Path to log files" | awk -F"= " '{print $2}' | tail -1`
+
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_DB_CFG"
+  fi
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo RESULT LOG_PRI:\'$LOG_PRI\'
+    echo RESULT LOG_SEC:\'$LOG_SEC\'
+    echo RESULT LOG_PATH:\'$LOG_PATH\'
   fi
 
-  if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
-    print_usage $APPL_NAME
-    RETURN=$UNKNOWN
-    CONTINUE=false
+  LOG_TOT=`echo "$LOG_PRI+$LOG_SEC" | bc`
+  LOG_USED=`ls -l $LOG_PATH*LOG | wc -l`
+  SIZE=`echo "($LOG_PRI+($LOG_SEC/2))" | bc`
+
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo RESULT LOG_TOT:\'$LOG_TOT\'
+    echo RESULT LOG_USED:\'$LOG_USED\'
+    echo RESULT SIZE:\'$SIZE\'
   fi
 
-  if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
-      || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
-      || $CRITICAL_THRES -eq 0
-      || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
-    print_usage $APPL_NAME
-    echo "Warning threshold should be less than critical threshold."
-    echo "Threshold should be greater than 0."    
-    RETURN=$UNKNOWN
-    CONTINUE=false
-  fi
-
-  if [[ $CONTINUE == true ]] ; then
-    # Trims the characters.
-    INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
-    DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
-
-    if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
-
-      # Load the DB2 profile.
-      . $INSTANCE_HOME/sqllib/db2profile
-
-    else
-      OUTPUT="DB2 - Instance directory is invalid."
-      RETURN=$UNKNOWN
-      CONTINUE=false
-    fi
-  fi
-
-  if [[ $CONTINUE == true ]] ; then
-    COMMAND_DATABASE="db2 list db directory"
-    DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  if [[ $LOG_USED -lt $SIZE ]] ; then
+    OUTPUT="DB2 - The transaction log utilization is OK."
+    RETURN=$OK
+  elif [[ $LOG_USED -gt $SIZE && $LOG_USED -lt $LOG_TOT ]] ; then
+    OUTPUT="DB2 - Please check database transaction workload."
+    RETURN=$WARNING
+  else
+    COMMAND_LOG_ID="db2diag -gi msg:='The active log is full'"
+    LOG_ID=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}'`
+    LOG_COUNT=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}' | wc -l`
     if [[ $VERBOSE -ge 2 ]] ; then
-      echo "COMMAND: $COMMAND_DATABASE"
+      echo "COMMAND: $COMMAND_LOG_ID"
     fi
     if [[ $VERBOSE -ge 3 ]] ; then
-      echo RESULT:\'$DATABASE\'
+      echo RESULT LOG_ID:\'$LOG_ID\'
+      echo RESULT LOG_COUNT:\'$LOG_COUNT\'
     fi
-
-    if [[ $DATABASE == "" ]] ; then
-      OUTPUT="DB2 - The database $DATABASE_NAME is not cataloged."
-      RETURN=$UNKNOWN
-      CONTINUE=false
-    fi
-  fi
-
-  if [[ $CONTINUE == true ]] ; then
-    COMMAND_DB_CFG="db2 get db cfg for $DATABASE_NAME"
-    LOG_PRI=`$COMMAND_DB_CFG | grep LOGPRIMARY | awk -F"= " '{print $2}' | tail -1`
-    LOG_SEC=`$COMMAND_DB_CFG | grep LOGSECOND | awk -F"= " '{print $2}' | tail -1`
-    LOG_PATH=`$COMMAND_DB_CFG | grep "Path to log files" | awk -F"= " '{print $2}' | tail -1`
-
-    if [[ $VERBOSE -ge 2 ]] ; then
-      echo "COMMAND: $COMMAND_DB_CFG"
-    fi
-    if [[ $VERBOSE -ge 3 ]] ; then
-      echo RESULT LOG_PRI:\'$LOG_PRI\'
-      echo RESULT LOG_SEC:\'$LOG_SEC\'
-      echo RESULT LOG_PATH:\'$LOG_PATH\'
-    fi
-
-    LOG_TOT=`echo "$LOG_PRI+$LOG_SEC" | bc`
-    LOG_USED=`ls -l $LOG_PATH*LOG | wc -l`
-    SIZE=`echo "($LOG_PRI+($LOG_SEC/2))" | bc`
-
-    if [[ $VERBOSE -ge 3 ]] ; then
-      echo RESULT LOG_TOT:\'$LOG_TOT\'
-      echo RESULT LOG_USED:\'$LOG_USED\'
-      echo RESULT SIZE:\'$SIZE\'
-    fi
-
-    if [[ $LOG_USED -lt $SIZE ]] ; then
-      OUTPUT="DB2 - The transaction log utilization is OK."
-      RETURN=$OK
-    elif [[ $LOG_USED -gt $SIZE && $LOG_USED -lt $LOG_TOT ]] ; then
-      OUTPUT="DB2 - Please check database transaction workload."
-      RETURN=$WARNING
-    else
-      COMMAND_LOG_ID="db2diag -gi msg:='The active log is full'"
-      LOG_ID=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}'`
-      LOG_COUNT=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}' | wc -l`
-      if [[ $VERBOSE -ge 2 ]] ; then
-        echo "COMMAND: $COMMAND_LOG_ID"
-      fi
-      if [[ $VERBOSE -ge 3 ]] ; then
-        echo RESULT LOG_ID:\'$LOG_ID\'
-        echo RESULT LOG_COUNT:\'$LOG_COUNT\'
-      fi
-      if [[ $LOG_COUNT -ne "0" ]] ; then
-        OUTPUT="DB2 - There was occurrence of transaction log full due to application handle: $LOGID"   
-        RETURN=$CRITICAL
-      fi
+    if [[ $LOG_COUNT -ne "0" ]] ; then
+      OUTPUT="DB2 - There was occurrence of transaction log full due to application handle: $LOGID"   
+      RETURN=$CRITICAL
     fi
   fi
 fi
