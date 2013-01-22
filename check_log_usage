@@ -290,6 +290,7 @@ if [[ $CONTINUE == true ]] ; then
     COMMAND_LOG_ID="db2diag -gi msg:='The active log is full'"
     LOG_ID=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}'`
     LOG_COUNT=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}' | wc -l`
+
     if [[ $VERBOSE -ge 2 ]] ; then
       echo "COMMAND: $COMMAND_LOG_ID"
     fi
@@ -297,6 +298,7 @@ if [[ $CONTINUE == true ]] ; then
       echo RESULT LOG_ID:\'$LOG_ID\'
       echo RESULT LOG_COUNT:\'$LOG_COUNT\'
     fi
+
     if [[ $LOG_COUNT -ne "0" ]] ; then
       OUTPUT="DB2 - There was occurrence of transaction log full due to application handle: $LOGID"   
       RETURN=$CRITICAL
