@@ -260,12 +260,10 @@ if [[ $CONTINUE == true ]] ; then
      OUTPUT="DB2 - Normal quantity of connections."
      RETURN=$OK
   elif [[ $QTY -lt $CRITICAL_THRES ]] ; then
-     OUTPUT="DB2 - Quantity of connections is increasing."
-     LONG_OUTPUT="There are $QTY connections."
+     OUTPUT="DB2 - Quantity of connections is increasing, currently $QTY."
      RETURN=$WARNING
   else
-     OUTPUT="DB2 - Quantity of connections is critical."
-     LONG_OUTPUT="There are $QTY connections."
+     OUTPUT="DB2 - Quantity of connections is critical, currently $QTY."
      RETURN=$CRITICAL
   fi
 fi
