@@ -20,9 +20,6 @@
 
 # This script checks for long lock waits in the database.
 #
-# NOTE: This script activates the monitor switches for lock automatically.
-#   db2 update monitor switches using lock on
-#
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
 #
@@ -39,7 +36,6 @@
 #         check_command           check_lock_wait!-i /home/db2inst1!-d sample
 #         use                     generic-service
 # }
-#
 #
 # Parameters:
 # -c | --critical : Critical threshold in milliseconds.
