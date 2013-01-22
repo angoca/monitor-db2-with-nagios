@@ -78,7 +78,7 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w] | -h | -V } 
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w] # -h # -V } 
 [ -v ]"
 }
 
