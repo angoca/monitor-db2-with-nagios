@@ -1,0 +1,304 @@
+#! /usr/bin/env bash
+
+###############################################################################
+# Monitor DB2 with Nagios
+# Copyright 2013 Andres Gomez Casanova
+# https://github.com/angoca/monitor-db2-with-nagios
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+###############################################################################
+
+# This script analyzes the allocated and used space in a tablespace.
+#
+# This script was based on the plugins written by Felipe Alkain de Souza.
+# http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
+#
+# In order to be used in Nagios, you have to configure the following.
+#
+# # 'check_tablespace_size' command definition
+# define command {
+#         command_name    check_tablespace_size
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_tablespace_size '$ARG1$' '$ARG2$'"
+# }
+# define service{
+#         host_name               db2server
+#         service_description     Log usage
+#         check_command           check_tablespace_size!-i /home/db2inst1!-d sample!-n USERSPACE1
+#         use                     generic-service
+# }
+#
+# Parameters:
+# -c | --critical : Critical threshold in milliseconds.
+# -d | --database : Database name.
+# -h | --help : Show the help of this script.
+# -i | --instance : Home directory of the instance. Usually it is
+#   /home/db2inst1
+# -n | --name : Tablespace name
+# -V | --version : Show the current version of this script.
+# -v | --verbose : Execute the program in verbose mode.
+# -w | --warning : Warning threshold in milliseconds.
+# --id : Tablespace ID (instead of name)
+#
+# The exit codes are the standard for Nagios.
+#
+# 0 The plugin was able to check the service and it appeared to be functioning
+#   properly.
+# 1 The plugin was able to check the service, but it appeared to be above some
+#   "warning" threshold or did not appear to be working properly.
+# 2 The plugin detected that either the service was not running or it was above
+#   some "critical" threshold.
+# 3 Invalid command line arguments were supplied to the plugin or low-level
+#   failures internal to the plugin (such as unable to fork, or open a tcp
+#   socket) that prevent it from performing the specified operation.
+#   Higher-level errors (such as name resolution errors, socket timeouts, etc)
+#   are outside of the control of plugins and should generally NOT be reported
+#   as UNKNOWN states.
+#
+# Author: Andres Gomez Casanova
+# Version: v1.0 2013-01-18
+
+# Flag for debugging.
+#set -xv
+
+# Version of this script.
+function print_revision {
+  echo Andres Gomez Casanova - AngocA
+  echo v1.0 2013-01-18
+}
+# Function to show the help
+function print_usage {
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-n!--id] [-c][-w]
+! -h ! -V } [ -v ]"
+}
+
+function print_help {
+  print_revision
+  print_usage $1
+  # Max 80 chars width.
+  /bin/cat <<__EOT
+This script check the usage of a tablespace.
+-c | --critical INTEGER
+   Critical percentage of usage.
+-d | --database STRING
+   Database name.
+-h | --help
+   Shows the current documentation.
+-i | --instance STRING
+   Instance home directory. It is usually /home/db2inst1
+-n | --name STRING
+   Tablespace name to check.
+-v | --verbose
+   Executes the script in verbose mode (multiple times).
+-V | --version
+   Shows the current version of this script.
+-w | --warning INTEGER
+   Warning level of usage.
+--id
+   ID of the tablespace. This should be usage when the name is unknown.
+__EOT
+}
+
+# Variable to control the flow execution. Prevent Spaghetti code.
+CONTINUE=true
+
+# Nagios return codes
+OK=0
+WARNING=1
+CRITICAL=2
+UNKNOWN=3
+# This is the returned code.
+RETURN=$UNKNOWN
+
+# Nagios Output
+# Text output 80 chars | Optional Perf Data Line 1
+# Long text Line 1
+# Long text Line 2 | Optional Perf Data Line 2
+# Optional Perf Data Line 3
+OUTPUT=
+PERFORMANCE=
+LONG_OUTPUT=
+LONG_PERFORMANCE=
+
+APPL_NAME=$0
+
+if [ $# == 0 ] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+# The following requieres GNU getopt. See the following discusion.
+# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+
+TEMP=`getopt -o hVvi:d:c:w:n: --long help,version,verbose,instance:,database:,critical:,warning:,name:,id: \
+             -n $APPL_NAME -- "$@"`
+
+if [ $? != 0 ] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  # Note the quotes around $TEMP: they are essential!
+  eval set -- "$TEMP"
+
+  HELP=false
+  VERSION=false
+  # Verbosity level
+  VERBOSE=0
+  INSTANCE_HOME=
+  DATABASE_NAME=
+  WARNING_THRES=80
+  CRITICAL_THRES=90
+  TABLESPACE_NAME=
+  TABLESPACE_ID=
+  while true; do
+    case "$1" in
+      -c | --critical ) CRITICAL_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -h | --help ) HELP=true; shift ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -n | --name ) TABLESPACE_NAME=`echo $2 | awk '{print $1}'` ; shift 2 ;;
+      -V | --version ) VERSION=true; shift ;;
+      -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
+      -w | --warning ) WARNING_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      --id ) TABLESPACE_ID=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -- ) shift; break ;;
+      * ) break ;;
+    esac
+  done
+fi
+
+if [[ $VERBOSE -ge 2 ]] ; then
+  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
+  ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
+  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES, "
+  ECHO=$ECHO"ts_name:$TABLESPACE_NAME, ts_id:$TABLESPACE_ID"
+  echo $ECHO
+fi
+
+if [[ $CONTINUE == true && $HELP == true ]] ; then
+  print_help $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $VERSION == true ]] ; then
+  print_revision $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
+    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
+    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
+    || $WARNING_THRES -gt 100 || $CRITICAL_THRES -gt 100
+    || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
+  print_usage $APPL_NAME
+  echo "Warning threshold should be less than critical threshold."
+  echo "Threshold should be greater than 0 and less than 100."
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $TABLESPACE_NAME == "" && $TABLESPACE_ID == "" ]] ; then
+  print_usage $APPL_NAME
+  echo "Tablespace name or id should be provided."
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  # Trims the characters.
+  INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
+  DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
+
+  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+    # Load the DB2 profile.
+    . $INSTANCE_HOME/sqllib/db2profile
+  else
+    OUTPUT="DB2 - Instance directory is invalid."
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  COMMAND_DATABASE="db2 list db directory"
+  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_DATABASE"
+  fi
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo RESULT:\'$DATABASE\'
+  fi
+
+  if [[ $DATABASE == "" ]] ; then
+    OUTPUT="DB2 - The database $DATABASE_NAME is not cataloged."
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  if [[ $TABLESPACE_NAME != "" ]] ; then
+    COMMAND_SIZE="db2 -x select integer(decimal(TBSP_USED_PAGES, 10, 2) / decimal((case TBSP_TOTAL_PAGES when 0 then 1 else TBSP_TOTAL_PAGES end), 10, 2)*100) from SYSIBMADM.SNAPTBSP_PART where TBSP_NAME = '$TABLESPACE_NAME'"
+ else
+    COMMAND_SIZE="db2 -x select integer(decimal(TBSP_USED_PAGES, 10, 2) / decimal((case TBSP_TOTAL_PAGES when 0 then 1 else TBSP_TOTAL_PAGES end), 10, 2)*100) from SYSIBMADM.SNAPTBSP_PART where TBSP_ID = $TABLESPACE_ID"
+  fi
+  SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_SIZE"
+  fi
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo RESULT:\'$SIZE\'
+  fi
+
+  if [[ $SIZE -lt $WARNING_THRES ]] ; then
+    OUTPUT="Tablespace size is OK ($SIZE%)."
+    RETURN=$OK
+  elif [[ $SIZE -lt $CRITICAL_THRES ]] ; then
+    OUTPUT="Tablespace size is getting bigger ($SIZE%)."
+    RETURN=$WARNING
+  else
+    OUTPUT="Tablespace size is critical ($SIZE%)."
+    RETURN=$CRITICAL
+  fi
+fi
+
+# Prints the output.
+if [[ $OUTPUT == "" ]] ; then
+  OUTPUT="Note: The test was not executed."
+fi
+# Builds the output.
+echo "$OUTPUT|$PERFORMANCE
+$LONG_OUTPUT|$LONG_PERFORMANCE"
+# Returns the error code.
+if [[ $VERBOSE -ge 2 ]] ; then
+  echo Return code: $RETURN
+fi
+exit $RETURN
