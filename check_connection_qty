@@ -266,6 +266,7 @@ if [[ $CONTINUE == true ]] ; then
      OUTPUT="DB2 - Quantity of connections is critical, currently $QTY."
      RETURN=$CRITICAL
   fi
+  PERFORMANCE='connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES;0
 fi
 
 # Prints the output.
