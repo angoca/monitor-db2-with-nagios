@@ -18,7 +18,8 @@
 # limitations under the License.
 ###############################################################################
 
-# This script checks the quantity of connections to the database.
+# This script checks the quantity of connections on the database. The quantity
+# can be filtered by a given criterion, and inverted if wanted.
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
@@ -46,6 +47,8 @@
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
 # -w | --warning : Warning threshold in milliseconds.
+# --filter : Extra filter for the grep.
+# --inverted : Filter inverted.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -76,8 +79,8 @@ function print_revision {
 # Function to show the help
 function print_usage {
   # TODO Add arguments.
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w] # -h # -V } 
-[ -v ]"
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w][--filter
+[--inverted]] # -h # -V } [ -v ]"
 }
 
 function print_help {
@@ -100,6 +103,10 @@ This script check the quantity of established connections.
    Shows the current version of this script.
 -w | --warning INTEGER
    Quantity of connections to consider as warning.
+--filter STRING
+   Criterion to filter the data on.
+--inverted STRING
+   Filter inverted.
 __EOT
 }
 
@@ -135,7 +142,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,critical:,warning: \
+TEMP=`getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,critical:,warning:,filter:,inverted \
              -n $APPL_NAME -- "$@"`
 
 if [ $? != 0 ] ; then
@@ -156,6 +163,8 @@ if [[ $CONTINUE == true ]] ; then
   DATABASE_NAME=
   WARNING_THRES=5
   CRITICAL_THRES=10
+  FILTER=
+  FILTER_INVERTED=false
   while true; do
     case "$1" in
       -c | --critical ) CRITICAL_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
@@ -165,6 +174,8 @@ if [[ $CONTINUE == true ]] ; then
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
       -w | --warning ) WARNING_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      --filter ) FILTER=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      --inverted ) FILTER_INVERTED=true ; shift ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
@@ -174,7 +185,8 @@ fi
 if [[ $VERBOSE -ge 2 ]] ; then
   ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
   ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
+  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES, "
+  ECHO=$ECHO"filter:$FILTER, inverted:$FILTER_INVERTED"
   echo $ECHO
 fi
 
@@ -247,7 +259,17 @@ fi
 
 if [[ $CONTINUE == true ]] ; then
   QTY_COMMAND="db2 list applications"
-  QTY=`$QTY_COMMAND | grep $DATABASE | wc -l`
+  if [[ $FILTER != "" ]] ; then
+    if [[ $FILTER_INVERTED == true ]] ; then
+      QTY=`$QTY_COMMAND | grep $DATABASE | grep -iv $FILTER | wc -l`
+echo 1
+    else 
+      QTY=`$QTY_COMMAND | grep $DATABASE | grep -i $FILTER | wc -l`
+echo 2
+    fi
+  else
+    QTY=`$QTY_COMMAND | grep $DATABASE | wc -l`
+  fi
 
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $QTY_COMMAND"
@@ -266,7 +288,7 @@ if [[ $CONTINUE == true ]] ; then
      OUTPUT="DB2 - Quantity of connections is critical, currently $QTY."
      RETURN=$CRITICAL
   fi
-  PERFORMANCE='connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES;0
+  PERFORMANCE="'connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES;0"
 fi
 
 # Prints the output.
