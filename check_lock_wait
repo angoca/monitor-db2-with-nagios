@@ -232,80 +232,101 @@ if [[ $CONTINUE == true ]] ; then
       # Load the DB2 profile.
       . $INSTANCE_HOME/sqllib/db2profile
 
-      db2 connect to $DATABASE_NAME > /dev/null
-      if [[ $? -eq 0 ]] ; then
+    else
+      OUTPUT="DB2 - Instance directory is invalid."
+      RETURN=$UNKNOWN
+      CONTINUE=false
+    fi
+  fi
 
-        COMMAND_LOCKS="db2 -x select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database"
-        LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_LOCKS | awk '{print $1}' ; db2 connect reset > /dev/null`
+  if [[ $CONTINUE == TRUE ]] ; then
+    COMMAND_DATABASE="db2 list db directory"
+    DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+    if [[ $VERBOSE -ge 2 ]] ; then
+      echo "COMMAND: $COMMAND_DATABASE"
+    fi
+    if [[ $VERBOSE -ge 3 ]] ; then
+      echo RESULT:\'$DATABASE\'
+    fi
 
-        if [[ $VERBOSE -ge 2 ]] ; then
-          echo "COMMAND: $COMMAND_LOCKS"
-        fi
-        if [[ $VERBOSE -ge 3 ]] ; then 
-          echo RESULT:\'$LOCKS\'
-        fi
+    if [[ $DATABASE == "" ]] ; then
+      OUTPUT="DB2 - The database $DATABASE_NAME is not cataloged."
+      RETURN=$UNKNOWN
+      CONTINUE=false
+    fi
+  fi
 
-        db2 connect reset > /dev/null
+  if [[ $CONTINUE == true ]] ; then
+    db2 connect to $DATABASE_NAME > /dev/null
+    if [[ $? -eq 0 ]] ; then
 
-        COMMAND_LOCK_WAIT="db2 get snapshot for locks on $DATABASE_NAME"
+      COMMAND_LOCKS="db2 -x select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database"
+      LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_LOCKS | awk '{print $1}' ; db2 connect reset > /dev/null`
+
+      if [[ $VERBOSE -ge 2 ]] ; then
+        echo "COMMAND: $COMMAND_LOCKS"
+      fi
+      if [[ $VERBOSE -ge 3 ]] ; then 
+        echo RESULT:\'$LOCKS\'
+      fi
+
+      db2 connect reset > /dev/null
+
+      COMMAND_LOCK_WAIT="db2 get snapshot for locks on $DATABASE_NAME"
+      if [[ $UPDATE_MON == true ]] ; then
+        LOCK_WAIT=`db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_WAIT | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1` 
+        COMMAND_LOCK_WAIT="db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_WAIT"
+      else
+        LOCK_WAIT=`$COMMAND_LOCK_WAIT | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1`
+      fi
+
+      if [[ $VERBOSE == true ]] ; then
+        echo "COMMAND: $COMMAND_LOCK_WAIT"
+      fi
+      if [[ $VERBOSE -ge 3 ]] ; then 
+        echo RESULT:\'$LOCK_WAIT\'
+      fi
+
+      if [[ $LOCKS -eq 0 ]] ; then
+        OUTPUT="DB2 - There is not any application in lock-wait state."
+        RETURN=$OK
+      elif [[ $LOCK_WAIT != "Not Collected" ]] ; then
+        COMMAND_LOCK_IDS="db2 get snapshot for locks on $DATABASE_NAME"
         if [[ $UPDATE_MON == true ]] ; then
-          LOCK_WAIT=`db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_WAIT | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1` 
-          COMMAND_LOCK_WAIT="db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_WAIT"
+          LOCK_IDS=`db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_IDS | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
+          COMMAND_LOCK_IDS="db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_IDS"
         else
-          LOCK_WAIT=`$COMMAND_LOCK_WAIT | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1`
+          LOCK_IDS=`$COMMAND_LOCK_IDS | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
         fi
 
         if [[ $VERBOSE == true ]] ; then
-          echo "COMMAND: $COMMAND_LOCK_WAIT"
+          echo "COMMAND: $COMMAND_LOCK_IDS"
         fi
         if [[ $VERBOSE -ge 3 ]] ; then 
-          echo RESULT:\'$LOCK_WAIT\'
+          echo RESULT:\'$LOCK_IDS\'
         fi
 
-        if [[ $LOCKS -eq 0 ]] ; then
-          OUTPUT="DB2 - There is not any application in lock-wait state."
-          RETURN=$OK
-        elif [[ $LOCK_WAIT != "Not Collected" ]] ; then
-          COMMAND_LOCK_IDS="db2 get snapshot for locks on $DATABASE_NAME"
-          if [[ $UPDATE_MON == true ]] ; then
-            LOCK_IDS=`db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_IDS | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
-            COMMAND_LOCK_IDS="db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_IDS"
-          else
-            LOCK_IDS=`$COMMAND_LOCK_IDS | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
-          fi
-
-          if [[ $VERBOSE == true ]] ; then
-            echo "COMMAND: $COMMAND_LOCK_IDS"
-          fi
-          if [[ $VERBOSE -ge 3 ]] ; then 
-            echo RESULT:\'$LOCK_IDS\'
-          fi
-
-          if [[ $LOCK_WAIT -gt 60000 ]] ; then
-            OUTPUT="DB2 - There are $LOCKS application(s) in lock wait."
-            LONG_OUTPUT="The handles of the blocking applications are: $LOCK_IDS."
-            RETURN=$CRITICAL
-          elif [[ $LOCK_WAIT -gt 10000 ]] ; then
-            OUTPUT="DB2 - There are $LOCKS application(s) in lock wait."
-            LONG_OUTPUT="The handles of the blocking applications are: $LOCK_IDS."
-            RETURN=$WARNING
-          else
-            OUTPUT="DB2 - There are short time locks."
-            RETURN=$OK
-          fi
-          if [[ $VERBOSE == true ]] ; then
-            OUTPUT="$OUTPUT - IDs $LOCK_IDS"
-          fi
-        else
-          OUTPUT="DB2 - There are lock-waits, but the monitor switches are off."
+        if [[ $LOCK_WAIT -gt 60000 ]] ; then
+          OUTPUT="DB2 - There are $LOCKS application(s) in lock wait."
+          LONG_OUTPUT="The handles of the blocking applications are: $LOCK_IDS."
+          RETURN=$CRITICAL
+        elif [[ $LOCK_WAIT -gt 10000 ]] ; then
+          OUTPUT="DB2 - There are $LOCKS application(s) in lock wait."
+          LONG_OUTPUT="The handles of the blocking applications are: $LOCK_IDS."
           RETURN=$WARNING
+        else
+          OUTPUT="DB2 - There are short time locks."
+          RETURN=$OK
+        fi
+        if [[ $VERBOSE == true ]] ; then
+          OUTPUT="$OUTPUT - IDs $LOCK_IDS"
         fi
       else
-        OUTPUT="DB2 - Problem with the connection."
-        RETURN=$UNKNOWN
+        OUTPUT="DB2 - There are lock-waits, but the monitor switches are off."
+        RETURN=$WARNING
       fi
     else
-      OUTPUT="DB2 - Instance directory is invalid."
+      OUTPUT="DB2 - Problem with the connection."
       RETURN=$UNKNOWN
     fi
   fi
