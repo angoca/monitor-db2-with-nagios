@@ -21,6 +21,7 @@
 # This script checks the log usage to prevent log full conditions when there
 # are long transactions.
 #
+# TODO: User warn and crit values
 # TODO: Accept percentage for warn and crit
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
@@ -249,52 +250,55 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $DATABASE == "" ]] ; then
       OUTPUT="DB2 - The database $DATABASE_NAME is not cataloged."
       RETURN=$UNKNOWN
+      CONTINUE=false
+    fi
+  fi
+
+  if [[ $CONTINUE == true ]] ; then
+    COMMAND_DB_CFG="db2 get db cfg for $DATABASE_NAME"
+    LOG_PRI=`$COMMAND_DB_CFG | grep LOGPRIMARY | awk -F"= " '{print $2}' | tail -1`
+    LOG_SEC=`$COMMAND_DB_CFG | grep LOGSECOND | awk -F"= " '{print $2}' | tail -1`
+    LOG_PATH=`$COMMAND_DB_CFG | grep "Path to log files" | awk -F"= " '{print $2}' | tail -1`
+
+    if [[ $VERBOSE -ge 2 ]] ; then
+      echo "COMMAND: $COMMAND_DB_CFG"
+    fi
+    if [[ $VERBOSE -ge 3 ]] ; then
+      echo RESULT LOG_PRI:\'$LOG_PRI\'
+      echo RESULT LOG_SEC:\'$LOG_SEC\'
+      echo RESULT LOG_PATH:\'$LOG_PATH\'
+    fi
+
+    LOG_TOT=`echo "$LOG_PRI+$LOG_SEC" | bc`
+    LOG_USED=`ls -l $LOG_PATH*LOG | wc -l`
+    SIZE=`echo "($LOG_PRI+($LOG_SEC/2))" | bc`
+
+    if [[ $VERBOSE -ge 3 ]] ; then
+      echo RESULT LOG_TOT:\'$LOG_TOT\'
+      echo RESULT LOG_USED:\'$LOG_USED\'
+      echo RESULT SIZE:\'$SIZE\'
+    fi
+
+    if [[ $LOG_USED -lt $SIZE ]] ; then
+      OUTPUT="DB2 - The transaction log utilization is OK."
+      RETURN=$OK
+    elif [[ $LOG_USED -gt $SIZE && $LOG_USED -lt $LOG_TOT ]] ; then
+      OUTPUT="DB2 - Please check database transaction workload."
+      RETURN=$WARNING
     else
-      COMMAND_DB_CFG="db2 get db cfg for $DATABASE_NAME"
-      LOG_PRI=`$COMMAND_DB_CFG | grep LOGPRIMARY | awk -F"= " '{print $2}' | tail -1`
-      LOG_SEC=`$COMMAND_DB_CFG | grep LOGSECOND | awk -F"= " '{print $2}' | tail -1`
-      LOG_PATH=`$COMMAND_DB_CFG | grep "Path to log files" | awk -F"= " '{print $2}' | tail -1`
-
+      COMMAND_LOG_ID="db2diag -gi msg:='The active log is full'"
+      LOG_ID=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}'`
+      LOG_COUNT=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}' | wc -l`
       if [[ $VERBOSE -ge 2 ]] ; then
-        echo "COMMAND: $COMMAND_DB_CFG"
+        echo "COMMAND: $COMMAND_LOG_ID"
       fi
       if [[ $VERBOSE -ge 3 ]] ; then
-        echo RESULT LOG_PRI:\'$LOG_PRI\'
-        echo RESULT LOG_SEC:\'$LOG_SEC\'
-        echo RESULT LOG_PATH:\'$LOG_PATH\'
+        echo RESULT LOG_ID:\'$LOG_ID\'
+        echo RESULT LOG_COUNT:\'$LOG_COUNT\'
       fi
-
-      LOG_TOT=`echo "$LOG_PRI+$LOG_SEC" | bc`
-      LOG_USED=`ls -l $LOG_PATH*LOG | wc -l`
-      SIZE=`echo "($LOG_PRI+($LOG_SEC/2))" | bc`
-
-      if [[ $VERBOSE -ge 3 ]] ; then
-        echo RESULT LOG_TOT:\'$LOG_TOT\'
-        echo RESULT LOG_USED:\'$LOG_USED\'
-        echo RESULT SIZE:\'$SIZE\'
-      fi
-
-      if [[ $LOG_USED -lt $SIZE ]] ; then
-        OUTPUT="DB2 - The transaction log utilization is OK."
-        RETURN=$OK
-      elif [[ $LOG_USED -gt $SIZE && $LOG_USED -lt $LOG_TOT ]] ; then
-        OUTPUT="DB2 - Please check database transaction workload."
-        RETURN=$WARNING
-      else
-        COMMAND_LOG_ID="db2diag -gi msg:='The active log is full'"
-        LOG_ID=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}'`
-        LOG_COUNT=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}' | wc -l`
-        if [[ $VERBOSE -ge 2 ]] ; then
-          echo "COMMAND: $COMMAND_LOG_ID"
-        fi
-        if [[ $VERBOSE -ge 3 ]] ; then
-          echo RESULT LOG_ID:\'$LOG_ID\'
-          echo RESULT LOG_COUNT:\'$LOG_COUNT\'
-        fi
-        if [[ $LOG_COUNT -ne "0" ]] ; then
-          OUTPUT="DB2 - There was occurrence of transaction log full due to application handle: $LOGID"   
-          RETURN=$CRITICAL
-        fi
+      if [[ $LOG_COUNT -ne "0" ]] ; then
+        OUTPUT="DB2 - There was occurrence of transaction log full due to application handle: $LOGID"   
+        RETURN=$CRITICAL
       fi
     fi
   fi
