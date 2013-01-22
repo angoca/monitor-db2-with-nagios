@@ -21,7 +21,6 @@
 # This script checks the log usage to prevent log full conditions when there
 # are long transactions.
 #
-# TODO: User warn and crit values
 # TODO: Accept percentage for warn and crit
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
@@ -160,7 +159,7 @@ if [[ $CONTINUE == true ]] ; then
   INSTANCE_HOME=
   DATABASE_NAME=
   UPDATE_MON=false
-  WARNING_THRES=0
+  WARNING_THRES=1
   CRITICAL_THRES=50
   while true; do
     case "$1" in
@@ -212,7 +211,7 @@ fi
 
 if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
     || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
-    || $WARNING_THRES -lt 0 || $CRITICAL_THRES -le 0
+    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
     || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
   print_usage $APPL_NAME
   echo "Warning threshold should be less than critical threshold."
@@ -268,20 +267,20 @@ if [[ $CONTINUE == true ]] ; then
     echo RESULT LOG_PATH:\'$LOG_PATH\'
   fi
 
-  LOG_TOT=`echo "$LOG_PRI+$LOG_SEC" | bc`
   LOG_USED=`ls -l $LOG_PATH*LOG | wc -l`
-  SIZE=`echo "($LOG_PRI+($LOG_SEC/2))" | bc`
+  LOG_WARN=`echo "$LOG_PRI+$WARNING_THRES" | bc`
+  LOG_CRIT=`echo "$LOG_SEC+$CRITICAL_THRES" | bc`
 
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo RESULT LOG_TOT:\'$LOG_TOT\'
     echo RESULT LOG_USED:\'$LOG_USED\'
-    echo RESULT SIZE:\'$SIZE\'
+    echo RESULT LOG_WARN:\'$LOG_WARN\'
+    echo RESULT LOG_CRIT:\'$LOG_CRIT\'
   fi
 
-  if [[ $LOG_USED -lt $SIZE ]] ; then
+  if [[ $LOG_USED -le $LOG_WARN ]] ; then
     OUTPUT="DB2 - The transaction log utilization is OK."
     RETURN=$OK
-  elif [[ $LOG_USED -gt $SIZE && $LOG_USED -lt $LOG_TOT ]] ; then
+  elif [[ $LOG_USED -gt $LOG_WARN && $LOG_USED -lt $LOG_CRIT ]] ; then
     OUTPUT="DB2 - Please check database transaction workload."
     RETURN=$WARNING
   else
@@ -299,8 +298,10 @@ if [[ $CONTINUE == true ]] ; then
 
     if [[ $LOG_COUNT -ne "0" ]] ; then
       OUTPUT="DB2 - There was occurrence of transaction log full due to application handle: $LOGID"   
-      RETURN=$CRITICAL
+    else
+      OUTPUT="DB2 - Workload is reaching the limit."
     fi
+    RETURN=$CRITICAL
   fi
 fi
 
