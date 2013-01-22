@@ -44,9 +44,9 @@
 # name.
 #
 # Parameters:
+# -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
-# -h | --help : Show the help of this script.
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
 #
@@ -73,6 +73,7 @@
 
 # Version of this script.
 function print_revision {
+  echo Andres Gomez Casanova - AngocA
   echo v1.0 2013-01-18
 }
 # Function to show the help
@@ -84,12 +85,17 @@ function print_help {
   print_revision
   print_usage $1
   # Max 80 chars width.
-  echo "This script checks if the instance is active by querying netstats."
-  echo "-i | --instance : Instance home directory. It is usually \
-/home/db2inst1"
-  echo "-h | --help : Shows the current documentation."
-  echo "-v | --verbose : Executes the script in verbose mode."
-  echo "-V | --version : Shows the current version of this script."
+  /bin/cat <<__EOT
+This script checks if the instance is active by querying netstats.
+-h | --help
+   Shows the current documentation.
+-i | --instance STRING
+   Instance home directory. It is usually /home/db2inst1
+-v | --verbose
+   Executes the script in verbose mode (multiple times).
+-V | --version
+   Shows the current version of this script.
+__EOT
 }
 
 # Variable to control the flow execution. Prevent Spaghetti code.
@@ -139,78 +145,81 @@ if [[ $CONTINUE == true ]] ; then
 
   HELP=false
   VERSION=false
-  VERBOSE=false
+  # Verbosity level
+  VERBOSE=0
   INSTANCE_HOME=
   while true; do
     case "$1" in
       -h | --help ) HELP=true; shift ;;
-      -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=true; shift ;;
       -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
+      -V | --version ) VERSION=true; shift ;;
+      -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
   done
+fi
 
-  if [[ $CONTINUE == true && $VERBOSE == true ]] ; then
-    echo "help:$HELP, version:$VERSION, verbose:$VERBOSE,
- directory:$INSTANCE_HOME"
-  fi
+if [[ $VERBOSE -ge 2 ]] ; then
+  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
+  ECHO=$ECHO"directory:$INSTANCE_HOME"
+  echo $ECHO
+fi
 
-  if [[ $CONTINUE == true && $HELP == true ]] ; then
-    print_help $APPL_NAME
+if [[ $CONTINUE == true && $HELP == true ]] ; then
+  print_help $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $VERSION == true ]] ; then
+  print_revision $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  # Trims the characters.
+  INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
+
+  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+    # Load the DB2 profile.
+    . $INSTANCE_HOME/sqllib/db2profile
+  else
+    OUTPUT="DB2 - Instance directory is invalid."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
+fi
 
-  if [[ $CONTINUE == true && $VERSION == true ]] ; then
-    print_revision $APPL_NAME
-    RETURN=$UNKNOWN
-    CONTINUE=false
+if [[ $CONTINUE == true ]] ; then
+  # Gets the service name configure in the instance. It could be a text or a number.
+  SVCNAME=`db2 get dbm cfg | grep SVCENAME | awk -F= '{print $2}' | sed "s/^[ \t]*//"`
+  # Copies the value in portnum, but checks later.
+  PORTNUM=$SVCNAME
+
+  if ! [[ $SVCNAME =~ ^[0-9]+$ ]] ; then
+    # SVCNAME is a text, thus replace portnum.
+    # FIXME Real Regular expression should be "^$SVCNAME[ \t]"
+    REGEXP="^$SVCNAME "
+    PORTNUM=`grep -P $REGEXP /etc/services | awk '{print $2}' | awk -F/ '{print $1}'`
   fi
 
-  if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-    print_usage $APPL_NAME
-    RETURN=$UNKNOWN
-    CONTINUE=false
-  fi
+  # Checks if the port has a active service associated.
+  PROC=`netstat -na | grep $PORTNUM | wc -l`
 
-  if [[ $CONTINUE == true ]] ; then
-
-    # Trims the characters.
-    INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
-
-    if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
-
-      # Load the DB2 profile.
-      . $INSTANCE_HOME/sqllib/db2profile
-
-      # Gets the service name configure in the instance. It could be a text or a number.
-      SVCNAME=`db2 get dbm cfg | grep SVCENAME | awk -F= '{print $2}' | sed "s/^[ \t]*//"`
-      # Copies the value in portnum, but checks later.
-      PORTNUM=$SVCNAME
-
-      if ! [[ $SVCNAME =~ ^[0-9]+$ ]] ; then
-        # SVCNAME is a text, thus replace portnum.
-        # FIXME Real Regular expression should be "^$SVCNAME[ \t]"
-        REGEXP="^$SVCNAME "
-        PORTNUM=`grep -P $REGEXP /etc/services | awk '{print $2}' | awk -F/ '{print $1}'`
-      fi
-
-      # Checks if the port has a active service associated.
-      PROC=`netstat -na | grep $PORTNUM | wc -l`
-
-      if [[ $PROC -eq "0" ]] ; then
-        OUTPUT="DB2 - Instance at $INSTANCE_HOME is down."
-        RETURN=$CRITICAL
-      else
-        OUTPUT="DB2 - Instance at $INSTANCE_HOME is up."
-        RETURN=$OK
-      fi
-    else
-      OUTPUT="DB2 - Instance directory is invalid."
-      RETURN=$UNKNOWN
-    fi
+  if [[ $PROC -eq "0" ]] ; then
+    OUTPUT="DB2 - Instance at $INSTANCE_HOME is down."
+    RETURN=$CRITICAL
+  else
+    OUTPUT="DB2 - Instance at $INSTANCE_HOME is up."
+    RETURN=$OK
   fi
 fi
 
@@ -222,7 +231,7 @@ fi
 echo "$OUTPUT|$PERFORMANCE
 $LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
-if [[ $VERBOSE == true ]] ; then
+if [[ $VERBOSE -ge 2 ]] ; then
   echo Return code: $RETURN
 fi
 exit $RETURN

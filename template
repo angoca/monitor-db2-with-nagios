@@ -26,11 +26,14 @@
 # TODO Nagios usage.
 #
 # Parameters:
+# -c | --critical : Critical threshold in milliseconds.
+# -d | --database : Database name.
+# -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
-# -h | --help : Show the help of this script.
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
+# -w | --warning : Warning threshold in milliseconds.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -55,12 +58,14 @@
 
 # Version of this script.
 function print_revision {
+  echo Andres Gomez Casanova - AngocA
   echo v1.0 2013-01-18
 }
 # Function to show the help
 function print_usage {
   # TODO Add arguments.
-  echo "Usage: $1 { -i instanceHomeDirectory | -h | -V } [ -v ]"
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w] | -h | -V } 
+[ -v ]"
 }
 
 function print_help {
@@ -68,16 +73,20 @@ function print_help {
   print_usage $1
   # Max 80 chars width.
   /bin/cat <<__EOT
-TODO  Add a global description.
+TODO Add a global description.
 TODO Add arguments in detail.
 -c | --critical INTEGER
    TODO What is critical
 -d | --database STRING
    Database name.
--h | --help : Shows the current documentation.
--i | --instance : Instance home directory. It is usually /home/db2inst1
--v | --verbose : Executes the script in verbose mode.
--V | --version : Shows the current version of this script.
+-h | --help
+   Shows the current documentation.
+-i | --instance STRING
+   Instance home directory. It is usually /home/db2inst1
+-v | --verbose
+   Executes the script in verbose mode (multiple times).
+-V | --version
+   Shows the current version of this script.
 -w | --warning INTEGER
    TODO What is warning
 __EOT
@@ -116,7 +125,7 @@ fi
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
 # TODO Add the arguments here. One char in -o, multiple char in -long.
-TEMP=`getopt -o hVvi: --long help,version,verbose,instance: \
+TEMP=`getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,critical:,warning: \
              -n $APPL_NAME -- "$@"`
 
 if [ $? != 0 ] ; then
@@ -144,72 +153,91 @@ if [[ $CONTINUE == true ]] ; then
       -h | --help ) HELP=true; shift ;;
       -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=true; shift ;;
+      -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
       -w | --warning ) WARNING_THRES="$2"; shift 2 ;;
       # TODO Validate any new argument.
       -- ) shift; break ;;
       * ) break ;;
     esac
   done
+fi
 
-  if [[ $CONTINUE == true && $VERBOSE -ge 2 ]] ; then
-    ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-    ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-    ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
-    echo $ECHO
-  fi
+if [[ $VERBOSE -ge 2 ]] ; then
+  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
+  ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
+  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
+  echo $ECHO
+fi
 
-  if [[ $CONTINUE == true && $HELP == true ]] ; then
-    print_help $APPL_NAME
+if [[ $CONTINUE == true && $HELP == true ]] ; then
+  print_help $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $VERSION == true ]] ; then
+  print_revision $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
+    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
+    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
+    || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
+  print_usage $APPL_NAME
+  echo "Warning threshold should be less than critical threshold."
+  echo "Threshold should be greater than 0."
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  # Trims the characters.
+  INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
+  DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
+
+  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+    # Load the DB2 profile.
+    . $INSTANCE_HOME/sqllib/db2profile
+  else
+    OUTPUT="DB2 - Instance directory is invalid."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
+fi
 
-  if [[ $CONTINUE == true && $VERSION == true ]] ; then
-    print_revision $APPL_NAME
+if [[ $CONTINUE == true ]] ; then
+  COMMAND_DATABASE="db2 list db directory"
+  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_DATABASE"
+  fi
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo RESULT:\'$DATABASE\'
+  fi
+
+  if [[ $DATABASE == "" ]] ; then
+    OUTPUT="DB2 - The database $DATABASE_NAME is not cataloged."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
+fi
 
-  if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-    print_usage $APPL_NAME
-    RETURN=$UNKNOWN
-    CONTINUE=false
-  fi
-
-  if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
-    print_usage $APPL_NAME
-    RETURN=$UNKNOWN
-    CONTINUE=false
-  fi
-
-  if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
-      || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
-      || $WARNING_THRES -eq 0 || $CRITICAL_THRES -eq 0
-      || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
-    print_usage $APPL_NAME
-    echo "Warning threshold should be less than critical threshold."
-    echo "Threshold should be greater than 0."
-    RETURN=$UNKNOWN
-    CONTINUE=false
-  fi
-
-  if [[ $CONTINUE == true ]] ; then
-
-    # Trims the characters.
-    INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
-    DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
-
-    if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
-      # Load the DB2 profile.
-      . $INSTANCE_HOME/sqllib/db2profile
-
-      # TODO add the logic
-    else
-      OUTPUT="DB2 - Instance directory is invalid."
-      RETURN=$UNKNOWN
-    fi
-  fi
+if [[ $CONTINUE == true ]] ; then
+  # TODO add the logic
 fi
 
 # Prints the output.

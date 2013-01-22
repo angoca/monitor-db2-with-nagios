@@ -142,7 +142,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,datbase:,update,critical:,warning: \
+TEMP=`getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,update,critical:,warning: \
              -n $APPL_NAME -- "$@"`
 
 if [ $? != 0 ] ; then
@@ -183,8 +183,8 @@ fi
 if [[ $VERBOSE -ge 2 ]] ; then
   ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
   ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-  ECHO=$ECHO"update:$UPDATE_MON, warning:$WARNING_THRES, "
-  ECHO=$ECHO"critical:$CRITICAL_THRES"
+  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
+  ECHO=$ECHO"update:$UPDATE_MON"
   echo $ECHO
 fi
 
@@ -218,7 +218,7 @@ if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
     || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
   print_usage $APPL_NAME
   echo "Warning threshold should be less than critical threshold."
-  echo "Threshold should be greater than 0."    
+  echo "Threshold should be greater than 0."
   RETURN=$UNKNOWN
   CONTINUE=false
 fi
@@ -229,10 +229,8 @@ if [[ $CONTINUE == true ]] ; then
   DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
 
   if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
-
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
-
   else
     OUTPUT="DB2 - Instance directory is invalid."
     RETURN=$UNKNOWN
@@ -240,7 +238,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
 fi
 
-if [[ $CONTINUE == TRUE ]] ; then
+if [[ $CONTINUE == true ]] ; then
   COMMAND_DATABASE="db2 list db directory"
   DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
   if [[ $VERBOSE -ge 2 ]] ; then
