@@ -28,12 +28,12 @@
 # # 'check_database_connection' command definition
 # define command {
 #         command_name    check_database_connection
-#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_database_connection '$ARG1$' '$ARG2$'"
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_database_connection -i '$ARG1$' -d '$ARG2$'"
 # }
 # define service{
 #         host_name               db2server
 #         service_description     Database conectivity
-#         check_command           check_database_connection!-i /home/db2inst1!-d sample
+#         check_command           check_database_connection!/home/db2inst1!sample
 #         use                     generic-service
 # }
 #

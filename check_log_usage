@@ -31,12 +31,12 @@
 # # 'check_log_usage' command definition
 # define command {
 #         command_name    check_log_usage
-#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_log_usage '$ARG1$' '$ARG2$'"
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_log_usage -i '$ARG1$' -d '$ARG2$'"
 # }
 # define service{
 #         host_name               db2server
 #         service_description     Log usage
-#         check_command           check_log_usage!-i /home/db2inst1!-d sample
+#         check_command           check_log_usage!/home/db2inst1!sample
 #         use                     generic-service
 # }
 #

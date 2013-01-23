@@ -30,12 +30,12 @@
 # # 'check_instance_up' command definition
 # define command {
 #         command_name    check_instance_up
-#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_instance_up '$ARG1$'"
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_instance_up -i '$ARG1$'"
 # }
 # define service{
 #         host_name               db2server
 #         service_description     Instance status
-#         check_command           check_instance_up!-i /home/db2inst1
+#         check_command           check_instance_up!/home/db2inst1
 #         use                     generic-service
 # }
 #

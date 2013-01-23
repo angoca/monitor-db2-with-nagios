@@ -29,12 +29,12 @@
 # # 'check_connection_qty' command definition
 # define command {
 #         command_name    check_connection_qty
-#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_connection_qty '$ARG1$' '$ARG2$' '$ARG3$' '$ARG4$'"
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_connection_qty -i '$ARG1$' -d '$ARG2$' -w '$ARG3$' -c '$ARG4$'"
 # }
 # define service{
 #         host_name               db2server
 #         service_description     Quantity of current connections
-#         check_command           check_connection_qty!-i /home/db2inst1!-d sample!-w 5!-c 10
+#         check_command           check_connection_qty!/home/db2inst1!sample!5!10
 #         use                     generic-service
 # }
 #

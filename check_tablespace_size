@@ -20,6 +20,10 @@
 
 # This script analyzes the allocated and used space in a tablespace.
 #
+# TODO: Si el tablespace quiesce, recuperar el tamagno.
+# TODO: si el tablespace es SMS o automatico, no generar alarmas, indicar que DB2 lo aumentara.
+# TODO: Tablespaces in HADR should reflect the same values in both machines.
+#
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
 #
@@ -28,12 +32,12 @@
 # # 'check_tablespace_size' command definition
 # define command {
 #         command_name    check_tablespace_size
-#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_tablespace_size '$ARG1$' '$ARG2$'"
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_tablespace_size -i '$ARG1$' -d '$ARG2$' -n '$ARG3$'"
 # }
 # define service{
 #         host_name               db2server
-#         service_description     Log usage
-#         check_command           check_tablespace_size!-i /home/db2inst1!-d sample!-n USERSPACE1
+#         service_description     Tablespace usage
+#         check_command           check_tablespace_size!/home/db2inst1!sample!USERSPACE1
 #         use                     generic-service
 # }
 #
