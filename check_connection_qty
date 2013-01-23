@@ -262,10 +262,8 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $FILTER != "" ]] ; then
     if [[ $FILTER_INVERTED == true ]] ; then
       QTY=`$QTY_COMMAND | grep $DATABASE | grep -iv $FILTER | wc -l`
-echo 1
     else 
       QTY=`$QTY_COMMAND | grep $DATABASE | grep -i $FILTER | wc -l`
-echo 2
     fi
   else
     QTY=`$QTY_COMMAND | grep $DATABASE | wc -l`
