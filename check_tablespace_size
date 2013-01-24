@@ -342,7 +342,7 @@ if [[ $CONTINUE == true ]] ; then
         OUTPUT="Tablespace size is getting bigger ($SIZE% - Auto resize)."
         RETURN=$OK
       else
-        OUTPUT="Tablespace size is critical. It should be resized automatically ($SIZE% i - Auto reisze)."
+        OUTPUT="Tablespace size is critical. It should be resized automatically ($SIZE% - Auto reisze)."
         RETURN=$OK
       fi
     else
@@ -358,6 +358,45 @@ if [[ $CONTINUE == true ]] ; then
       fi
     fi
   fi
+  
+  #Availability
+  if [[ $TABLESPACE_NAME != "" ]] ; then
+    COMMAND_SIZE="db2 -x select TBSP_STATE from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
+  else
+    COMMAND_SIZE="db2 -x select TBSP_STATE from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
+  fi
+  STATUS=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_SIZE"
+  fi
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo RESULT:\'$STATUS\'
+  fi
+
+  if [[ $STATUS != "NORMAL" ]] ; then
+    OUTPUT="State not normal ($STATUS). "$OUTPUT
+    if [[ $RETURN == $OK ]] ; then
+      RETURN=$WARNING
+    fi
+  fi
+  
+  # Performancee data
+  if [[ $TABLESPACE_NAME != "" ]] ; then
+    COMMAND_SIZE="db2 -x select TBSP_USED_SIZE_KB from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
+  else
+    COMMAND_SIZE="db2 -x select TBSP_USED_SIZE_KB from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
+  fi
+  KBYTES=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_SIZE"
+  fi
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo RESULT:\'$KBYTES\'
+  fi
+
+  PERFORMANCE="$KBYTES KB"
 fi
 
 # Prints the output.
