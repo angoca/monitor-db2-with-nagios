@@ -39,10 +39,6 @@
 #         use                     generic-service
 # }
 #
-# FIXME: The regular expression to check the service name does not work, and
-# if the file has tabs instead of spaces, it could fail to find the instance
-# name.
-#
 # Parameters:
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
@@ -206,8 +202,7 @@ if [[ $CONTINUE == true ]] ; then
 
   if ! [[ $SVCNAME =~ ^[0-9]+$ ]] ; then
     # SVCNAME is a text, thus replace portnum.
-    # FIXME Real Regular expression should be "^$SVCNAME[ \t]"
-    REGEXP="^$SVCNAME "
+    REGEXP="^$SVCNAME\s"
     PORTNUM=`grep -P $REGEXP /etc/services | awk '{print $2}' | awk -F/ '{print $1}'`
   fi
 
