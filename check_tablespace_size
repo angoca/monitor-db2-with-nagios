@@ -269,9 +269,9 @@ fi
 
 if [[ $CONTINUE == true ]] ; then
   if [[ $TABLESPACE_NAME != "" ]] ; then
-    COMMAND_SIZE="db2 -x select integer(decimal(TBSP_USED_PAGES, 10, 2) / decimal((case TBSP_TOTAL_PAGES when 0 then 1 else TBSP_TOTAL_PAGES end), 10, 2)*100) from SYSIBMADM.SNAPTBSP_PART where TBSP_NAME = '$TABLESPACE_NAME'"
- else
-    COMMAND_SIZE="db2 -x select integer(decimal(TBSP_USED_PAGES, 10, 2) / decimal((case TBSP_TOTAL_PAGES when 0 then 1 else TBSP_TOTAL_PAGES end), 10, 2)*100) from SYSIBMADM.SNAPTBSP_PART where TBSP_ID = $TABLESPACE_ID"
+    COMMAND_SIZE="db2 -x select integer(TBSP_UTILIZATION_PERCENT) from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
+  else
+    COMMAND_SIZE="db2 -x select integer(TBSP_UTILIZATION_PERCENT) from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
   fi
   SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
@@ -282,15 +282,81 @@ if [[ $CONTINUE == true ]] ; then
     echo RESULT:\'$SIZE\'
   fi
 
-  if [[ $SIZE -lt $WARNING_THRES ]] ; then
-    OUTPUT="Tablespace size is OK ($SIZE%)."
-    RETURN=$OK
-  elif [[ $SIZE -lt $CRITICAL_THRES ]] ; then
-    OUTPUT="Tablespace size is getting bigger ($SIZE%)."
-    RETURN=$WARNING
+  if [[ $TABLESPACE_NAME != "" ]] ; then
+    COMMAND_SIZE="db2 -x select TBSP_TYPE from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
   else
-    OUTPUT="Tablespace size is critical ($SIZE%)."
-    RETURN=$CRITICAL
+    COMMAND_SIZE="db2 -x select TBSP_TYPE from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
+  fi
+  TYPE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_SIZE"
+  fi
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo RESULT:\'$TYPE\'
+  fi
+
+  if [[ $TYPE == "SMS" ]] ; then
+    if [[ $SIZE -lt $WARNING_THRES ]] ; then
+      OUTPUT="Tablespace size is OK (SMS)."
+      RETURN=$OK
+    else
+      OUTPUT="Script error for SMS tablespace."
+      RETURN=$CRITICAL
+    fi
+  else
+    # Tablespace should be DMS
+    if [[ $TABLESPACE_NAME != "" ]] ; then
+      COMMAND_SIZE="db2 -x select TBSP_USING_AUTO_STORAGE from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
+    else
+      COMMAND_SIZE="db2 -x select TBSP_USING_AUTO_STORAGE from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
+    fi
+    AUTO=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
+    if [[ $VERBOSE -ge 2 ]] ; then
+      echo "COMMAND: $COMMAND_SIZE"
+    fi
+    if [[ $VERBOSE -ge 3 ]] ; then
+      echo RESULT:\'$AUTO\'
+    fi
+
+    if [[ $TABLESPACE_NAME != "" ]] ; then
+      COMMAND_SIZE="db2 -x select TBSP_AUTO_RESIZE_ENABLED from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
+    else
+      COMMAND_SIZE="db2 -x select TBSP_AUTO_RESIZE_ENABLED from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
+    fi
+    RESIZE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
+    if [[ $VERBOSE -ge 2 ]] ; then
+      echo "COMMAND: $COMMAND_SIZE"
+    fi
+    if [[ $VERBOSE -ge 3 ]] ; then
+      echo RESULT:\'$RESIZE\'
+    fi
+
+    if [[ $AUTO -eq "1" || $RESIZE -eq "1" ]] ; then
+      if [[ $SIZE -lt $WARNING_THRES ]] ; then
+        OUTPUT="Tablespace size is OK ($SIZE% - Auto resize)."
+        RETURN=$OK
+      elif [[ $SIZE -lt $CRITICAL_THRES ]] ; then
+        OUTPUT="Tablespace size is getting bigger ($SIZE% - Auto resize)."
+        RETURN=$OK
+      else
+        OUTPUT="Tablespace size is critical. It should be resized automatically ($SIZE% i - Auto reisze)."
+        RETURN=$OK
+      fi
+    else
+      if [[ $SIZE -lt $WARNING_THRES ]] ; then
+        OUTPUT="Tablespace size is OK ($SIZE%)."
+        RETURN=$OK
+      elif [I[ $SIZE -lt $CRITICAL_THRES ]] ; then
+        OUTPUT="Tablespace size is getting bigger ($SIZE%)."
+        RETURN=$WARNING
+      else
+        OUTPUT="Tablespace size is critical ($SIZE%)."
+        RETURN=$CRITICAL
+      fi
+    fi
   fi
 fi
 
