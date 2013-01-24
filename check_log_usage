@@ -22,6 +22,8 @@
 # are long transactions.
 #
 # TODO: Accept percentage for warn and crit
+# TODO: When using check_by_ssh plugin, db2diag does not retrieve an answer for
+# the provided string, and it hungs.
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
