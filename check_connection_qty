@@ -277,7 +277,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   if [[ $QTY -lt $WARNING_THRES ]] ; then
-     OUTPUT="DB2 - Normal quantity of connections."
+     OUTPUT="DB2 - Normal quantity of connections ($QTY)."
      RETURN=$OK
   elif [[ $QTY -lt $CRITICAL_THRES ]] ; then
      OUTPUT="DB2 - Quantity of connections is increasing, currently $QTY."
