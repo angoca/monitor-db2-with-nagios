@@ -279,13 +279,31 @@ if [[ $CONTINUE == true ]] ; then
     echo RESULT LOG_CRIT:\'$LOG_CRIT\'
   fi
 
-  if [[ $LOG_USED -le $LOG_WARN ]] ; then
-    OUTPUT="DB2 - The transaction log utilization is OK."
+  COMMAND_HADR="db2pd -db $DATABASE_NAME -hadr"
+  RESULT_HARD=`$COMMAND_HADR | awk '/Standby/ && !/Active/ {print $1}'`
+
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_HADR"
+  fi
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo RESULT HADR:\'$RESULT_HARD\'
+  fi
+
+  if [[ $RESULT_HARD == "Standby" ]] ; then
+    HADR=true
+  fi
+
+  if [[ $HADR == true ]] ; then
+    OUTPUT="DB2 - HADR is using the whole space for logs."
     RETURN=$OK
-  elif [[ $LOG_USED -gt $LOG_WARN && $LOG_USED -lt $LOG_CRIT ]] ; then
-    OUTPUT="DB2 - Please check database transaction workload."
-    RETURN=$WARNING
   else
+    if [[ $LOG_USED -le $LOG_WARN ]] ; then
+      OUTPUT="DB2 - The transaction log utilization is OK."
+      RETURN=$OK
+    elif [[ $LOG_USED -gt $LOG_WARN && $LOG_USED -lt $LOG_CRIT ]] ; then
+      OUTPUT="DB2 - Please check database transaction workload."
+      RETURN=$WARNING
+    else
     # TODO db2diag command does not function as desired.
     #COMMAND_LOG_ID="db2diag -gi msg:=\"The active log is full\""
     #LOG_ID=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}'`
@@ -304,7 +322,8 @@ if [[ $CONTINUE == true ]] ; then
     #else
       OUTPUT="DB2 - Workload is reaching the limit."
     #fi
-    RETURN=$CRITICAL
+      RETURN=$CRITICAL
+    fi
   fi
 fi
 
