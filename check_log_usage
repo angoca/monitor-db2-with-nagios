@@ -301,7 +301,7 @@ if [[ $CONTINUE == true ]] ; then
       OUTPUT="DB2 - The transaction log utilization is OK."
       RETURN=$OK
     elif [[ $LOG_USED -gt $LOG_WARN && $LOG_USED -lt $LOG_CRIT ]] ; then
-      OUTPUT="DB2 - Please check database transaction workload."
+      OUTPUT="DB2 - Please check database transaction workload ($LOG_USED files)."
       RETURN=$WARNING
     else
     # TODO db2diag command does not function as desired.
@@ -320,7 +320,7 @@ if [[ $CONTINUE == true ]] ; then
     #if [[ $LOG_COUNT -ne "0" ]] ; then
     #  OUTPUT="DB2 - There was occurrence of transaction log full due to application handle: $LOGID"   
     #else
-      OUTPUT="DB2 - Workload is reaching the limit."
+      OUTPUT="DB2 - Workload is reaching the limit ($LOG_USED files)."
     #fi
       RETURN=$CRITICAL
     fi
