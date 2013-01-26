@@ -252,10 +252,10 @@ fi
 
 if [[ $CONTINUE == true ]] ; then
   COMMAND_DATABASE="db2 list db directory"
-  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DATABASE"
   fi
+  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$DATABASE\'
   fi
@@ -273,11 +273,11 @@ if [[ $CONTINUE == true ]] ; then
   else
     COMMAND_SIZE="db2 -x select integer(TBSP_UTILIZATION_PERCENT) from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
   fi
-  SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
-
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
+  SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$SIZE\'
   fi
@@ -287,11 +287,11 @@ if [[ $CONTINUE == true ]] ; then
   else
     COMMAND_SIZE="db2 -x select TBSP_TYPE from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
   fi
-  TYPE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
-
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
+  TYPE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$TYPE\'
   fi
@@ -311,11 +311,11 @@ if [[ $CONTINUE == true ]] ; then
     else
       COMMAND_SIZE="db2 -x select TBSP_USING_AUTO_STORAGE from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
     fi
-    AUTO=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
-
     if [[ $VERBOSE -ge 2 ]] ; then
       echo "COMMAND: $COMMAND_SIZE"
     fi
+    AUTO=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
     if [[ $VERBOSE -ge 3 ]] ; then
       echo RESULT:\'$AUTO\'
     fi
@@ -325,11 +325,11 @@ if [[ $CONTINUE == true ]] ; then
     else
       COMMAND_SIZE="db2 -x select TBSP_AUTO_RESIZE_ENABLED from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
     fi
-    RESIZE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
-
     if [[ $VERBOSE -ge 2 ]] ; then
       echo "COMMAND: $COMMAND_SIZE"
     fi
+    RESIZE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
     if [[ $VERBOSE -ge 3 ]] ; then
       echo RESULT:\'$RESIZE\'
     fi
@@ -365,11 +365,11 @@ if [[ $CONTINUE == true ]] ; then
   else
     COMMAND_SIZE="db2 -x select TBSP_STATE from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
   fi
-  STATUS=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
-
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
+  STATUS=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$STATUS\'
   fi
@@ -387,11 +387,11 @@ if [[ $CONTINUE == true ]] ; then
   else
     COMMAND_SIZE="db2 -x select TBSP_USED_SIZE_KB from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
   fi
-  KBYTES=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
-
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
+  KBYTES=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$KBYTES\'
   fi

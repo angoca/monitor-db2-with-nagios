@@ -242,10 +242,10 @@ fi
 
 if [[ $CONTINUE == true ]] ; then
   COMMAND_DATABASE="db2 list db directory"
-  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DATABASE"
   fi
+  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$DATABASE\'
   fi
@@ -259,6 +259,9 @@ fi
 
 if [[ $CONTINUE == true ]] ; then
   QTY_COMMAND="db2 list applications"
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $QTY_COMMAND"
+  fi
   if [[ $FILTER != "" ]] ; then
     if [[ $FILTER_INVERTED == true ]] ; then
       QTY=`$QTY_COMMAND | grep $DATABASE | grep -iv $FILTER | wc -l`
@@ -269,9 +272,6 @@ if [[ $CONTINUE == true ]] ; then
     QTY=`$QTY_COMMAND | grep $DATABASE | wc -l`
   fi
 
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $QTY_COMMAND"
-  fi
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$QTY\'
   fi
