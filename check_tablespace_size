@@ -396,7 +396,7 @@ if [[ $CONTINUE == true ]] ; then
     echo RESULT:\'$KBYTES\'
   fi
 
-  PERFORMANCE="$KBYTES KB"
+  PERFORMANCE="tablespace $TABLESPACE_NAME=$KBYTES KB"
 fi
 
 # Prints the output.

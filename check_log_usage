@@ -43,14 +43,14 @@
 # }
 #
 # Parameters:
-# -c | --critical : Critical threshold in milliseconds.
+# -c | --critical : Critical threshold in quantity of files
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
-# -w | --warning : Warning threshold in milliseconds.
+# -w | --warning : Warning threshold in quantity of files.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -271,7 +271,7 @@ if [[ $CONTINUE == true ]] ; then
 
   LOG_USED=`ls -l $LOG_PATH*LOG | wc -l`
   LOG_WARN=`echo "$LOG_PRI+$WARNING_THRES" | bc`
-  LOG_CRIT=`echo "$LOG_SEC+$CRITICAL_THRES" | bc`
+  LOG_CRIT=`echo "$LOG_PRI+$CRITICAL_THRES" | bc`
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT LOG_USED:\'$LOG_USED\'

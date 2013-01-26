@@ -305,12 +305,12 @@ if [[ $CONTINUE == true ]] ; then
       echo RESULT:\'$LOCK_IDS\'
     fi
 
-    if [[ $LOCK_WAIT -gt 60000 ]] ; then
-      OUTPUT="DB2 - There are $LOCKS application(s) in lock wait."
+    if [[ $LOCK_WAIT -gt $CRITICAL_THRES ]] ; then
+      OUTPUT="DB2 - There are $LOCKS application(s) in lock wait. Handles $LOCK_IDS"
       LONG_OUTPUT="The handles of the blocking applications are: $LOCK_IDS."
       RETURN=$CRITICAL
-    elif [[ $LOCK_WAIT -gt 10000 ]] ; then
-      OUTPUT="DB2 - There are $LOCKS application(s) in lock wait."
+    elif [[ $LOCK_WAIT -gt $WARNING_THRES ]] ; then
+      OUTPUT="DB2 - There are $LOCKS application(s) in lock wait. Handles $LOCK_IDS"
       LONG_OUTPUT="The handles of the blocking applications are: $LOCK_IDS."
       RETURN=$WARNING
     else
@@ -320,6 +320,7 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE == true ]] ; then
       OUTPUT="$OUTPUT - IDs $LOCK_IDS"
     fi
+    PERFORMANCE="locks=$LOCK_WAIT;$WARNING_THRES;$CRITICAL_THRES;0"
   else
     OUTPUT="DB2 - There are lock-waits, but the monitor switches are off."
     RETURN=$WARNING
