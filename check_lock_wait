@@ -289,6 +289,7 @@ if [[ $CONTINUE == true ]] ; then
 
   if [[ $LOCKS -eq 0 ]] ; then
     OUTPUT="DB2 - There is not any application in lock-wait state."
+    PERFORMANCE="longLocks=0;$WARNING_THRES;$CRITICAL_THRES;0"
     RETURN=$OK
   elif [[ $LOCK_WAIT != "Not Collected" ]] ; then
     COMMAND_LOCK_IDS="db2 get snapshot for locks on $DATABASE_NAME"
@@ -320,11 +321,12 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE == true ]] ; then
       OUTPUT="$OUTPUT - IDs $LOCK_IDS"
     fi
-    PERFORMANCE="locks=$LOCK_WAIT;$WARNING_THRES;$CRITICAL_THRES;0"
+    PERFORMANCE="longLocks=$LOCK_WAIT;$WARNING_THRES;$CRITICAL_THRES;0"
   else
     OUTPUT="DB2 - There are lock-waits, but the monitor switches are off."
     RETURN=$WARNING
   fi
+  PERFORMANCE="locks=$LOCKS;;;0"
 fi
 
 # Prints the output.
