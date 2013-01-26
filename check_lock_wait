@@ -262,11 +262,11 @@ fi
 
 if [[ $CONTINUE == true ]] ; then
   COMMAND_LOCKS="db2 -x select rtrim(char(locks_waiting)) as locks from table(snapshot_database('$DATABASE_NAME', -1)) as snapshot_database"
-  LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_LOCKS | awk '{print $1}' ; db2 connect reset > /dev/null`
-
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_LOCKS"
   fi
+
+  LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_LOCKS | awk '{print $1}' ; db2 connect reset > /dev/null`
   if [[ $VERBOSE -ge 3 ]] ; then 
     echo RESULT:\'$LOCKS\'
   fi
@@ -274,15 +274,14 @@ if [[ $CONTINUE == true ]] ; then
   db2 connect reset > /dev/null
 
   COMMAND_LOCK_WAIT="db2 get snapshot for locks on $DATABASE_NAME"
-  if [[ $UPDATE_MON == true ]] ; then
-    LOCK_WAIT=`db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_WAIT | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1` 
-    COMMAND_LOCK_WAIT="db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_WAIT"
-  else
-    LOCK_WAIT=`$COMMAND_LOCK_WAIT | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1`
-  fi
-
   if [[ $VERBOSE == true ]] ; then
     echo "COMMAND: $COMMAND_LOCK_WAIT"
+  fi
+
+  if [[ $UPDATE_MON == true ]] ; then
+    LOCK_WAIT=`db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_WAIT | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1` 
+  else
+    LOCK_WAIT=`$COMMAND_LOCK_WAIT | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1`
   fi
   if [[ $VERBOSE -ge 3 ]] ; then 
     echo RESULT:\'$LOCK_WAIT\'
@@ -293,15 +292,14 @@ if [[ $CONTINUE == true ]] ; then
     RETURN=$OK
   elif [[ $LOCK_WAIT != "Not Collected" ]] ; then
     COMMAND_LOCK_IDS="db2 get snapshot for locks on $DATABASE_NAME"
-    if [[ $UPDATE_MON == true ]] ; then
-      LOCK_IDS=`db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_IDS | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
-      COMMAND_LOCK_IDS="db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_IDS"
-    else
-      LOCK_IDS=`$COMMAND_LOCK_IDS | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
-    fi
-
     if [[ $VERBOSE == true ]] ; then
       echo "COMMAND: $COMMAND_LOCK_IDS"
+    fi
+
+    if [[ $UPDATE_MON == true ]] ; then
+      LOCK_IDS=`db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK_IDS | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
+    else
+      LOCK_IDS=`$COMMAND_LOCK_IDS | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
     fi
     if [[ $VERBOSE -ge 3 ]] ; then 
       echo RESULT:\'$LOCK_IDS\'
