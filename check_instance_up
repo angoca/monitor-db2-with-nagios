@@ -209,6 +209,7 @@ if [[ $CONTINUE == true ]] ; then
   # Checks if the port has a active service associated.
   PROC=`netstat -na | grep $PORTNUM | wc -l`
 
+  # TODO maxdb should indicate the instance is active.
   if [[ $PROC -eq "0" ]] ; then
     OUTPUT="DB2 - Instance at $INSTANCE_HOME is down."
     PERFORMANCE="'Started Instance'=0;;0;0;1 "
