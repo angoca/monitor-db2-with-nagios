@@ -290,6 +290,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
+  # TODO Validar que hay conexiont. Esta devolvieno codigo SQL1024
   TYPE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
@@ -301,6 +302,7 @@ if [[ $CONTINUE == true ]] ; then
       OUTPUT="Tablespace size is OK (SMS)."
       RETURN=$OK
     else
+      # TODO cambiar mensaje, se esta yendo por este camino
       OUTPUT="Script error for SMS tablespace."
       RETURN=$CRITICAL
     fi
@@ -396,7 +398,7 @@ if [[ $CONTINUE == true ]] ; then
     echo RESULT:\'$KBYTES\'
   fi
 
-  PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=$KBYTES KB;;;0"
+  PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${KBYTES}KB;;;0 "
 fi
 
 # Prints the output.
