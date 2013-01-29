@@ -266,7 +266,7 @@ if [[ $CONTINUE == true ]] ; then
     echo "COMMAND: $COMMAND_LOCKS"
   fi
 
-  LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_LOCKS | awk '{print $1}' ; db2 connect reset > /dev/null`
+  LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_LOCKS ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
   if [[ $VERBOSE -ge 3 ]] ; then 
     echo RESULT:\'$LOCKS\'
   fi
