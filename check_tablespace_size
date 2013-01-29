@@ -303,7 +303,7 @@ if [[ $CONTINUE == true ]] ; then
       RETURN=$OK
     else
       # TODO cambiar mensaje, se esta yendo por este camino
-      OUTPUT="Script error for SMS tablespace."
+      OUTPUT="Script error for SMS tablespace. - $SIZE"
       RETURN=$CRITICAL
     fi
   else
