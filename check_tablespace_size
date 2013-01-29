@@ -276,7 +276,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
-  SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+  SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$SIZE\'
@@ -291,7 +291,7 @@ if [[ $CONTINUE == true ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
   # TODO Validar que hay conexiont. Esta devolvieno codigo SQL1024
-  TYPE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+  TYPE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$TYPE\'
@@ -306,7 +306,7 @@ if [[ $CONTINUE == true ]] ; then
       OUTPUT="Script error for SMS tablespace. - $SIZE"
       RETURN=$CRITICAL
     fi
-  else
+  elif [[ $TYPE == "DMS" ]] ; then
     # Tablespace should be DMS
     if [[ $TABLESPACE_NAME != "" ]] ; then
       COMMAND_SIZE="db2 -x select TBSP_USING_AUTO_STORAGE from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
@@ -316,7 +316,7 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE -ge 2 ]] ; then
       echo "COMMAND: $COMMAND_SIZE"
     fi
-    AUTO=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+    AUTO=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
 
     if [[ $VERBOSE -ge 3 ]] ; then
       echo RESULT:\'$AUTO\'
@@ -330,13 +330,16 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE -ge 2 ]] ; then
       echo "COMMAND: $COMMAND_SIZE"
     fi
-    RESIZE=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+    RESIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
 
     if [[ $VERBOSE -ge 3 ]] ; then
       echo RESULT:\'$RESIZE\'
     fi
 
-    if [[ $AUTO -eq "1" || $RESIZE -eq "1" ]] ; then
+    if [[ ! $AUTO =~ ^[0-9]+$ || $RESIZE =~ ^[0-9]+$ ]] ; then
+      OUTPUT="Problem determining if auto or resize"
+      RETURN=$UNKNOWN
+    elif [[ $AUTO -eq "1" || $RESIZE -eq "1" ]] ; then
       if [[ $SIZE -lt $WARNING_THRES ]] ; then
         OUTPUT="Tablespace size is OK ($SIZE% - Auto resize)."
         RETURN=$OK
@@ -359,6 +362,9 @@ if [[ $CONTINUE == true ]] ; then
         RETURN=$CRITICAL
       fi
     fi
+  else
+    OUTPUT="Problem retrieving the type"
+    RETURN=$UNKNOWN
   fi
   
   #Availability
@@ -370,13 +376,16 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
-  STATUS=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+  STATUS=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$STATUS\'
   fi
 
-  if [[ $STATUS != "NORMAL" ]] ; then
+  if [[ $STATUS == "error" ]] ; then
+    OUTPUT="Connection problem"
+    RETURN=$UNKNOWN
+  elif [[ $STATUS != "NORMAL" ]] ; then
     OUTPUT="State not normal ($STATUS). "$OUTPUT
     if [[ $RETURN == $OK ]] ; then
       RETURN=$WARNING
@@ -392,13 +401,16 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
-  KBYTES=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+  KBYTES=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$KBYTES\'
   fi
 
-  PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${KBYTES}KB;;;0 "
+  if [[ $KBYTES != "error" ]] ; then
+    PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${KBYTES}KB;;;0 "
+  fi
+  # TODO As part of the performance, display the status (backup pending, restore pending, etc.(
 fi
 
 # Prints the output.
