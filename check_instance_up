@@ -117,7 +117,7 @@ LONG_PERFORMANCE=
 
 APPL_NAME=$0
 
-if [ $# == 0 ] ; then
+if [[ $# -eq 0 ]] ; then
   print_usage $APPL_NAME
   RETURN=$UNKNOWN
   CONTINUE=false
@@ -129,7 +129,7 @@ fi
 TEMP=`getopt -o hVvi: --long help,version,verbose,instance: \
              -n $APPL_NAME -- "$@"`
 
-if [ $? != 0 ] ; then
+if [[ $? -ne 0 ]] ; then
   print_usage $APPL_NAME
   RETURN=$UNKNOWN
   CONTINUE=false
