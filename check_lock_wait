@@ -266,7 +266,7 @@ if [[ $CONTINUE == true ]] ; then
     echo "COMMAND: $COMMAND_LOCKS"
   fi
 
-  LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_LOCKS ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
+  LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_LOCKS | awk '{print $1}' ; db2 connect reset > /dev/null`
   if [[ $VERBOSE -ge 3 ]] ; then 
     echo RESULT:\'$LOCKS\'
   fi
@@ -287,7 +287,10 @@ if [[ $CONTINUE == true ]] ; then
     echo RESULT:\'$LOCK_WAIT\'
   fi
 
-  if [[ $LOCKS -eq 0 ]] ; then
+  if [[ ! $LOCKS =~ ^[0-9]+$ ]] ; then
+    OUTPUT="Problem retrieving the locks."
+    RETURN=$UNKNOWN
+  elif [[ $LOCKS -eq 0 ]] ; then
     OUTPUT="DB2 - There is not any application in lock-wait state."
     PERFORMANCE="'Long duration locks'=0;$WARNING_THRES;$CRITICAL_THRES;0 "
     RETURN=$OK
