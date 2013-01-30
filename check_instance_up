@@ -225,7 +225,7 @@ if [[ $CONTINUE == true ]] ; then
     RETURN=$CRITICAL
   else
     OUTPUT="DB2 - Instance at $INSTANCE_HOME is up."
-    PERFORMANCE="'Started Instance'=$MAX_DB;;0.4;0 "
+    PERFORMANCE="'Started Instance'=$MAX_DB;;0.4;0;$MAX_DB "
     RETURN=$OK
   fi
 
