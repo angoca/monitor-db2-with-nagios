@@ -235,11 +235,11 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $ACTIVE == "" ]] ; then
     OUTPUT_ACTIVE="The database is not active"
     LONG_OUTPUT="$OUTPUT_ACTIVE"
-    LONG_PERFORMANCE="'Database Active'=0.2;0.5;;0;1 "
+    LONG_PERFORMANCE="'Database Active'=0.2;0.5;;0.1;1 "
   else
     OUTPUT_ACTIVE="The database is active"
     LONG_OUTPUT="$OUTPUT_ACTIVE"
-    LONG_PERFORMANCE="'Database Active'=0.8;0.5;;0;1 "
+    LONG_PERFORMANCE="'Database Active'=0.8;0.5;;0.1;1 "
   fi
 
   COMMAND_CONNECTABLE="db2 -a connect to $DATABASE_NAME"
@@ -254,15 +254,15 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $CONNECTABLE -eq 0 ]] ; then
     OUTPUT="DB2 - Connection to database $DATABASE_NAME is OK. "$OUTPUT_ACTIVE
     RETURN=$OK
-    PERFORMANCE="'Connectable Database'=1.8;1.6;1.3;1;2 "
+    PERFORMANCE="'Connectable Database'=1.8;1.6;1.3;1.1;2 "
   elif [[ $CONNECTABLE -eq -20157 ]] ; then
     OUTPUT="DB2 - The database is in quiesce mode. "$OUTPUT_ACTIVE
     RETURN=$WARNING
-    PERFORMANCE="'Connectable Database'=1.5;1.6;1.3;1;2 "
+    PERFORMANCE="'Connectable Database'=1.5;1.6;1.3;1.1;2 "
   else
     OUTPUT="DB2 - A connection to database $DATABASE_NAME was not succesful. "$OUTPUT_ACTIVE
     RETURN=$CRITICAL
-    PERFORMANCE="'Connectable Database'=1.2;1.6;1.3;1;2 "
+    PERFORMANCE="'Connectable Database'=1.2;1.6;1.3;1.1;2 "
   fi
 fi
 
