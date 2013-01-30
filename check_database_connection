@@ -235,13 +235,11 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $ACTIVE == "" ]] ; then
     OUTPUT_ACTIVE="The database is not active"
     LONG_OUTPUT="$OUTPUT_ACTIVE"
-    #LONG_PERFORMANCE="'Active Databases'=0;;0;0;1 "
-    LONG_PERFORMANCE="'Active Databases'=0.2;;;0;1 "
+    LONG_PERFORMANCE="'Database Active'=0.2;0.5;;0;1 "
   else
     OUTPUT_ACTIVE="The database is active"
     LONG_OUTPUT="$OUTPUT_ACTIVE"
-    #LONG_PERFORMANCE="'Active Databases'=1;;0;0;1 "
-    LONG_PERFORMANCE="'Active Databases'=0.8;;;0;1 "
+    LONG_PERFORMANCE="'Database Active'=0.8;0.5;;0;1 "
   fi
 
   COMMAND_CONNECTABLE="db2 -a connect to $DATABASE_NAME"
