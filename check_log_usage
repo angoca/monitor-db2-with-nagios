@@ -244,7 +244,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
   DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:\'$DATABASE\'"
+    echo "RESULT:'$DATABASE'"
   fi
 
   if [[ $DATABASE == "" ]] ; then
@@ -265,10 +265,10 @@ if [[ $CONTINUE == true ]] ; then
   LOG_TOTAL=`echo "$LOG_PRI+$LOG_SEC" | bc`
 
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT LOG_PRI:\'$LOG_PRI\'"
-    echo "RESULT LOG_SEC:\'$LOG_SEC\'"
-    echo "RESULT LOG_PATH:\'$LOG_PATH\'"
-    echo "RESULT LOG_PATH:\'$LOG_TOTAL\'"
+    echo "RESULT LOG_PRI:'$LOG_PRI'"
+    echo "RESULT LOG_SEC:'$LOG_SEC'"
+    echo "RESULT LOG_PATH:'$LOG_PATH'"
+    echo "RESULT LOG_PATH:'$LOG_TOTAL'"
   fi
 
   LOG_USED=`ls -l $LOG_PATH*LOG | wc -l`
@@ -276,9 +276,9 @@ if [[ $CONTINUE == true ]] ; then
   LOG_CRIT=`echo "$LOG_PRI+$CRITICAL_THRES" | bc`
 
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT LOG_USED:\'$LOG_USED\'"
-    echo "RESULT LOG_WARN:\'$LOG_WARN\'"
-    echo "RESULT LOG_CRIT:\'$LOG_CRIT\'"
+    echo "RESULT LOG_USED:'$LOG_USED'"
+    echo "RESULT LOG_WARN:'$LOG_WARN'"
+    echo "RESULT LOG_CRIT:'$LOG_CRIT'"
   fi
 
   COMMAND_HADR="db2pd -db $DATABASE_NAME -hadr"
@@ -288,7 +288,7 @@ if [[ $CONTINUE == true ]] ; then
   RESULT_HARD=`$COMMAND_HADR | awk '/Standby/ && !/Active/ {print $1}'`
 
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT HADR:\'$RESULT_HARD\'"
+    echo "RESULT HADR:'$RESULT_HARD'"
   fi
 
   if [[ $RESULT_HARD == "Standby" ]] ; then
@@ -315,8 +315,8 @@ if [[ $CONTINUE == true ]] ; then
     #  echo "COMMAND: $COMMAND_LOG_ID"
     #fi
     #if [[ $VERBOSE -ge 3 ]] ; then
-    #  echo "RESULT LOG_ID:\'$LOG_ID\'"
-    #  echo "RESULT LOG_COUNT:\'$LOG_COUNT\'"
+    #  echo "RESULT LOG_ID:'$LOG_ID'"
+    #  echo "RESULT LOG_COUNT:'$LOG_COUNT'"
     #fi
 
     #if [[ $LOG_COUNT -ne "0" ]] ; then
@@ -333,9 +333,9 @@ if [[ $CONTINUE == true ]] ; then
     DATE=`date | awk '{print $2,$3}'`
     ARCHIVE_SIZE=`ls -lR $ARCHIVE | grep "$DATE" | awk '{sum +=$5}END{print sum/1024/1024}' | awk -F. '{print $1}'`
     if [[ $VERBOSE -ge 3 ]] ; then
-      echo "RESULT ARCHIVE:\'$ARCHIVE\'"
-      echo "RESULT ARCHIVE:\'$DATE\'"
-      echo "RESULT ARCHIVE:\'$ARCHIVE_SIZE\'"
+      echo "RESULT ARCHIVE:'$ARCHIVE'"
+      echo "RESULT ARCHIVE:'$DATE'"
+      echo "RESULT ARCHIVE:'$ARCHIVE_SIZE'"
     fi
     LONG_PERFORMANCE="'Size archive logs'=$ARCHIVE_SIZE;;;0 "
   fi
