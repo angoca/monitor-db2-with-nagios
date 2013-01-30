@@ -257,7 +257,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
   DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo RESULT:\'$DATABASE\'
+    echo "RESULT:\'$DATABASE\'"
   fi
 
   if [[ $DATABASE == "" ]] ; then
@@ -279,7 +279,7 @@ if [[ $CONTINUE == true ]] ; then
   SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo RESULT:\'$SIZE\'
+    echo "RESULT:\'$SIZE\'"
   fi
 
   if [[ $TABLESPACE_NAME != "" ]] ; then
@@ -294,7 +294,7 @@ if [[ $CONTINUE == true ]] ; then
   TYPE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo RESULT:\'$TYPE\'
+    echo "RESULT:\'$TYPE\'"
   fi
 
   if [[ $TYPE == "SMS" ]] ; then
@@ -319,7 +319,7 @@ if [[ $CONTINUE == true ]] ; then
     AUTO=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
     if [[ $VERBOSE -ge 3 ]] ; then
-      echo RESULT:\'$AUTO\'
+      echo "RESULT:\'$AUTO\'"
     fi
 
     if [[ $TABLESPACE_NAME != "" ]] ; then
@@ -333,7 +333,7 @@ if [[ $CONTINUE == true ]] ; then
     RESIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
     if [[ $VERBOSE -ge 3 ]] ; then
-      echo RESULT:\'$RESIZE\'
+      echo "RESULT:\'$RESIZE\'"
     fi
 
     if [[ ! $AUTO =~ ^[0-9]+$ || ! $RESIZE =~ ^[0-9]+$ ]] ; then
@@ -379,7 +379,7 @@ if [[ $CONTINUE == true ]] ; then
   STATUS=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo RESULT:\'$STATUS\'
+    echo "RESULT:\'$STATUS\'"
   fi
 
   if [[ $STATUS == "error" ]] ; then
@@ -404,7 +404,7 @@ if [[ $CONTINUE == true ]] ; then
   KBYTES=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo RESULT:\'$KBYTES\'
+    echo "RESULT:\'$KBYTES\'"
   fi
 
   if [[ $KBYTES != "error" ]] ; then
@@ -422,6 +422,6 @@ echo "$OUTPUT|$PERFORMANCE
 $LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
 if [[ $VERBOSE -ge 2 ]] ; then
-  echo Return code: $RETURN
+  echo "Return code: $RETURN"
 fi
 exit $RETURN

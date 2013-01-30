@@ -252,6 +252,6 @@ echo "$OUTPUT|$PERFORMANCE
 $LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
 if [[ $VERBOSE -ge 2 ]] ; then
-  echo Return code: $RETURN
+  echo "Return code: $RETURN"
 fi
 exit $RETURN

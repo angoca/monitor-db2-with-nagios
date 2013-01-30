@@ -226,7 +226,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
   DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo RESULT:\'$DATABASE\'
+    echo "RESULT:\'$DATABASE\'"
   fi
 
   if [[ $DATABASE == "" ]] ; then
@@ -250,6 +250,6 @@ echo "$OUTPUT|$PERFORMANCE
 $LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
 if [[ $VERBOSE -ge 2 ]] ; then
-  echo Return code: $RETURN
+  echo "Return code: $RETURN"
 fi
 exit $RETURN

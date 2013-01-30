@@ -241,7 +241,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
   DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo RESULT:\'$DATABASE\'
+    echo "RESULT:\'$DATABASE\'"
   fi
 
   if [[ $DATABASE == "" ]] ; then
@@ -268,7 +268,7 @@ if [[ $CONTINUE == true ]] ; then
 
   LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_LOCKS | awk '{print $1}' ; db2 connect reset > /dev/null`
   if [[ $VERBOSE -ge 3 ]] ; then 
-    echo RESULT:\'$LOCKS\'
+    echo "RESULT:\'$LOCKS\'"
   fi
 
   db2 connect reset > /dev/null
@@ -284,7 +284,7 @@ if [[ $CONTINUE == true ]] ; then
     LOCK_WAIT=`$COMMAND_LOCK_WAIT | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1`
   fi
   if [[ $VERBOSE -ge 3 ]] ; then 
-    echo RESULT:\'$LOCK_WAIT\'
+    echo "RESULT:\'$LOCK_WAIT\'"
   fi
 
   if [[ ! $LOCKS =~ ^[0-9]+$ ]] ; then
@@ -306,7 +306,7 @@ if [[ $CONTINUE == true ]] ; then
       LOCK_IDS=`$COMMAND_LOCK_IDS | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
     fi
     if [[ $VERBOSE -ge 3 ]] ; then 
-      echo RESULT:\'$LOCK_IDS\'
+      echo "RESULT:\'$LOCK_IDS\'"
     fi
 
     if [[ $LOCK_WAIT -gt $CRITICAL_THRES ]] ; then
@@ -341,6 +341,6 @@ echo "$OUTPUT|$PERFORMANCE
 $LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
 if [[ $VERBOSE -ge 2 ]] ; then
-  echo Return code: $RETURN
+  echo "Return code: $RETURN"
 fi
 exit $RETURN
