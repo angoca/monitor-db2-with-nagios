@@ -276,7 +276,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
-  SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
+  SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$SIZE\'
@@ -291,7 +291,7 @@ if [[ $CONTINUE == true ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
   # TODO Validar que hay conexiont. Esta devolvieno codigo SQL1024
-  TYPE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
+  TYPE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$TYPE\'
@@ -316,7 +316,7 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE -ge 2 ]] ; then
       echo "COMMAND: $COMMAND_SIZE"
     fi
-    AUTO=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
+    AUTO=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
     if [[ $VERBOSE -ge 3 ]] ; then
       echo RESULT:\'$AUTO\'
@@ -330,13 +330,13 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE -ge 2 ]] ; then
       echo "COMMAND: $COMMAND_SIZE"
     fi
-    RESIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
+    RESIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
     if [[ $VERBOSE -ge 3 ]] ; then
       echo RESULT:\'$RESIZE\'
     fi
 
-    if [[ ! $AUTO =~ ^[0-9]+$ || $RESIZE =~ ^[0-9]+$ ]] ; then
+    if [[ ! $AUTO =~ ^[0-9]+$ || ! $RESIZE =~ ^[0-9]+$ ]] ; then
       OUTPUT="Problem determining if auto or resize"
       RETURN=$UNKNOWN
     elif [[ $AUTO -eq "1" || $RESIZE -eq "1" ]] ; then
@@ -376,7 +376,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
-  STATUS=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
+  STATUS=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$STATUS\'
@@ -401,7 +401,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
-  KBYTES=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -eq 0 ]] ; then $COMMAND_SIZE ; else echo "error" ; fi | awk '{print $1}' ; db2 connect reset > /dev/null`
+  KBYTES=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT:\'$KBYTES\'
