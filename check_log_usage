@@ -262,11 +262,13 @@ if [[ $CONTINUE == true ]] ; then
   LOG_PRI=`$COMMAND_DB_CFG | grep LOGPRIMARY | awk -F"= " '{print $2}' | tail -1`
   LOG_SEC=`$COMMAND_DB_CFG | grep LOGSECOND | awk -F"= " '{print $2}' | tail -1`
   LOG_PATH=`$COMMAND_DB_CFG | grep "Path to log files" | awk -F"= " '{print $2}' | tail -1`
+  LOG_TOTAL=`echo "$LOG_PRI+$LOG_SEC" | bc`
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo RESULT LOG_PRI:\'$LOG_PRI\'
     echo RESULT LOG_SEC:\'$LOG_SEC\'
     echo RESULT LOG_PATH:\'$LOG_PATH\'
+    echo RESULT LOG_PATH:\'$LOG_TOTAL\'
   fi
 
   LOG_USED=`ls -l $LOG_PATH*LOG | wc -l`
@@ -325,12 +327,12 @@ if [[ $CONTINUE == true ]] ; then
       RETURN=$CRITICAL
     fi
 
-    PERFORMANCE="'Log used'=$LOG_USED;$LOG_WARN;$LOG_CRIT;0;$LOG_SEC "
+    PERFORMANCE="'Log used'=$LOG_USED;$LOG_WARN;$LOG_CRIT;0;$LOG_TOTAL"
 
     ARCHIVE=`db2 get db cfg for $DATABASE_NAME | awk '/LOGARCHMETH1/ {print $7}' | awk -F: '{print $2}'`
     DATE=`date | awk '{print $2,$3}'`
-    ARCHIVE_SIZE=`ls -l | grep "$DATE" | awk '{sum +=$5}END{print sum/1024}'`
-    LONG_PERFORMANCE="'Size archive logs'=ARCHIVE_SIZE "
+    ARCHIVE_SIZE=`ls -l | grep "$DATE" | awk '{sum +=$5}END{print sum/1024/1024}' | awk -F. '{print $1}`
+    LONG_PERFORMANCE="'Size archive logs'=$ARCHIVE_SIZE;;;0 "
   fi
 fi
 
