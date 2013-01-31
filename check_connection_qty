@@ -78,7 +78,6 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  # TODO Add arguments.
   echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w][--filter
 [--inverted]] # -h # -V } [ -v ]"
 }
