@@ -382,6 +382,8 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $STATUS == "error" ]] ; then
     OUTPUT="Connection problem"
     RETURN=$UNKNOWN
+  elif [[ $STATUS == "BACKUP_IN_PROGRESS" ]] ; then
+    OUTPUT="Backup in progress. "$OUTPUT
   elif [[ $STATUS != "NORMAL" ]] ; then
     OUTPUT="State not normal ($STATUS). "$OUTPUT
     if [[ $RETURN == $OK ]] ; then
