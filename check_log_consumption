@@ -26,14 +26,14 @@
 #
 # In order to be used in Nagios, you have to configure the following.
 #
-# # 'check_log_usage' command definition
+# # 'check_log_consumption' command definition
 # define command {
 #         command_name    check_log_consumption
 #         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_log_consumption -i '$ARG1$' -d '$ARG2$'"
 # }
 # define service{
 #         host_name               db2server
-#         service_description     Log usage
+#         service_description     Log daily consumption
 #         check_command           check_log_consumption!/home/db2inst1!sample
 #         use                     generic-service
 # }
