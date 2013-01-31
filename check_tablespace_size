@@ -21,8 +21,6 @@
 # This script analyzes the allocated and used space in a tablespace.
 #
 # TODO: Si el tablespace quiesce, recuperar el tamagno.
-# TODO: si el tablespace es SMS o automatico, no generar alarmas, indicar que DB2 lo aumentara.
-# TODO: Tablespaces in HADR should reflect the same values in both machines.
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
@@ -290,7 +288,6 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_SIZE"
   fi
-  # TODO Validar que hay conexiont. Esta devolvieno codigo SQL1024
   TYPE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
@@ -410,7 +407,9 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $KBYTES != "error" ]] ; then
     PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${KBYTES};;;0 "
   fi
-  # TODO As part of the performance, display the status (backup pending, restore pending, etc.(
+  # TODO As part of the performance, display the status (backup pending, restore pending, etc.
+  # TODO Monitor the allocatedd size, to view how often it is incremented. In performance
+  # TODO Monitor the high water mark in performacen
 fi
 
 # Prints the output.
