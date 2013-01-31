@@ -252,7 +252,7 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE -ge 2 ]] ; then
       echo "COMMAND: $COMMAND_DB_CFG"
     fi
-    ARCHIVE=`$DATABASE_NAME | awk '/LOGARCHMETH1/ {print $7}' | awk -F: '{print $2}'`
+    ARCHIVE=`$COMMAND_DB_CFG | awk '/LOGARCHMETH1/ {print $7}' | awk -F: '{print $2}'`
     DATE=`date | awk '{print $2,$3}'`
     ARCHIVE_SIZE=`ls -lR $ARCHIVE | grep "$DATE" | awk '{sum +=$5}END{print sum/1024/1024}' | awk -F. '{print $1}'`
     if [[ $VERBOSE -ge 3 ]] ; then

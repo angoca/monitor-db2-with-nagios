@@ -404,8 +404,8 @@ if [[ $CONTINUE == true ]] ; then
     echo "RESULT:'$KBYTES'"
   fi
 
-  if [[ $KBYTES != "error" ]] ; then
-    PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${KBYTES};;;0 "
+  if [[ $TB_SIZE != "error" ]] ; then
+    PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${TB_SIZE};;;0 "
   fi
   # TODO As part of the performance, display the status (backup pending, restore pending, etc.
   # TODO Monitor the allocatedd size, to view how often it is incremented. In performance
