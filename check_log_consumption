@@ -147,13 +147,11 @@ if [[ $CONTINUE == true ]] ; then
   INSTANCE_HOME=
   DATABASE_NAME=
   UPDATE_MON=false
-  WARNING_THRES=1
-  CRITICAL_THRES=50
   while true; do
     case "$1" in
-      -d | --database ) DATABASE_NAME="$2"; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'`; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
       --update ) UPDATE_MON=true; shift ;;

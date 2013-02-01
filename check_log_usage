@@ -165,13 +165,13 @@ if [[ $CONTINUE == true ]] ; then
   CRITICAL_THRES=50
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES="$2"; shift 2 ;;
-      -d | --database ) DATABASE_NAME="$2"; shift 2 ;;
+      -c | --critical ) CRITICAL_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'`; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
-      -w | --warning ) WARNING_THRES="$2"; shift 2 ;;
+      -w | --warning ) WARNING_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
       --update ) UPDATE_MON=true; shift ;;
       -- ) shift; break ;;
       * ) break ;;

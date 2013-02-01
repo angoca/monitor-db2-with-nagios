@@ -26,14 +26,14 @@
 # TODO Nagios usage.
 #
 # Parameters:
-# -c | --critical : Critical threshold in milliseconds.
+# -c | --critical : TODO What is critical
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
-# -w | --warning : Warning threshold in milliseconds.
+# -w | --warning : TODO What is critical
 #
 # The exit codes are the standard for Nagios.
 #
@@ -148,13 +148,13 @@ if [[ $CONTINUE == true ]] ; then
   CRITICAL_THRES=2
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES="$2"; shift 2 ;;
-      -d | --database ) DATABASE_NAME="$2"; shift 2 ;;
+      -c | --critical ) CRITICAL_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'`; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
-      -w | --warning ) WARNING_THRES="$2"; shift 2 ;;
+      -w | --warning ) WARNING_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
       # TODO Validate any new argument.
       -- ) shift; break ;;
       * ) break ;;

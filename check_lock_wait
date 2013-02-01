@@ -162,13 +162,13 @@ if [[ $CONTINUE == true ]] ; then
   CRITICAL_THRES=60000
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES="$2"; shift 2 ;;
-      -d | --database ) DATABASE_NAME="$2"; shift 2 ;;
+      -c | --critical ) CRITICAL_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'`; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
-      -w | --warning ) WARNING_THRES="$2"; shift 2 ;;
+      -w | --warning ) WARNING_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
       --update ) UPDATE_MON=true; shift ;;
       -- ) shift; break ;;
       * ) break ;;
@@ -210,7 +210,7 @@ fi
 
 if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
     || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
-    || $WARNING_THRES -eq 0 || $CRITICAL_THRES -eq 0
+    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
     || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
   print_usage $APPL_NAME
   echo "Warning threshold should be less than critical threshold."

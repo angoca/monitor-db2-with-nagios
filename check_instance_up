@@ -147,7 +147,7 @@ if [[ $CONTINUE == true ]] ; then
   while true; do
     case "$1" in
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME="$2"; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
       -- ) shift; break ;;
