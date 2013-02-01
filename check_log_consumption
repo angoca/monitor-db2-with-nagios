@@ -251,12 +251,14 @@ if [[ $CONTINUE == true ]] ; then
       echo "COMMAND: $COMMAND_DB_CFG"
     fi
     ARCHIVE=`$COMMAND_DB_CFG | awk '/LOGARCHMETH1/ {print $7}' | awk -F: '{print $2}'`
-    DATE=`date | awk '{print $2,$3}'`
-    ARCHIVE_SIZE=`ls -lR $ARCHIVE | grep "$DATE" | awk '{sum +=$5}END{print sum/1024/1024}' | awk -F. '{print $1}'`
+    MONTH=`date | awk '{print $2}'`
+    DAY=`date | awk '{print $3}'`
+    ARCHIVE_SIZE=`ls -lR $ARCHIVE | grep "$MONTH\s*$DAY" | awk '{sum +=$5}END{print sum/1024/1024}' | awk -F. '{print $1}'`
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "RESULT ARCHIVE:'$ARCHIVE'"
-      echo "RESULT ARCHIVE:'$DATE'"
-      echo "RESULT ARCHIVE:'$ARCHIVE_SIZE'"
+      echo "RESULT MONTH:'$MONTH'"
+      echo "RESULT DAY:'$DAY'"
+      echo "RESULT ARCHIVE_SIZE:'$ARCHIVE_SIZE'"
     fi
     PERFORMANCE="'Size archive logs'=$ARCHIVE_SIZE;;;0 "
   fi
