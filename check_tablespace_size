@@ -378,10 +378,11 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$STATUS'"
   fi
-
-  if [[ $STATUS == "error" ]] ; then
+  STATUS_ERROR=`echo $STATUS | cut -c 1-5`
+  if [[ $STATUS_ERROR == "error" ]] ; then
     OUTPUT="Connection problem"
     RETURN=$UNKNOWN
+    CONTINUE=false
   elif [[ $STATUS == "BACKUP_IN_PROGRESS" ]] ; then
     OUTPUT="Backup in progress. "$OUTPUT
   elif [[ $STATUS != "NORMAL" ]] ; then
@@ -390,7 +391,9 @@ if [[ $CONTINUE == true ]] ; then
       RETURN=$WARNING
     fi
   fi
-  
+fi
+
+if [[ $CONTINUE == true ]] ; then
   # Performancee data
   ## Allocated size
   if [[ $TABLESPACE_NAME != "" ]] ; then
