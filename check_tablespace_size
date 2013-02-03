@@ -392,6 +392,26 @@ if [[ $CONTINUE == true ]] ; then
   fi
   
   # Performancee data
+  ## Allocated size
+  if [[ $TABLESPACE_NAME != "" ]] ; then
+    COMMAND_ALLOCATED="db2 -x select TBSP_TOTAL_SIZE_KB / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
+  else
+    COMMAND_ALLOCATED="db2 -x select TBSP_TOTAL_SIZE_KB / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
+  fi
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_ALLOCATED"
+  fi
+  TB_ALLOCATED=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_ALLOCATED | awk '{print $1}' ; db2 connect reset > /dev/null`
+
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "RESULT:'$TB_ALLOCATED'"
+  fi
+
+  if [[ $TB_SIZE != "error" ]] ; then
+    LONG_OUTPUT="Tablespace $TABLESPACE_NAME$TABLESPACE_ID has allocated $TB_SIZE MB"
+    LONG_PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${TB_ALLOCATED};;;0 "
+  fi
+  ## Used size
   if [[ $TABLESPACE_NAME != "" ]] ; then
     COMMAND_SIZE="db2 -x select TBSP_USED_SIZE_KB / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
   else
@@ -403,15 +423,35 @@ if [[ $CONTINUE == true ]] ; then
   TB_SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
 
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$KBYTES'"
+    echo "RESULT:'$TB_SIZE'"
   fi
 
   if [[ $TB_SIZE != "error" ]] ; then
-    PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${TB_SIZE};;;0 "
+    PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${TB_SIZE};;;0;$TB_ALLOCATED "
+  fi
+  ## High water mark
+  set -f
+  if [[ $TABLESPACE_NAME != "" ]] ; then
+    COMMAND_HWM="db2 -x select TBSP_PAGE_TOP * TBSP_PAGE_SIZE / 1024 / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
+  else
+    COMMAND_HWM="db2 -x select TBSP_PAGE_TOP * TBSP_PAGE_SIZE / 1024 / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
+  fi
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_HWM"
+  fi
+  TB_HWM=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_HWM | awk '{print $1}' ; db2 connect reset > /dev/null`
+  set +f
+
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "RESULT:'$TB_HWM'"
+  fi
+
+  if [[ $TB_SIZE != "error" ]] ; then
+    LONG_OUTPUT="$LONG_OUTPUT and its watermark is at TB_HWM"
+    LONG_PERFORMANCE="$LONG_PERFORMANCE
+'Current Watermark'=$TB_HWM;;;0;$TB_ALLOCATED"
   fi
   # TODO As part of the performance, display the status (backup pending, restore pending, etc.
-  # TODO Monitor the allocatedd size, to view how often it is incremented. In performance
-  # TODO Monitor the high water mark in performacen
 fi
 
 # Prints the output.
