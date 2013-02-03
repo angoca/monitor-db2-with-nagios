@@ -20,8 +20,6 @@
 
 # This script analyzes the allocated and used space in a tablespace.
 #
-# TODO: Si el tablespace quiesce, recuperar el tamagno.
-#
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
 #
@@ -264,7 +262,26 @@ if [[ $CONTINUE == true ]] ; then
     CONTINUE=false
   fi
 fi
-
+# Checks if the tablespace exist.
+if [[ $CONTINUE == true ]] ; then
+  COMMAND_EXIST="db2 list tablespaces"
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_EXIST"
+  fi
+  if [[ $TABLESPACE_NAME != "" ]] ; then
+    EXIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep Name | grep $TABLESPACE_NAME | awk '{print $3}' ; db2 connect reset > /dev/null`
+  else
+    EXIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep ID | grep $TABLESPACE_ID | awk '{print $4}' ; db2 connect reset > /dev/null`
+  fi
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "RESULT:'$EXIST'"
+  fi
+  if [[ ( $TABLESPACE_ID == "" && $EXIST != $TABLESPACE_NAME ) || ( $TABLESPACE_NAME == "" && $EXIST != $TABLESPACE_ID ) ]] ; then
+    OUTPUT="Tablespace $TABLESPACE_NAME$TABLESPACE_ID does not exist."
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+fi
 if [[ $CONTINUE == true ]] ; then
   if [[ $TABLESPACE_NAME != "" ]] ; then
     COMMAND_SIZE="db2 -x select integer(TBSP_UTILIZATION_PERCENT) from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
@@ -410,8 +427,8 @@ if [[ $CONTINUE == true ]] ; then
     echo "RESULT:'$TB_ALLOCATED'"
   fi
 
-  if [[ $TB_SIZE != "error" ]] ; then
-    LONG_OUTPUT="Tablespace $TABLESPACE_NAME$TABLESPACE_ID has allocated $TB_SIZE MB"
+  if [[ $TB_ALLOCATED != "error" ]] ; then
+    LONG_OUTPUT="Tablespace $TABLESPACE_NAME$TABLESPACE_ID has allocated $TB_ALLOCATED MB"
     LONG_PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${TB_ALLOCATED};;;0 "
   fi
   ## Used size
@@ -449,8 +466,8 @@ if [[ $CONTINUE == true ]] ; then
     echo "RESULT:'$TB_HWM'"
   fi
 
-  if [[ $TB_SIZE != "error" ]] ; then
-    LONG_OUTPUT="$LONG_OUTPUT and its watermark is at TB_HWM"
+  if [[ $TB_HWM != "error" ]] ; then
+    LONG_OUTPUT="$LONG_OUTPUT and its watermark is at $TB_HWM"
     LONG_PERFORMANCE="$LONG_PERFORMANCE
 'Current Watermark'=$TB_HWM;;;0;$TB_ALLOCATED"
   fi
