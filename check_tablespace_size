@@ -269,9 +269,9 @@ if [[ $CONTINUE == true ]] ; then
     echo "COMMAND: $COMMAND_EXIST"
   fi
   if [[ $TABLESPACE_NAME != "" ]] ; then
-    EXIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep Name | grep $TABLESPACE_NAME | awk '{print $3}' ; db2 connect reset > /dev/null`
+    EXIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep Name | grep -w $TABLESPACE_NAME | awk '{print $3}' ; db2 connect reset > /dev/null`
   else
-    EXIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep ID | grep $TABLESPACE_ID | awk '{print $4}' ; db2 connect reset > /dev/null`
+    EXIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep ID | grep -w $TABLESPACE_ID | awk '{print $4}' ; db2 connect reset > /dev/null`
   fi
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$EXIST'"
