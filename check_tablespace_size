@@ -427,7 +427,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   if [[ $TB_SIZE != "error" ]] ; then
-    PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${TB_SIZE};;;0;$TB_ALLOCATED "
+    PERFORMANCE="'Allocated $TABLESPACE_NAME$TABLESPACE_ID'=${TB_SIZE};;;0;$TB_ALLOCATED "
   fi
   ## High water mark
   set -f
