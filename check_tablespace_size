@@ -401,7 +401,7 @@ if [[ $CONTINUE == true ]] ; then
     RETURN=$UNKNOWN
     CONTINUE=false
   elif [[ $STATUS == "BACKUP_IN_PROGRESS" ]] ; then
-    OUTPUT="Backup in progress. "$OUTPUT
+    OUTPUT="Backup in progress. $OUTPUT"
   elif [[ $STATUS != "NORMAL" ]] ; then
     OUTPUT="State not normal ($STATUS). $OUTPUT"
     if [[ $RETURN == $OK ]] ; then
@@ -411,7 +411,7 @@ if [[ $CONTINUE == true ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
-  # Performancee data
+  # Performance data
   ## Allocated size
   if [[ $TABLESPACE_NAME != "" ]] ; then
     COMMAND_ALLOCATED="db2 -x select TBSP_TOTAL_SIZE_KB / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
@@ -429,7 +429,7 @@ if [[ $CONTINUE == true ]] ; then
 
   if [[ $TB_ALLOCATED != "error" ]] ; then
     LONG_OUTPUT="Tablespace $TABLESPACE_NAME$TABLESPACE_ID has allocated $TB_ALLOCATED MB"
-    LONG_PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${TB_ALLOCATED};;;0 "
+    LONG_PERFORMANCE="'Allocated $TABLESPACE_NAME$TABLESPACE_ID'=${TB_ALLOCATED}" #;;;0 "
   fi
   ## Used size
   if [[ $TABLESPACE_NAME != "" ]] ; then
@@ -447,7 +447,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   if [[ $TB_SIZE != "error" ]] ; then
-    PERFORMANCE="'Allocated $TABLESPACE_NAME$TABLESPACE_ID'=${TB_SIZE};;;0;$TB_ALLOCATED "
+    PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${TB_SIZE};;;0;$TB_ALLOCATED "
   fi
   ## High water mark
   set -f
