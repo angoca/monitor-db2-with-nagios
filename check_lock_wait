@@ -179,7 +179,7 @@ fi
 if [[ $VERBOSE -ge 2 ]] ; then
   ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
   ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
+  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES, "
   ECHO=$ECHO"update:$UPDATE_MON"
   echo $ECHO
 fi
