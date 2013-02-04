@@ -316,9 +316,26 @@ if [[ $CONTINUE == true ]] ; then
       OUTPUT="Tablespace size is OK (SMS)."
       RETURN=$OK
     else
-      # TODO cambiar mensaje, se esta yendo por este camino
-      OUTPUT="Script error for SMS tablespace. - $SIZE"
-      RETURN=$CRITICAL
+      if [[ $TABLESPACE_NAME != "" ]] ; then
+        COMMAND_CONTENT="db2 -x select TBSP_CONTENT_TYPE from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
+      else
+        COMMAND_CONTENT="db2 -x select TBSP_CONTENT_TYPE from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
+      fi
+      if [[ $VERBOSE -ge 2 ]] ; then
+        echo "COMMAND: $COMMAND_CONTENT"
+      fi
+      CONTENT=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_CONTENT | awk '{print $1}' ; db2 connect reset > /dev/null`
+
+      if [[ $VERBOSE -ge 3 ]] ; then
+        echo "RESULT:'$CONTENT'"
+      fi
+      if [[ $CONTENT == "SYSTEMP" || $CONTENT == "USRTEMP" ]] ; then
+        OUTPUT="Temporary tablespace is being used. - $SIZE"
+        RETURN=$OK
+      else
+        OUTPUT="Script error for SMS tablespace. - $SIZE"
+        RETURN=$CRITICAL
+      fi
     fi
   elif [[ $TYPE == "DMS" ]] ; then
     # Tablespace should be DMS
