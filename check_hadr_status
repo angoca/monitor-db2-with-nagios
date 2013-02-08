@@ -289,10 +289,12 @@ if [[ $CONTINUE == true ]] ; then
 fi
 if [[ $CONTINUE == true ]] ; then
   HEX_DIFF=`db2pd -db wfscpd -hadr | awk '/LOG/ {print $3}' | awk -Fx '{print $2}' | sed '/0$/!N;s/\n/-/' | awk '{print "ibase=16;"$1}' | bc`
-  PERFORMANCE="HexDiff=$HEX_DIFF" 
+  PERFORMANCE="HexDiff=${HEX_DIFF} " 
   PAGE_DIFF=`db2pd -db wfscpd -hadr | awk '/LOG/ {print $2}' | sed '/0$/!N;s/\n/-/' | bc`
   LOG_DIFF=`db2pd -db wfscpd -hadr | awk '/LOG/ {print $1}' | awk -F. '{print $1}' | sed 's/^.//' | sed '/0$/!N;s/\n/-/' | bc`
-  LONG_PERFORMANCE="PageDiff=$PAGE_DIFF LogDiff=$LOG_DIFF" 
+  LONG_PERFORMANCE="PageDiff=${PAGE_DIFF} LogDiff=${LOG_DIFF} " 
+  echo $PERFORMANCE >> /tmp/Nagios_HADR_check
+  echo $LONG_PERFORMANCE >> /tmp/Nagios_HADR_check
 fi
 # Prints the output.
 if [[ $OUTPUT == "" ]] ; then
