@@ -201,7 +201,7 @@ if [[ $CONTINUE == true ]] ; then
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
   else
-    OUTPUT="DB2 - Instance directory is invalid."
+    OUTPUT="Instance directory is invalid."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
@@ -218,7 +218,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   if [[ $DATABASE == "" ]] ; then
-    OUTPUT="DB2 - The database $DATABASE_NAME is not cataloged."
+    OUTPUT="The database $DATABASE_NAME is not cataloged."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi

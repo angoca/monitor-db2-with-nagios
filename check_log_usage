@@ -231,7 +231,7 @@ if [[ $CONTINUE == true ]] ; then
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
   else
-    OUTPUT="DB2 - Instance directory is invalid."
+    OUTPUT="Instance directory is invalid."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
@@ -248,7 +248,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   if [[ $DATABASE == "" ]] ; then
-    OUTPUT="DB2 - The database $DATABASE_NAME is not cataloged."
+    OUTPUT="The database $DATABASE_NAME is not cataloged."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
@@ -296,14 +296,14 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   if [[ $HADR == true ]] ; then
-    OUTPUT="DB2 - HADR is using the whole space for logs."
+    OUTPUT="HADR is using the whole space for logs."
     RETURN=$OK
   else
     if [[ $LOG_USED -le $LOG_WARN ]] ; then
-      OUTPUT="DB2 - The transaction log utilization is OK."
+      OUTPUT="The transaction log utilization is OK."
       RETURN=$OK
     elif [[ $LOG_USED -gt $LOG_WARN && $LOG_USED -lt $LOG_CRIT ]] ; then
-      OUTPUT="DB2 - Please check database transaction workload ($LOG_USED files)."
+      OUTPUT="Please check database transaction workload ($LOG_USED files)."
       RETURN=$WARNING
     else
     # TODO db2diag command does not function as desired.
@@ -320,9 +320,9 @@ if [[ $CONTINUE == true ]] ; then
     #fi
 
     #if [[ $LOG_COUNT -ne "0" ]] ; then
-    #  OUTPUT="DB2 - There was occurrence of transaction log full due to application handle: $LOGID"   
+    #  OUTPUT="There was occurrence of transaction log full due to application handle: $LOGID"   
     #else
-      OUTPUT="DB2 - Workload is reaching the limit ($LOG_USED files)."
+      OUTPUT="Workload is reaching the limit ($LOG_USED files)."
     #fi
       RETURN=$CRITICAL
     fi

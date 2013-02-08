@@ -233,7 +233,7 @@ if [[ $CONTINUE == true ]] ; then
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
   else
-    OUTPUT="DB2 - Instance directory is invalid."
+    OUTPUT="Instance directory is invalid."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
@@ -250,7 +250,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   if [[ $DATABASE == "" ]] ; then
-    OUTPUT="DB2 - The database $DATABASE_NAME is not cataloged."
+    OUTPUT="The database $DATABASE_NAME is not cataloged."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
@@ -276,13 +276,13 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   if [[ $QTY -lt $WARNING_THRES ]] ; then
-     OUTPUT="DB2 - Normal quantity of connections ($QTY)."
+     OUTPUT="Normal quantity of connections ($QTY)."
      RETURN=$OK
   elif [[ $QTY -lt $CRITICAL_THRES ]] ; then
-     OUTPUT="DB2 - Quantity of connections is increasing, currently $QTY."
+     OUTPUT="Quantity of connections is increasing, currently $QTY."
      RETURN=$WARNING
   else
-     OUTPUT="DB2 - Quantity of connections is critical, currently $QTY."
+     OUTPUT="Quantity of connections is critical, currently $QTY."
      RETURN=$CRITICAL
   fi
   PERFORMANCE="'Connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES;0 "

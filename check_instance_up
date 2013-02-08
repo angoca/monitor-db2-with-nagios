@@ -188,7 +188,7 @@ if [[ $CONTINUE == true ]] ; then
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
   else
-    OUTPUT="DB2 - Instance directory is invalid."
+    OUTPUT="Instance directory is invalid."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
@@ -220,11 +220,11 @@ if [[ $CONTINUE == true ]] ; then
   PROC=`netstat -na | grep $PORTNUM | wc -l`
 
   if [[ $PROC -eq "0" ]] ; then
-    OUTPUT="DB2 - Instance at $INSTANCE_HOME is down."
+    OUTPUT="Instance at $INSTANCE_HOME is down."
     PERFORMANCE="'Started Instance'=0.2;;0.4;0 "
     RETURN=$CRITICAL
   else
-    OUTPUT="DB2 - Instance at $INSTANCE_HOME is up."
+    OUTPUT="Instance at $INSTANCE_HOME is up."
     PERFORMANCE="'Started Instance'=$MAX_DB;;0.4;0;$MAX_DB "
     RETURN=$OK
   fi

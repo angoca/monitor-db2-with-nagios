@@ -228,7 +228,7 @@ if [[ $CONTINUE == true ]] ; then
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
   else
-    OUTPUT="DB2 - Instance directory is invalid."
+    OUTPUT="Instance directory is invalid."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
@@ -245,7 +245,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   if [[ $DATABASE == "" ]] ; then
-    OUTPUT="DB2 - The database $DATABASE_NAME is not cataloged."
+    OUTPUT="The database $DATABASE_NAME is not cataloged."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
@@ -254,7 +254,7 @@ fi
 if [[ $CONTINUE == true ]] ; then
   db2 connect to $DATABASE_NAME > /dev/null
   if [[ $? -ne 0 ]] ; then
-    OUTPUT="DB2 - Problem with the connection."
+    OUTPUT="Problem with the connection."
     RETURN=$UNKNOWN
     CONTINUE=false
   fi
@@ -287,11 +287,12 @@ if [[ $CONTINUE == true ]] ; then
     echo "RESULT:'$LOCK_WAIT'"
   fi
 
+  # Valida que LOCKS sea un numero y que no haya habido errores.
   if [[ ! $LOCKS =~ ^[0-9]+$ ]] ; then
     OUTPUT="Problem retrieving the locks."
     RETURN=$UNKNOWN
   elif [[ $LOCKS -eq 0 ]] ; then
-    OUTPUT="DB2 - There is not any application in lock-wait state."
+    OUTPUT="There is not any application in lock-wait state."
     PERFORMANCE="'Long duration locks'=0;$WARNING_THRES;$CRITICAL_THRES;0 "
     RETURN=$OK
   elif [[ $LOCK_WAIT != "Not Collected" ]] ; then
@@ -310,15 +311,15 @@ if [[ $CONTINUE == true ]] ; then
     fi
 
     if [[ $LOCK_WAIT -gt $CRITICAL_THRES ]] ; then
-      OUTPUT="DB2 - There are $LOCKS application(s) in lock wait. Handles $LOCK_IDS"
+      OUTPUT="There are $LOCKS application(s) in lock wait. Handles $LOCK_IDS"
       LONG_OUTPUT="The handles of the blocking applications are: $LOCK_IDS."
       RETURN=$CRITICAL
     elif [[ $LOCK_WAIT -gt $WARNING_THRES ]] ; then
-      OUTPUT="DB2 - There are $LOCKS application(s) in lock wait. Handles $LOCK_IDS"
+      OUTPUT="There are $LOCKS application(s) in lock wait. Handles $LOCK_IDS"
       LONG_OUTPUT="The handles of the blocking applications are: $LOCK_IDS."
       RETURN=$WARNING
     else
-      OUTPUT="DB2 - There are short time locks."
+      OUTPUT="There are short time locks."
       RETURN=$OK
     fi
     if [[ $VERBOSE == true ]] ; then
@@ -326,7 +327,7 @@ if [[ $CONTINUE == true ]] ; then
     fi
     PERFORMANCE="'Long duration locks'=$LOCK_WAIT;$WARNING_THRES;$CRITICAL_THRES;0 "
   else
-    OUTPUT="DB2 - There are lock-waits, but the monitor switches are off."
+    OUTPUT="There are lock-waits, but the monitor switches are off."
     RETURN=$WARNING
   fi
   PERFORMANCE="'All locks'=$LOCKS;;;0 "
