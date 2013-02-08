@@ -278,7 +278,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
  # Substring para ver si hubo un error
-  EXIST_ERROR=`echo $STATUS | cut -c 1-5`
+  EXIST_ERROR=`echo $EXIST | cut -c 1-5`
   if [[ $EXIST_ERROR == "error" ]] ; then
     OUTPUT="Connection problem"
     RETURN=$UNKNOWN
