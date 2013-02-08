@@ -260,6 +260,9 @@ if [[ $CONTINUE == true ]] ; then
       if [[ $PRIMARY == "Peer" ]] ; then
         OUTPUT="Database is primary and peer"
         RETURN=$OK
+      elif [[ $PRIMARY == "Disconnected" ]] ; then
+        OUTPUT="Standby database is not reachable"
+        RETURN=$WARNING
       else
         OUTPUT="Database is primary and not peer: $PRIMARY"
         RETURN=$UNKNOWN
@@ -276,6 +279,9 @@ if [[ $CONTINUE == true ]] ; then
       if [[ $STANDBY == "Peer" ]] ; then
         OUTPUT="Database is standby and peer"
         RETURN=$OK
+      elif [[ $STANDBY == "DisconnectedPeer" ]] ; then
+        OUTPUT="Pimary database is not reachable"
+        RETURN=$WARNING
       else
         OUTPUT="Database is standby and not peer: $STANDBY"
         RETURN=$UNKNOWN
