@@ -277,7 +277,7 @@ if [[ $CONTINUE == true ]] ; then
     echo "RESULT:'$EXIST'"
   fi
 
- # Substring para ver si hubo un error
+  # Substring para ver si hubo un error
   EXIST_ERROR=`echo $EXIST | cut -c 1-5`
   if [[ $EXIST_ERROR == "error" ]] ; then
     OUTPUT="Connection problem"
@@ -455,7 +455,7 @@ if [[ $CONTINUE == true ]] ; then
 
   if [[ $TB_ALLOCATED != "error" ]] ; then
     LONG_OUTPUT="Tablespace $TABLESPACE_NAME$TABLESPACE_ID has allocated $TB_ALLOCATED MB"
-    LONG_PERFORMANCE="'Allocated $TABLESPACE_NAME$TABLESPACE_ID'=${TB_ALLOCATED}" #;;;0 "
+    LONG_PERFORMANCE="Allocated=${TB_ALLOCATED} "
   fi
   ## Used size
   if [[ $TABLESPACE_NAME != "" ]] ; then
@@ -473,7 +473,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   if [[ $TB_SIZE != "error" ]] ; then
-    PERFORMANCE="'Tablespace $TABLESPACE_NAME$TABLESPACE_ID'=${TB_SIZE};;;0;$TB_ALLOCATED "
+    PERFORMANCE="Tablespace=${TB_SIZE} "
   fi
   ## High water mark
   set -f
@@ -494,8 +494,7 @@ if [[ $CONTINUE == true ]] ; then
 
   if [[ $TB_HWM != "error" ]] ; then
     LONG_OUTPUT="$LONG_OUTPUT and its watermark is at $TB_HWM"
-    LONG_PERFORMANCE="$LONG_PERFORMANCE
-'Current Watermark'=$TB_HWM;;;0;$TB_ALLOCATED"
+    LONG_PERFORMANCE="${LONG_PERFORMANCE}Watermark=${TB_HWM}"
   fi
   # TODO As part of the performance, display the status (backup pending, restore pending, etc.
 fi

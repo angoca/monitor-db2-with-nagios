@@ -285,7 +285,9 @@ if [[ $CONTINUE == true ]] ; then
      OUTPUT="Quantity of connections is critical, currently $QTY."
      RETURN=$CRITICAL
   fi
-  PERFORMANCE="'Connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES;0 "
+  PERFORMANCE="'Connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES "
+
+  # TODO Add the status of the connection (UOW, Connected, ...)
 fi
 
 # Prints the output.

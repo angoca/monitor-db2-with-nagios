@@ -260,7 +260,7 @@ if [[ $CONTINUE == true ]] ; then
       echo "RESULT DAY:'$DAY'"
       echo "RESULT ARCHIVE_SIZE:'$ARCHIVE_SIZE'"
     fi
-    PERFORMANCE="'Size archive logs'=$ARCHIVE_SIZE;;;0 "
+    PERFORMANCE="'Size archive logs'=$ARCHIVE_SIZE "
   fi
 fi
 

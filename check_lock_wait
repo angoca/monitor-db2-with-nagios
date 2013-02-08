@@ -330,7 +330,7 @@ if [[ $CONTINUE == true ]] ; then
     OUTPUT="There are lock-waits, but the monitor switches are off."
     RETURN=$WARNING
   fi
-  PERFORMANCE="'All locks'=$LOCKS;;;0 "
+  PERFORMANCE="'All locks'=$LOCKS "
 fi
 
 # Prints the output.
