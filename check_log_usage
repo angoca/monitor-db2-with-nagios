@@ -326,7 +326,7 @@ if [[ $CONTINUE == true ]] ; then
       RETURN=$CRITICAL
     fi
 
-    PERFORMANCE="'Log used'=$LOG_USED;$LOG_WARN;$LOG_CRIT;0;$LOG_TOTAL"
+    PERFORMANCE="'Log used'=$LOG_USED;$LOG_WARN;$LOG_CRIT;;$LOG_TOTAL"
   fi
 fi
 
