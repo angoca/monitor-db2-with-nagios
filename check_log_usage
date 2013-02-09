@@ -306,24 +306,23 @@ if [[ $CONTINUE == true ]] ; then
       OUTPUT="Please check database transaction workload ($LOG_USED files)."
       RETURN=$WARNING
     else
-    # TODO db2diag command does not function as desired.
-    #COMMAND_LOG_ID="db2diag -gi msg:=\"The active log is full\""
-    #LOG_ID=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}'`
-    #LOG_COUNT=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}' | wc -l`
+      COMMAND_LOG_ID="db2diag -readfile -gi msg:=\"The active log is full\""
+      LOG_ID=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}'`
+      LOG_COUNT=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}' | wc -l`
 
-    #if [[ $VERBOSE -ge 2 ]] ; then
-    #  echo "COMMAND: $COMMAND_LOG_ID"
-    #fi
-    #if [[ $VERBOSE -ge 3 ]] ; then
-    #  echo "RESULT LOG_ID:'$LOG_ID'"
-    #  echo "RESULT LOG_COUNT:'$LOG_COUNT'"
-    #fi
+      if [[ $VERBOSE -ge 2 ]] ; then
+        echo "COMMAND: $COMMAND_LOG_ID"
+      fi
+      if [[ $VERBOSE -ge 3 ]] ; then
+        echo "RESULT LOG_ID:'$LOG_ID'"
+        echo "RESULT LOG_COUNT:'$LOG_COUNT'"
+      fi
 
-    #if [[ $LOG_COUNT -ne "0" ]] ; then
-    #  OUTPUT="There was occurrence of transaction log full due to application handle: $LOGID"   
-    #else
-      OUTPUT="Workload is reaching the limit ($LOG_USED files)."
-    #fi
+      if [[ $LOG_COUNT -ne "0" ]] ; then
+        OUTPUT="There was occurrence of transaction log full due to application handle: $LOGID"
+      else
+        OUTPUT="Workload is reaching the limit ($LOG_USED files)."
+      fi
       RETURN=$CRITICAL
     fi
 
