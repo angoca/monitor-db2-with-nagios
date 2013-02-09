@@ -264,6 +264,31 @@ if [[ $CONTINUE == true ]] ; then
     RETURN=$CRITICAL
     PERFORMANCE="'Connectable Database'=1.2;1.6;1.3;1.1;2 "
   fi
+
+  # Check for HADR Window replay
+  COMMAND_ROLE="db2 get db cfg for $DATABASE_NAME"
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_ROLE"
+  fi
+  ROLE=`$COMMAND_ROLE | awk '/HADR database role/ {print $5}'`
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "RESULT:'$ROLE'"
+  fi
+  if [[ $ROLE == "STANDBY" ]] ; then
+    COMMAND_REPLAY="db2pd -db wfscpd -hadr"
+    if [[ $VERBOSE -ge 2 ]] ; then
+      echo "COMMAND: $COMMAND_REPLAY"
+    fi
+    REPLAY=`$COMMAND_REPLAY | awk '/^Active/ {print "active"}'`
+    if [[ $VERBOSE -ge 3 ]] ; then
+      echo "RESULT:'$REPLAY'"
+    fi
+    if [[ $REPLAY == "active" ]] ; then
+      LONG_PERFORMANCE="${LONG_PERFORMANCE}HADR-replay=2.4;2.6;;2.2;3 "
+    else
+      LONG_PERFORMANCE="${LONG_PERFORMANCE}HADR-replay=2.8;2.6;;2.2;3 "
+    fi
+  fi
 fi
 
 # Prints the output.
