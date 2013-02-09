@@ -325,7 +325,7 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE == true ]] ; then
       OUTPUT="$OUTPUT - IDs $LOCK_IDS"
     fi
-    PERFORMANCE="'Long duration locks'=$LOCK_WAIT;$WARNING_THRES;$CRITICAL_THRES;0 "
+    PERFORMANCE="'Long duration locks'=$LOCK_WAIT;$WARNING_THRES;$CRITICAL_THRES "
   else
     OUTPUT="There are lock-waits, but the monitor switches are off."
     RETURN=$WARNING
