@@ -221,11 +221,11 @@ if [[ $CONTINUE == true ]] ; then
 
   if [[ $PROC -eq "0" ]] ; then
     OUTPUT="Instance at $INSTANCE_HOME is down."
-    PERFORMANCE="'Started Instance'=0.2;;0.4;0 "
+    PERFORMANCE="'Started Instance'=0.2;;0.4 "
     RETURN=$CRITICAL
   else
     OUTPUT="Instance at $INSTANCE_HOME is up."
-    PERFORMANCE="'Started Instance'=$MAX_DB;;0.4;0;$MAX_DB "
+    PERFORMANCE="'Started Instance'=$MAX_DB;;0.4 "
     RETURN=$OK
   fi
 
@@ -240,7 +240,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   LONG_OUTPUT="There are $ACTIVE active databases"
-  LONG_PERFORMANCE="'Active Databases'=$ACTIVE;;0.2;0;$MAX_DB "
+  LONG_PERFORMANCE="'Active Databases'=$ACTIVE;;0.2 "
 fi
 
 # Prints the output.
