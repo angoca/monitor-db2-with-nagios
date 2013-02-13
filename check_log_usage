@@ -22,8 +22,6 @@
 # are long transactions.
 #
 # TODO: Accept percentage for warn and crit
-# TODO: When using check_by_ssh plugin, db2diag does not retrieve an answer for
-# the provided string, and it hungs.
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
@@ -267,8 +265,8 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT LOG_PRI:'$LOG_PRI'"
     echo "RESULT LOG_SEC:'$LOG_SEC'"
-    echo "RESULT LOG_PATH:'$LOG_PATH'"
     echo "RESULT LOG_PATH:'$LOG_TOTAL'"
+    echo "RESULT LOG_PATH:'$LOG_PATH'"
   fi
 
   LOG_USED=`ls -l $LOG_PATH*LOG | wc -l`
@@ -307,8 +305,8 @@ if [[ $CONTINUE == true ]] ; then
       RETURN=$WARNING
     else
       COMMAND_LOG_ID="db2diag -readfile -gi msg:=ADM1823E"
-      LOG_ID=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}'`
-      LOG_COUNT=`$COMMAND_LOG_ID | grep "\"." | uniq | awk -F\" '{print $2}' | wc -l`
+      LOG_ID=`$COMMAND_LOG_ID | grep "\"." | sort | uniq | awk -F\" '{print $2}'`
+      LOG_COUNT=`printf '%s\n' "$LOG_ID" | wc -l`
 
       if [[ $VERBOSE -ge 2 ]] ; then
         echo "COMMAND: $COMMAND_LOG_ID"
@@ -318,7 +316,7 @@ if [[ $CONTINUE == true ]] ; then
         echo "RESULT LOG_COUNT:'$LOG_COUNT'"
       fi
 
-      if [[ $LOG_COUNT -ne "0" ]] ; then
+      if [[ $LOG_COUNT -ne 0 ]] ; then
         OUTPUT="There was occurrence of transaction log full due to application handle: $LOG_ID"
       else
         OUTPUT="Workload is reaching the limit ($LOG_USED files)."
