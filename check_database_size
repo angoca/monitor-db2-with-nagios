@@ -1,0 +1,304 @@
+#! /usr/bin/env bash
+
+###############################################################################
+# Monitor DB2 with Nagios
+# Copyright 2013 Andres Gomez Casanova
+# https://github.com/angoca/monitor-db2-with-nagios
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+###############################################################################
+
+# This script checks the database size. Retrieves a critical alarm when the
+# size is bigger than the given size in critical, or retrieves a warning
+# alarm when the size percentage is bigger than the provided, comparing with
+# the allocated size.
+#
+# TODO Nagios usage.
+#
+# Parameters:
+# -c | --critical : TODO What is critical
+# -d | --database : Database name.
+# -h | --help : Show the help of this script.
+# -i | --instance : Home directory of the instance. Usually it is
+#   /home/db2inst1
+# -p | --percentage : Usage percentage (size : allocated).
+# -V | --version : Show the current version of this script.
+# -v | --verbose : Execute the program in verbose mode.
+#
+# The exit codes are the standard for Nagios.
+#
+# 0 The plugin was able to check the service and it appeared to be functioning
+#   properly.
+# 1 The plugin was able to check the service, but it appeared to be above some
+#   "warning" threshold or did not appear to be working properly.
+# 2 The plugin detected that either the service was not running or it was above
+#   some "critical" threshold.
+# 3 Invalid command line arguments were supplied to the plugin or low-level
+#   failures internal to the plugin (such as unable to fork, or open a tcp
+#   socket) that prevent it from performing the specified operation.
+#   Higher-level errors (such as name resolution errors, socket timeouts, etc)
+#   are outside of the control of plugins and should generally NOT be reported
+#   as UNKNOWN states.
+#
+# Author: Andres Gomez Casanova
+# Version: v1.0 2013-01-18
+
+# Flag for debugging.
+#set -xv
+
+# Version of this script.
+function print_revision {
+  echo Andres Gomez Casanova - AngocA
+  echo v1.0 2013-01-18
+}
+# Function to show the help
+function print_usage {
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-p] # -h # -V } 
+[ -v ]"
+}
+
+function print_help {
+  print_revision
+  print_usage $1
+  # Max 80 chars width.
+  /bin/cat <<__EOT
+Check the database usage size according with the allocated size. It triggers
+alarms if the size is bigger that the provided one (critical) or if it
+bigger that the provided percentage.
+-c | --critical INTEGER
+   Database usage size to be consider as critical. Value in bytes.
+-d | --database STRING
+   Database name.
+-h | --help
+   Shows the current documentation.
+-i | --instance STRING
+   Instance home directory. It is usually /home/db2inst1
+-p | --percentage INTEGER
+   Usage percentage (size : allocated). Value between 1 and 99.
+-v | --verbose
+   Executes the script in verbose mode (multiple times).
+-V | --version
+   Shows the current version of this script.
+__EOT
+}
+
+# Variable to control the flow execution. Prevent Spaghetti code.
+CONTINUE=true
+
+# Nagios return codes
+OK=0
+WARNING=1
+CRITICAL=2
+UNKNOWN=3
+# This is the returned code.
+RETURN=$UNKNOWN
+
+# Nagios Output
+# Text output 80 chars | Optional Perf Data Line 1
+# Long text Line 1
+# Long text Line 2 | Optional Perf Data Line 2
+# Optional Perf Data Line 3
+OUTPUT=
+PERFORMANCE=
+LONG_OUTPUT=
+LONG_PERFORMANCE=
+
+APPL_NAME=$0
+
+if [[ $# -eq 0 ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+# The following requieres GNU getopt. See the following discusion.
+# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+
+TEMP=`getopt -o hVvi:d:c:p: --long help,version,verbose,instance:,database:,critical:,percentage: \
+             -n $APPL_NAME -- "$@"`
+
+if [[ $? -ne 0 ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  # Note the quotes around $TEMP: they are essential!
+  eval set -- "$TEMP"
+
+  HELP=false
+  VERSION=false
+  # Verbosity level
+  VERBOSE=0
+  INSTANCE_HOME=
+  DATABASE_NAME=
+  CRITICAL_THRES=-1
+  PERCENTAGE=-1
+  while true; do
+    case "$1" in
+      -c | --critical ) CRITICAL_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -h | --help ) HELP=true; shift ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -V | --version ) VERSION=true; shift ;;
+      -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
+      -p | --percentage ) PERCENTAGE=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -- ) shift; break ;;
+      * ) break ;;
+    esac
+  done
+fi
+
+if [[ $VERBOSE -ge 2 ]] ; then
+  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
+  ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
+  ECHO=$ECHO"percentage:$PERCENTAGE, critical:$CRITICAL_THRES"
+  echo $ECHO
+fi
+
+if [[ $CONTINUE == true && $HELP == true ]] ; then
+  print_help $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $VERSION == true ]] ; then
+  print_revision $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CRITICAL_THRES == ""
+    || ! $CRITICAL_THRES =~ ^[0-9]+$
+    || $CRITICAL_THRES -lt 0 ]] ; then
+  print_usage $APPL_NAME
+  echo "Threshold should be greater than 0."
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $PERCENTAGE == "" 
+    || ! $PERCENTAGE =~ ^[0-9]+$ 
+    || $PERCENTAGE -lt 0 || $PERCENTAGE -ge 100 ]] ; then
+  print_usage $APPL_NAME
+  echo "Percentage should be between 1 and 99."
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  # Trims the characters.
+  INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
+  DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
+
+  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+    # Load the DB2 profile.
+    . $INSTANCE_HOME/sqllib/db2profile
+  else
+    OUTPUT="Instance directory is invalid."
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  COMMAND_DATABASE="db2 list db directory"
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_DATABASE"
+  fi
+  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "RESULT:'$DATABASE'"
+  fi
+
+  if [[ $DATABASE == "" ]] ; then
+    OUTPUT="The database $DATABASE_NAME is not cataloged."
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  COMMAND_DBSIZE="db2 call CALL GET_DBSIZE_INFO(?, ?, ?, 0)"
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_DBSIZE"
+  fi
+  DBSIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_DBSIZE | grep Name | grep -w $TABLESPACE_NAME | awk '{print $3}' ; db2 connect reset > /dev/null`
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "RESULT:'$DBSIZE'"
+  fi
+  # Substring para ver si hubo un error
+  EXIST_ERROR=`echo $DBSIZE | cut -c 1-5`
+  if [[ $EXIST_ERROR == "error" ]] ; then
+    OUTPUT="Connection problem"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  else
+    INDEX=0
+    ALLOCATED=
+    SIZE=
+    while IFS= read LINE ; do
+      if [[ $INDEX -eq 2 ]] ; then
+        SIZE=`echo $LINE | cut -d' ' -f4`
+      elif [[ $INDEX -eq 3 ]] ; then
+        ALLOCATED=`echo $LINE | cut -d' ' -f4`
+      fi
+      INDEX=$(($INDEX+1))
+    done < <( printf '%s\n' "$DBSIZE" | grep Value)
+    
+    PERCENT=`echo "$SIZE * 100 / $ALLOCATED" | bc`
+    if [[ $VERBOSE -ge 3 ]] ; then
+      echo "PERCENT:'$PERCENT'"
+    fi
+    if [[ $CRITICAL -ne 0 && $SIZE -ge $CRITICAL ]] ; then
+      OUTPUT="Database size surpassed the provided limit ($SIZE > $CRITICAL). "
+      RETURN=$CRITICAL
+    elif [[ $PERCENTAGE -ne 0 && $PERCENT -ge $PERCENTAGE ]] ; then
+      OUTPUT="Database size is reaching the limit ($PERCENT). "
+      RETURN=$WARNING
+    else
+      RETURN=$OK
+    fi
+    OUTPUT="${OUTPUT}Size is ${SIZE}B allocated in ${ALLOCATED}B" 
+    
+    # Performance data
+    PERFORMANCE="'Database size'=${SIZE}B "
+    LONG_PERFORMANCE="'Database allocation'=${ALLOCATED}B "
+  fi
+fi
+
+# Prints the output.
+if [[ $OUTPUT == "" ]] ; then
+  OUTPUT="Note: The test was not executed."
+fi
+# Builds the output.
+echo "$OUTPUT|$PERFORMANCE
+$LONG_OUTPUT|$LONG_PERFORMANCE"
+# Returns the error code.
+if [[ $VERBOSE -ge 2 ]] ; then
+  echo "Return code: $RETURN"
+fi
+exit $RETURN
