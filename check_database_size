@@ -144,17 +144,19 @@ if [[ $CONTINUE == true ]] ; then
   INSTANCE_HOME=
   DATABASE_NAME=
   CRITICAL_THRES=-1
+  CRITICAL_SET=false
   PERCENTAGE=-1
+  PERCENTAGE_SET=false
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
-      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'`; shift 2 ;;
-      -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
-      -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
-      -p | --percentage ) PERCENTAGE=`echo $2 | awk '{print $1}'`; shift 2 ;;
-      -- ) shift; break ;;
+      -c | --critical ) CRITICAL_THRES=`echo $2 | awk '{print $1}'` ; CRITICAL_SET=true ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'` ; shift 2 ;;
+      -h | --help ) HELP=true ; shift ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'` ; shift 2 ;;
+      -V | --version ) VERSION=true ; shift ;;
+      -v | --verbose ) VERBOSE=$VERBOSE+1 ; shift ;;
+      -p | --percentage ) PERCENTAGE=`echo $2 | awk '{print $1}'` ; PERCENTAGE_SET=true ; shift 2 ;;
+      -- ) shift ; break ;;
       * ) break ;;
     esac
   done
@@ -163,7 +165,8 @@ fi
 if [[ $VERBOSE -ge 2 ]] ; then
   ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
   ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-  ECHO=$ECHO"percentage:$PERCENTAGE, critical:$CRITICAL_THRES"
+  ECHO=$ECHO"percentage:$PERCENTAGE, percentage_set:$PERCENTAGE_SET, "
+  ECHO=$ECHO"critical:$CRITICAL_THRES, critical_set:$CRITICAL_SET "
   echo $ECHO
 fi
 
@@ -191,18 +194,18 @@ if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
   CONTINUE=false
 fi
 
-if [[ $CRITICAL_THRES == ""
+if [[ $CRITICAL_SET == true && ( $CRITICAL_THRES == ""
     || ! $CRITICAL_THRES =~ ^[0-9]+$
-    || $CRITICAL_THRES -lt 0 ]] ; then
+    || $CRITICAL_THRES -lt 0 ) ]] ; then
   print_usage $APPL_NAME
   echo "Threshold should be greater than 0."
   RETURN=$UNKNOWN
   CONTINUE=false
 fi
 
-if [[ $PERCENTAGE == "" 
+if [[ $PERCENTAGE_SET == true && ( $PERCENTAGE == "" 
     || ! $PERCENTAGE =~ ^[0-9]+$ 
-    || $PERCENTAGE -lt 0 || $PERCENTAGE -ge 100 ]] ; then
+    || $PERCENTAGE -lt 0 || $PERCENTAGE -ge 100 ) ]] ; then
   print_usage $APPL_NAME
   echo "Percentage should be between 1 and 99."
   RETURN=$UNKNOWN
@@ -242,7 +245,7 @@ if [[ $CONTINUE == true ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
-  COMMAND_DBSIZE="db2 call CALL GET_DBSIZE_INFO(?, ?, ?, 0)"
+  COMMAND_DBSIZE="db2 CALL GET_DBSIZE_INFO(?, ?, ?, 0)"
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DBSIZE"
   fi
@@ -273,10 +276,10 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "PERCENT:'$PERCENT'"
     fi
-    if [[ $CRITICAL -ne 0 && $SIZE -ge $CRITICAL ]] ; then
+    if [[ $CRITICAL_SET == true && $CRITICAL -ne 0 && $SIZE -ge $CRITICAL ]] ; then
       OUTPUT="Database size surpassed the provided limit ($SIZE > $CRITICAL). "
       RETURN=$CRITICAL
-    elif [[ $PERCENTAGE -ne 0 && $PERCENT -ge $PERCENTAGE ]] ; then
+    elif [[ $PERCENTAGE_SET == true && $PERCENTAGE -ne 0 && $PERCENT -ge $PERCENTAGE ]] ; then
       OUTPUT="Database size is reaching the limit ($PERCENT). "
       RETURN=$WARNING
     else
