@@ -26,12 +26,13 @@
 # TODO Nagios usage.
 #
 # Parameters:
-# -c | --critical : TODO What is critical
+# -c | --critical : Database size considered as critical.
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
 # -p | --percentage : Usage percentage (size : allocated).
+# -r | --refresh : Cache minutes before refresh (Stored procedure).
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
 #
@@ -63,7 +64,7 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-p] # -h # -V } 
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-p][-r] # -h # -V } 
 [ -v ]"
 }
 
@@ -85,6 +86,9 @@ bigger that the provided percentage.
    Instance home directory. It is usually /home/db2inst1
 -p | --percentage INTEGER
    Usage percentage (size : allocated). Value between 1 and 99.
+-r | --refresh INTEGER
+   Quantity of minutes before refresh cache values in the database.
+   Used to call the stored procedure GET_DBSIZE_INFO.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -124,7 +128,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d:c:p: --long help,version,verbose,instance:,database:,critical:,percentage: \
+TEMP=`getopt -o hVvi:d:c:p:r: --long help,version,verbose,instance:,database:,critical:,percentage:,refresh: \
              -n $APPL_NAME -- "$@"`
 
 if [[ $? -ne 0 ]] ; then
@@ -147,15 +151,17 @@ if [[ $CONTINUE == true ]] ; then
   CRITICAL_SET=false
   PERCENTAGE=-1
   PERCENTAGE_SET=false
+  REFRESH=-1
   while true; do
     case "$1" in
       -c | --critical ) CRITICAL_THRES=`echo $2 | awk '{print $1}'` ; CRITICAL_SET=true ; shift 2 ;;
       -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'` ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'` ; shift 2 ;;
+      -p | --percentage ) PERCENTAGE=`echo $2 | awk '{print $1}'` ; PERCENTAGE_SET=true ; shift 2 ;;
+      -r | --refresh ) REFRESH=`echo $2 | awk '{print $1}'` ; shift 2 ;;
       -V | --version ) VERSION=true ; shift ;;
       -v | --verbose ) VERBOSE=$VERBOSE+1 ; shift ;;
-      -p | --percentage ) PERCENTAGE=`echo $2 | awk '{print $1}'` ; PERCENTAGE_SET=true ; shift 2 ;;
       -- ) shift ; break ;;
       * ) break ;;
     esac
@@ -166,7 +172,8 @@ if [[ $VERBOSE -ge 2 ]] ; then
   ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
   ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
   ECHO=$ECHO"percentage:$PERCENTAGE, percentage_set:$PERCENTAGE_SET, "
-  ECHO=$ECHO"critical:$CRITICAL_THRES, critical_set:$CRITICAL_SET "
+  ECHO=$ECHO"critical:$CRITICAL_THRES, critical_set:$CRITICAL_SET, "
+  ECHO=$ECHO"refresh:$REFRESH "
   echo $ECHO
 fi
 
@@ -212,6 +219,14 @@ if [[ $PERCENTAGE_SET == true && ( $PERCENTAGE == ""
   CONTINUE=false
 fi
 
+if [[ ! $REFRESH =~ ^[-0-9]+$ || $REFRESH -lt -1 ]] ; then
+  print_usage $APPL_NAME
+  echo "Refresh cache should be -1 for default (30 minutes), 0 to force"
+  echo "calculation, or a quantity of second (positive value)."
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
 if [[ $CONTINUE == true ]] ; then
   # Trims the characters.
   INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
@@ -245,11 +260,11 @@ if [[ $CONTINUE == true ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
-  COMMAND_DBSIZE="db2 CALL GET_DBSIZE_INFO(?, ?, ?, 0)"
+  COMMAND_DBSIZE="db2 CALL GET_DBSIZE_INFO(?, ?, ?, $REFRESH)"
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DBSIZE"
   fi
-  DBSIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_DBSIZE | grep Name | grep -w $TABLESPACE_NAME | awk '{print $3}' ; db2 connect reset > /dev/null`
+  DBSIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_DBSIZE ; db2 connect reset > /dev/null`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$DBSIZE'"
   fi
