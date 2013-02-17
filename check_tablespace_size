@@ -290,30 +290,36 @@ if [[ $CONTINUE == true ]] ; then
   fi
 fi
 if [[ $CONTINUE == true ]] ; then
+  COMMAND_TS="db2 -x select integer(TBSP_UTILIZATION_PERCENT), TBSP_TYPE, TBSP_CONTENT_TYPE, TBSP_USING_AUTO_STORAGE, TBSP_AUTO_RESIZE_ENABLED, TBSP_STATE, TBSP_TOTAL_SIZE_KB / 1024, TBSP_USED_SIZE_KB / 1024, TBSP_PAGE_TOP * TBSP_PAGE_SIZE / 1024 / 1024 from sysibmadm.TBSP_UTILIZATION "
   if [[ $TABLESPACE_NAME != "" ]] ; then
-    COMMAND_SIZE="db2 -x select integer(TBSP_UTILIZATION_PERCENT) from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
+    COMMAND_TS="$COMMAND_TS where TBSP_NAME = '$TABLESPACE_NAME'"
   else
-    COMMAND_SIZE="db2 -x select integer(TBSP_UTILIZATION_PERCENT) from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
+    COMMAND_TS="$COMMAND_TS where TBSP_ID = $TABLESPACE_ID"
   fi
   if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_SIZE"
+    echo "COMMAND: $COMMAND_TS"
   fi
-  SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
+  set -f
+  TS=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_TS ; db2 connect reset > /dev/null`
+  set +f
+  TS_ERROR=`echo $TS | cut -c 1-5`
+  if [[ $TS_ERROR == "error" ]] ; then
+    OUTPUT="Connection problem"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "RESULT:'$TS'"
+  fi
+fi
 
+if [[ $CONTINUE == true ]] ; then
+  SIZE=`printf '%s\n' "$TS" | awk '{print $1}'`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$SIZE'"
   fi
 
-  if [[ $TABLESPACE_NAME != "" ]] ; then
-    COMMAND_SIZE="db2 -x select TBSP_TYPE from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
-  else
-    COMMAND_SIZE="db2 -x select TBSP_TYPE from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
-  fi
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_SIZE"
-  fi
-  TYPE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
-
+  TYPE=`printf '%s\n' "$TS" | awk '{print $2}'`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$TYPE'"
   fi
@@ -323,16 +329,7 @@ if [[ $CONTINUE == true ]] ; then
       OUTPUT="Tablespace size is OK (SMS)."
       RETURN=$OK
     else
-      if [[ $TABLESPACE_NAME != "" ]] ; then
-        COMMAND_CONTENT="db2 -x select TBSP_CONTENT_TYPE from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
-      else
-        COMMAND_CONTENT="db2 -x select TBSP_CONTENT_TYPE from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
-      fi
-      if [[ $VERBOSE -ge 2 ]] ; then
-        echo "COMMAND: $COMMAND_CONTENT"
-      fi
-      CONTENT=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_CONTENT | awk '{print $1}' ; db2 connect reset > /dev/null`
-
+      CONTENT=`printf '%s\n' "$TS" | awk '{print $3}'`
       if [[ $VERBOSE -ge 3 ]] ; then
         echo "RESULT:'$CONTENT'"
       fi
@@ -346,30 +343,12 @@ if [[ $CONTINUE == true ]] ; then
     fi
   elif [[ $TYPE == "DMS" ]] ; then
     # Tablespace should be DMS
-    if [[ $TABLESPACE_NAME != "" ]] ; then
-      COMMAND_SIZE="db2 -x select TBSP_USING_AUTO_STORAGE from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
-    else
-      COMMAND_SIZE="db2 -x select TBSP_USING_AUTO_STORAGE from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
-    fi
-    if [[ $VERBOSE -ge 2 ]] ; then
-      echo "COMMAND: $COMMAND_SIZE"
-    fi
-    AUTO=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
-
+    AUTO=`printf '%s\n' "$TS" | awk '{print $4}'`
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "RESULT:'$AUTO'"
     fi
 
-    if [[ $TABLESPACE_NAME != "" ]] ; then
-      COMMAND_SIZE="db2 -x select TBSP_AUTO_RESIZE_ENABLED from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
-    else
-      COMMAND_SIZE="db2 -x select TBSP_AUTO_RESIZE_ENABLED from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
-    fi
-    if [[ $VERBOSE -ge 2 ]] ; then
-      echo "COMMAND: $COMMAND_SIZE"
-    fi
-    RESIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
-
+    RESIZE=`printf '%s\n' "$TS" | awk '{print $5}'`
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "RESULT:'$RESIZE'"
     fi
@@ -392,7 +371,7 @@ if [[ $CONTINUE == true ]] ; then
       if [[ $SIZE -lt $WARNING_THRES ]] ; then
         OUTPUT="Tablespace size is OK ($SIZE%)."
         RETURN=$OK
-      elif [I[ $SIZE -lt $CRITICAL_THRES ]] ; then
+      elif [[ $SIZE -lt $CRITICAL_THRES ]] ; then
         OUTPUT="Tablespace size is getting bigger ($SIZE%)."
         RETURN=$WARNING
       else
@@ -406,16 +385,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
   
   #Availability
-  if [[ $TABLESPACE_NAME != "" ]] ; then
-    COMMAND_SIZE="db2 -x select TBSP_STATE from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
-  else
-    COMMAND_SIZE="db2 -x select TBSP_STATE from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
-  fi
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_SIZE"
-  fi
-  STATUS=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
-
+  STATUS=`printf '%s\n' "$TS" | awk '{print $6}'`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$STATUS'"
   fi
@@ -439,63 +409,27 @@ fi
 if [[ $CONTINUE == true ]] ; then
   # Performance data
   ## Allocated size
-  if [[ $TABLESPACE_NAME != "" ]] ; then
-    COMMAND_ALLOCATED="db2 -x select TBSP_TOTAL_SIZE_KB / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
-  else
-    COMMAND_ALLOCATED="db2 -x select TBSP_TOTAL_SIZE_KB / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
-  fi
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_ALLOCATED"
-  fi
-  TB_ALLOCATED=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_ALLOCATED | awk '{print $1}' ; db2 connect reset > /dev/null`
-
+  TB_ALLOCATED=`printf '%s\n' "$TS" | awk '{print $7}'`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$TB_ALLOCATED'"
   fi
+  LONG_OUTPUT="Tablespace $TABLESPACE_NAME$TABLESPACE_ID has allocated $TB_ALLOCATED MB"
+  LONG_PERFORMANCE="Allocated=${TB_ALLOCATED} "
 
-  if [[ $TB_ALLOCATED != "error" ]] ; then
-    LONG_OUTPUT="Tablespace $TABLESPACE_NAME$TABLESPACE_ID has allocated $TB_ALLOCATED MB"
-    LONG_PERFORMANCE="Allocated=${TB_ALLOCATED} "
-  fi
   ## Used size
-  if [[ $TABLESPACE_NAME != "" ]] ; then
-    COMMAND_SIZE="db2 -x select TBSP_USED_SIZE_KB / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
-  else
-    COMMAND_SIZE="db2 -x select TBSP_USED_SIZE_KB / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
-  fi
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_SIZE"
-  fi
-  TB_SIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_SIZE | awk '{print $1}' ; db2 connect reset > /dev/null`
-
+  TB_SIZE=`printf '%s\n' "$TS" | awk '{print $8}'`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$TB_SIZE'"
   fi
+  PERFORMANCE="Tablespace=${TB_SIZE} "
 
-  if [[ $TB_SIZE != "error" ]] ; then
-    PERFORMANCE="Tablespace=${TB_SIZE} "
-  fi
   ## High water mark
-  set -f
-  if [[ $TABLESPACE_NAME != "" ]] ; then
-    COMMAND_HWM="db2 -x select TBSP_PAGE_TOP * TBSP_PAGE_SIZE / 1024 / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '$TABLESPACE_NAME'"
-  else
-    COMMAND_HWM="db2 -x select TBSP_PAGE_TOP * TBSP_PAGE_SIZE / 1024 / 1024 from sysibmadm.TBSP_UTILIZATION where TBSP_ID = $TABLESPACE_ID"
-  fi
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_HWM"
-  fi
-  TB_HWM=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_HWM | awk '{print $1}' ; db2 connect reset > /dev/null`
-  set +f
-
+  TB_HWM=`printf '%s\n' "$TS" | awk '{print $9}'`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$TB_HWM'"
   fi
-
-  if [[ $TB_HWM != "error" ]] ; then
-    LONG_OUTPUT="$LONG_OUTPUT and its watermark is at $TB_HWM"
-    LONG_PERFORMANCE="${LONG_PERFORMANCE}Watermark=${TB_HWM}"
-  fi
+  LONG_OUTPUT="$LONG_OUTPUT and its watermark is at $TB_HWM"
+  LONG_PERFORMANCE="${LONG_PERFORMANCE}Watermark=${TB_HWM}"
   # TODO As part of the performance, display the status (backup pending, restore pending, etc.
 fi
 
