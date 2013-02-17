@@ -299,6 +299,10 @@ if [[ $CONTINUE == true ]] ; then
     OUTPUT="Trying to update calculation in Standby database"
     RETURN=$UNKNOWN
     CONTINUE=false
+  elif [[ $DBSIZE == "" ]] ; then
+    OUTPUT="Empty output, cheect the command"
+    RETURN=$UNKNOWN
+    CONTINUE=false
   else
     INDEX=0
     ALLOCATED=
@@ -316,8 +320,8 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "PERCENT:'$PERCENT'"
     fi
-    if [[ $CRITICAL_SET == true && $CRITICAL -ne 0 && $SIZE -ge $CRITICAL ]] ; then
-      OUTPUT="Database size surpassed the provided limit ($SIZE > $CRITICAL). "
+    if [[ $CRITICAL_SET == true && $CRITICAL_THRES -ne 0 && $SIZE -gt $CRITICAL_THRES ]] ; then
+      OUTPUT="Database size surpassed the provided limit ($SIZE > $CRITICAL_THRES). "
       RETURN=$CRITICAL
     elif [[ $PERCENTAGE_SET == true && $PERCENTAGE -ne 0 && $PERCENT -ge $PERCENTAGE ]] ; then
       OUTPUT="Database size is reaching the limit ($PERCENT). "
