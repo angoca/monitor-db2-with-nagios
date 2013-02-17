@@ -23,10 +23,20 @@
 # alarm when the size percentage is bigger than the provided, comparing with
 # the allocated size.
 #
+# The user that executes this script needs some special permission in the
+# tables associated with  storage management.
+#
+# db2 grant execute on procedure sysproc.GET_DBSIZE_INFO to user nagios
+# db2 grant select,update on table SYSTOOLS.STMG_DBSIZE_INFO to user nagios
+#
+# Be careful when using with a standby database in an HADR environment. The
+# values should be updated in the primary database. The standby should only
+# retrieve these values.
+#
 # # 'check_database_size' command definition
 # define command {
 #         command_name    check_database_size
-#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -t 20 -C "scripts/check_database_size -i '$ARG1$' -d '$ARG2$' -r 0"
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -t 20 -C "scripts/check_database_size -i '$ARG1$' -d '$ARG2$' -r 720"
 # }
 # define service{
 #         host_name               db2sever
@@ -34,7 +44,6 @@
 #         check_command           check_database_size!/home/db2inst1!sample
 #         use                     generic-service
 # }
-
 #
 # Parameters:
 # -c | --critical : Database size considered as critical.
@@ -281,8 +290,13 @@ if [[ $CONTINUE == true ]] ; then
   fi
   # Substring para ver si hubo un error
   EXIST_ERROR=`echo $DBSIZE | cut -c 1-5`
+  HADR_ERROR=`echo $DBSIZE | grep SQL1773`
   if [[ $EXIST_ERROR == "error" ]] ; then
     OUTPUT="Connection problem"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  elif [[ $HADR_ERROR != "" ]] ; then
+    OUTPUT="Trying to update calculation in Standby database"
     RETURN=$UNKNOWN
     CONTINUE=false
   else
