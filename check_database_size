@@ -300,7 +300,7 @@ if [[ $CONTINUE == true ]] ; then
     RETURN=$UNKNOWN
     CONTINUE=false
   elif [[ $DBSIZE == "" ]] ; then
-    OUTPUT="Empty output, cheect the command"
+    OUTPUT="Empty output, check the command"
     RETURN=$UNKNOWN
     CONTINUE=false
   else
