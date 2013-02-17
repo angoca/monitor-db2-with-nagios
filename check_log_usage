@@ -168,7 +168,7 @@ if [[ $CONTINUE == true ]] ; then
       -h | --help ) HELP=true; shift ;;
       -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=$VERBOSE+1; shift ;;
+      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -w | --warning ) WARNING_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
       --update ) UPDATE_MON=true; shift ;;
       -- ) shift; break ;;
@@ -257,9 +257,21 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DB_CFG"
   fi
-  LOG_PRI=`$COMMAND_DB_CFG | grep LOGPRIMARY | awk -F"= " '{print $2}' | tail -1`
-  LOG_SEC=`$COMMAND_DB_CFG | grep LOGSECOND | awk -F"= " '{print $2}' | tail -1`
-  LOG_PATH=`$COMMAND_DB_CFG | grep "Path to log files" | awk -F"= " '{print $2}' | tail -1`
+  COMMAND_OUTPUT=`$COMMAND_DB_CFG` 
+  while IFS= read -r LINE ; do
+    LOG_PRI_GREP=`echo $LINE | grep LOGPRIMARY`
+    if [[ $LOG_PRI == "" || $LOG_PRI_GREP != "" ]] ; then
+      LOG_PRI=`echo $LOG_PRI_GREP | awk -F"= " '{print $2}' | tail -1`
+    fi
+    LOG_SEC_GREP=`echo $LINE | grep LOGSECOND`
+    if [[ $LOG_SEC == "" || $LOG_SEC_GREP != "" ]] ; then
+      LOG_SEC=`echo $LOG_SEC_GREP | awk -F"= " '{print $2}' | tail -1`
+    fi
+    LOG_PATH_GREP=`echo $LINE | grep "Path to log files"`
+    if [[ $LOG_PATH == "" || $LOG_PATH_GREP != "" ]] ; then
+      LOG_PATH=`echo $LOG_PATH_GREP | awk -F"= " '{print $2}' | tail -1`
+    fi
+  done < <( printf '%s\n' "$COMMAND_OUTPUT" | grep -i log )
   LOG_TOTAL=`echo "$LOG_PRI+$LOG_SEC" | bc`
 
   if [[ $VERBOSE -ge 3 ]] ; then
