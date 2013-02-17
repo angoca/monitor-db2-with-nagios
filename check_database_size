@@ -181,7 +181,7 @@ if [[ $CONTINUE == true ]] ; then
       -p | --percentage ) PERCENTAGE=`echo $2 | awk '{print $1}'` ; PERCENTAGE_SET=true ; shift 2 ;;
       -r | --refresh ) REFRESH=`echo $2 | awk '{print $1}'` ; shift 2 ;;
       -V | --version ) VERSION=true ; shift ;;
-      -v | --verbose ) VERBOSE=$VERBOSE+1 ; shift ;;
+      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )) ; shift ;;
       -- ) shift ; break ;;
       * ) break ;;
     esac
