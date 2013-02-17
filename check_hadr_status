@@ -231,12 +231,13 @@ if [[ $CONTINUE == true ]] ; then
     OUTPUT="Database is not in HADR"
     RETURN=$UNKNOWN
   else
+    COMMAND_HADR="db2pd -db wfscpd -hadr"
+    if [[ $VERBOSE -ge 2 ]] ; then
+      echo "COMMAND: $COMMAND_HADR"
+    fi
+    OUTPUT_HADR=`$COMMAND_HADR`
     if [[ $ROLE == "PRIMARY" ]] ; then
-      COMMAND_PRIMARY="db2pd -db wfscpd -hadr"
-      if [[ $VERBOSE -ge 2 ]] ; then
-        echo "COMMAND: $COMMAND_PRIMARY"
-      fi
-      PRIMARY=`$COMMAND_PRIMARY | awk '/^Primary / {print $2}'`
+      PRIMARY=`printf '%s\n' "$OUTPUT_HADR" | awk '/^Primary / {print $2}'`
       if [[ $VERBOSE -ge 3 ]] ; then
         echo "RESULT:'$PRIMARY'"
       fi
@@ -251,11 +252,7 @@ if [[ $CONTINUE == true ]] ; then
         RETURN=$UNKNOWN
       fi
     elif [[ $ROLE == "STANDBY" ]] ; then
-      COMMAND_STANDBY="db2pd -db wfscpd -hadr"
-      if [[ $VERBOSE -ge 2 ]] ; then
-        echo "COMMAND: $COMMAND_STANDBY"
-      fi
-      STANDBY=`$COMMAND_STANDBY | awk '/^Standby/ {print $2}'`
+      STANDBY=`printf '%s\n' "$OUTPUT_HADR" | awk '/^Standby/ {print $2}'`
       if [[ $VERBOSE -ge 3 ]] ; then
         echo "RESULT:'$STANDBY'"
       fi
@@ -277,10 +274,10 @@ if [[ $CONTINUE == true ]] ; then
   fi
 fi
 if [[ $CONTINUE == true ]] ; then
-  HEX_DIFF=`db2pd -db wfscpd -hadr | awk '/LOG/ {print $3}' | awk -Fx '{print $2}' | sed 'N;s/\n/-/' | awk '{print "ibase=16;"$1}' | bc`
+  HEX_DIFF=`printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $3}' | awk -Fx '{print $2}' | sed 'N;s/\n/-/' | awk '{print "ibase=16;"$1}' | bc`
   PERFORMANCE="HexDiff=${HEX_DIFF} " 
-  PAGE_DIFF=`db2pd -db wfscpd -hadr | awk '/LOG/ {print $2}' | sed 'N;s/\n/-/' | bc`
-  LOG_DIFF=`db2pd -db wfscpd -hadr | awk '/LOG/ {print $1}' | awk -F. '{print $1}' | sed 's/^.//' | sed 'N;s/\n/-/' | bc`
+  PAGE_DIFF=`printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $2}' | sed 'N;s/\n/-/' | bc`
+  LOG_DIFF=`printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $1}' | awk -F. '{print $1}' | sed 's/^.//' | sed 'N;s/\n/-/' | bc`
   LONG_PERFORMANCE="PageDiff=${PAGE_DIFF} LogDiff=${LOG_DIFF} " 
 fi
 # Prints the output.
