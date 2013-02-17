@@ -195,8 +195,13 @@ if [[ $CONTINUE == true ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
+  COMMAND_CONF="db2 get dbm cfg"
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_CONF"
+  fi
+  OUTPUT_CONF=`$COMMAND_CONF`
   # Gets the service name configure in the instance. It could be a text or a number.
-  SVCNAME=`db2 get dbm cfg | grep SVCENAME | awk -F= '{print $2}' | sed "s/^[ \t]*//"`
+  SVCNAME=`printf '%s\n' "$OUTPUT_CONF" | grep SVCENAME | awk -F= '{print $2}' | sed "s/^[ \t]*//"`
   # Copies the value in portnum, but checks later.
   PORTNUM=$SVCNAME
 
@@ -206,12 +211,7 @@ if [[ $CONTINUE == true ]] ; then
     PORTNUM=`grep -P $REGEXP /etc/services | awk '{print $2}' | awk -F/ '{print $1}'`
   fi
 
-  COMMAND_MAX_DB="db2 get dbm cfg"
-  if [[ $ERBOSE -ge 2 ]] ; then
-    echo "Command: $COMMAND_MAX_DB"
-  fi
-
-  MAX_DB=`$COMMAND_MAX_DB | awk '/NUMDB/ {print $9}'`
+  MAX_DB=`printf '%s\n' "$OUTPUT_CONF" | awk '/NUMDB/ {print $9}'`
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "Result: $MAX_DB"
   fi
