@@ -195,6 +195,18 @@ if [[ $CONTINUE == true ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
+  COMMAND_PID="db2pd -edus | awk '/db2sysc PID/ {print \$3}'"
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_PID"
+  fi
+  OUTPUT_PID=`$COMMAND_PID`
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "Result: $OUTPUT_PID"
+  fi
+  if [[ $OUTPUT_PID != "" && $OUTPUT_PID =~ ^[0-9]+$ ]] ; then
+    OUTPUT_PS=`ps -ef | grep db2sysc | grep $OUTPUT_PID`
+  fi
+
   COMMAND_CONF="db2 get dbm cfg"
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_CONF"
@@ -212,21 +224,46 @@ if [[ $CONTINUE == true ]] ; then
   fi
 
   MAX_DB=`printf '%s\n' "$OUTPUT_CONF" | awk '/NUMDB/ {print $9}'`
-  if [[ $VERBOSE -ge 2 ]] ; then
+  if [[ $VERBOSE -ge 3 ]] ; then
     echo "Result: $MAX_DB"
   fi
 
   # Checks if the port has a active service associated.
-  PROC=`netstat -na | grep $PORTNUM | wc -l`
+  if [[ $PORTNUM != "" ]] ; then
+    PROC=`netstat -na | grep $PORTNUM | wc -l`
+  fi
 
-  if [[ $PROC -eq "0" ]] ; then
-    OUTPUT="Instance at $INSTANCE_HOME is down."
+  if [[ $OUTPUT_PID == "" || ! $OUTPUT_PID =~ ^[0-9]+$ ]] ; then
+    OUTPUT="Instance is not started (not listed in EDUs). "
+    PERFORMANCE="'Started Instance'=0.1;;0.4 "
+    RETURN=$UNKNOWN
+  fi
+  if [[ $SVCNAME == "" ]] ; then
+    OUTPUT="${OUTPUT}Instance output is invalid."
+    PERFORMANCE="'Started Instance'=0.1;;0.4 "
+    RETURN=$CRITICAL
+  elif [[ $PORTNUM == "" || ! $PORTNUM =~ ^[0-9]+$ ]] ; then
+    OUTPUT="${OUTPUT}Problem retrieving port number."
     PERFORMANCE="'Started Instance'=0.2;;0.4 "
     RETURN=$CRITICAL
+  elif [[ ! $PROC =~ ^[0-9]+$ ]] ; then
+    OUTPUT="${OUTPUT}Weird situation."
+    PERFORMANCE="'Started Instance'=0.0;;0.4 "
+    RETURN=$UNKNOWN
   else
-    OUTPUT="Instance at $INSTANCE_HOME is up."
-    PERFORMANCE="'Started Instance'=$MAX_DB;;0.4 "
-    RETURN=$OK
+    if [[ $PROC -eq "0" ]] ; then
+      OUTPUT="Instance at $INSTANCE_HOME is down."
+      PERFORMANCE="'Started Instance'=0.3;;0.4 "
+      RETURN=$CRITICAL
+    elif [[ ! $OUTPUT_PID =~ ^[0-9]+$ ]] ; then
+      OUTPUT="Instance at $INSTANCE_HOME is up but the PID is unknown"
+      PERFORMANCE="'Started Instance'=${MAX_DB};;0.4 "
+      RETURN=$WARNING
+    else
+      OUTPUT="Instance at $INSTANCE_HOME is up (PID $OUTPUT_PID)."
+      PERFORMANCE="'Started Instance'=$MAX_DB;;0.4 "
+      RETURN=$OK
+    fi
   fi
 
   COMMAND_ACTIVE="db2 list active databases"
