@@ -237,9 +237,11 @@ if [[ $CONTINUE == true ]] ; then
     OUTPUT="Instance is not started (not listed in EDUs). "
     PERFORMANCE="'Started Instance'=0.1;;0.4 "
     RETURN=$UNKNOWN
+  else
+    OUTPUT="PID: $OUTPUT_PID. "
   fi
   if [[ $SVCNAME == "" ]] ; then
-    OUTPUT="${OUTPUT}Instance output is invalid."
+    OUTPUT="${OUTPUT}TCP port not defined or instance output is invalid."
     PERFORMANCE="'Started Instance'=0.1;;0.4 "
     RETURN=$CRITICAL
   elif [[ $PORTNUM == "" || ! $PORTNUM =~ ^[0-9]+$ ]] ; then
