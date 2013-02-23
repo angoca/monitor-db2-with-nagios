@@ -236,34 +236,38 @@ if [[ $CONTINUE == true ]] ; then
       echo "COMMAND: $COMMAND_HADR"
     fi
     OUTPUT_HADR=`$COMMAND_HADR`
+    CONNECTED=`printf '%s\n' "$OUTPUT_HADR" | awk '/onnected/ {print $1}'`
     if [[ $ROLE == "PRIMARY" ]] ; then
-      PRIMARY=`printf '%s\n' "$OUTPUT_HADR" | awk '/^Primary / {print $2}'`
+      HADR_STATUS=`printf '%s\n' "$OUTPUT_HADR" | awk '/^Primary / {print $2}'`
       if [[ $VERBOSE -ge 3 ]] ; then
-        echo "RESULT:'$PRIMARY'"
+        echo "RESULT:'$HADR_STATUS'"
       fi
-      if [[ $PRIMARY == "Peer" ]] ; then
+      if [[ $HADR_STATUS == "Peer" ]] ; then
         OUTPUT="Database is primary and peer"
         RETURN=$OK
-      elif [[ $PRIMARY == "Disconnected" ]] ; then
-        OUTPUT="Standby database is not reachable"
+      elif [[ $HADR_STATUS == "Disconnected" ]] ; then
+        OUTPUT="Standby database is not reachable ($CONNECTED)."
         RETURN=$CRITICAL
       else
-        OUTPUT="Database is primary and not peer: $PRIMARY"
+        OUTPUT="Database is primary and not peer: $HADR_STATUS ($CONNECTED)."
         RETURN=$UNKNOWN
       fi
     elif [[ $ROLE == "STANDBY" ]] ; then
-      STANDBY=`printf '%s\n' "$OUTPUT_HADR" | awk '/^Standby/ {print $2}'`
+      HADR_STATUS=`printf '%s\n' "$OUTPUT_HADR" | awk '/^Standby/ {print $2}'`
       if [[ $VERBOSE -ge 3 ]] ; then
-        echo "RESULT:'$STANDBY'"
+        echo "RESULT:'$HADR_STATUS'"
       fi
-      if [[ $STANDBY == "Peer" ]] ; then
+      if [[ $HADR_STATUS == "Peer" ]] ; then
         OUTPUT="Database is standby and peer"
         RETURN=$OK
-      elif [[ $STANDBY == "DisconnectedPeer" ]] ; then
-        OUTPUT="Pimary database is not reachable"
+      elif [[ $HADR_STATUS == "DisconnectedPeer" ]] ; then
+        OUTPUT="Pimary database is not reachable ($CONNECTED)."
         RETURN=$CRITICAL
+      elif [[ $HADR_STATUS == "RemoteCatchupPending" ]] ; then
+        OUTPUT="StandBy in remote catchup pending. Make sure database primary is reachable ($CONNECTED)."
+        RETRUN=$WARNING
       else
-        OUTPUT="Database is standby and not peer: $STANDBY"
+        OUTPUT="Database is standby and not peer: $HADR_STATUS ($CONNECTED)."
         RETURN=$UNKNOWN
       fi
     else
