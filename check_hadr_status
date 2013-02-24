@@ -145,9 +145,9 @@ if [[ $CONTINUE == true ]] ; then
   DATABASE_NAME=
   while true; do
     case "$1" in
-      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -- ) shift; break ;;
@@ -187,10 +187,6 @@ if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
-  # Trims the characters.
-  INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
-  DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
-
   if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
@@ -280,10 +276,10 @@ if [[ $CONTINUE == true ]] ; then
   fi
 fi
 if [[ $CONTINUE == true ]] ; then
-  HEX_DIFF=`printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $3}' | awk -Fx '{print $2}' | sed 'N;s/\n/-/' | awk '{print "ibase=16;"$1}' | bc`
+  HEX_DIFF=`printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $3}' | cut -dx -f2 | sed 'N;s/\n/-/' | awk '{print "ibase=16;"$1}' | bc`
   PERFORMANCE="HexDiff=${HEX_DIFF} " 
   PAGE_DIFF=`printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $2}' | sed 'N;s/\n/-/' | bc`
-  LOG_DIFF=`printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $1}' | awk -F. '{print $1}' | sed 's/^.//' | sed 'N;s/\n/-/' | bc`
+  LOG_DIFF=`printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $1}' | cur -d. -f1 | sed 's/^.//' | sed 'N;s/\n/-/' | bc`
   LONG_PERFORMANCE="PageDiff=${PAGE_DIFF} LogDiff=${LOG_DIFF} " 
 fi
 # Prints the output.

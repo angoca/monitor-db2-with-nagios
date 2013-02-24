@@ -147,7 +147,7 @@ if [[ $CONTINUE == true ]] ; then
   while true; do
     case "$1" in
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -- ) shift; break ;;
@@ -182,7 +182,7 @@ fi
 
 if [[ $CONTINUE == true ]] ; then
   # Trims the characters.
-  INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
+  INSTANCE_HOME=`echo $INSTANCE_HOME | cut -d' ' -f1`
 
   if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
@@ -213,14 +213,14 @@ if [[ $CONTINUE == true ]] ; then
   fi
   OUTPUT_CONF=`$COMMAND_CONF`
   # Gets the service name configure in the instance. It could be a text or a number.
-  SVCNAME=`printf '%s\n' "$OUTPUT_CONF" | grep SVCENAME | awk -F= '{print $2}' | sed "s/^[ \t]*//"`
+  SVCNAME=`printf '%s\n' "$OUTPUT_CONF" | grep SVCENAME | cut -d= -f2 | sed "s/^[ \t]*//"`
   # Copies the value in portnum, but checks later.
   PORTNUM=$SVCNAME
 
   if ! [[ $SVCNAME =~ ^[0-9]+$ ]] ; then
     # SVCNAME is a text, thus replace portnum.
     REGEXP="^$SVCNAME\s"
-    PORTNUM=`grep -P $REGEXP /etc/services | awk '{print $2}' | awk -F/ '{print $1}'`
+    PORTNUM=`grep -P $REGEXP /etc/services | cut -d' ' -f2 | cut -d/ -f1`
   fi
 
   MAX_DB=`printf '%s\n' "$OUTPUT_CONF" | awk '/NUMDB/ {print $9}'`

@@ -8,3 +8,7 @@ References:
 * Nagios plug-in development guidelines. http://nagiosplug.sourceforge.net/developer-guidelines.html
 * Nagios Plugin API. http://nagios.sourceforge.net/docs/3_0/pluginapi.html
 * Nagios Plugins. http://nagios.sourceforge.net/docs/3_0/plugins.html
+
+These plugins were developed for a DB2 output in English, and for this reason
+they could not work correctly for other languages. If you have this kind of
+issues, contact me in order to improve the plugins (an go ca at ya hoo dot com)

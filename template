@@ -148,13 +148,13 @@ if [[ $CONTINUE == true ]] ; then
   CRITICAL_THRES=2
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
-      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       # TODO Validate any new argument.
       -- ) shift; break ;;
       * ) break ;;
@@ -205,10 +205,6 @@ if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
 fi
 
 if [[ $CONTINUE == true ]] ; then
-  # Trims the characters.
-  INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
-  DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
-
   if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile

@@ -165,15 +165,15 @@ if [[ $CONTINUE == true ]] ; then
   TABLESPACE_ID=
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
-      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
-      -n | --name ) TABLESPACE_NAME=`echo $2 | awk '{print $1}'` ; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -n | --name ) TABLESPACE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=`echo $2 | awk '{print $1}'`; shift 2 ;;
-      --id ) TABLESPACE_ID=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      --id ) TABLESPACE_ID=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
@@ -232,10 +232,6 @@ if [[ $TABLESPACE_NAME == "" && $TABLESPACE_ID == "" ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
-  # Trims the characters.
-  INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
-  DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
-
   if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
@@ -269,9 +265,9 @@ if [[ $CONTINUE == true ]] ; then
     echo "COMMAND: $COMMAND_EXIST"
   fi
   if [[ $TABLESPACE_NAME != "" ]] ; then
-    EXIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep Name | grep -w $TABLESPACE_NAME | awk '{print $3}' ; db2 connect reset > /dev/null`
+    EXIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep Name | grep -w $TABLESPACE_NAME | cut -d' ' -f3 ; db2 connect reset > /dev/null`
   else
-    EXIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep ID | grep -w $TABLESPACE_ID | awk '{print $4}' ; db2 connect reset > /dev/null`
+    EXIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep ID | grep -w $TABLESPACE_ID | cut -d' ' -f4 ; db2 connect reset > /dev/null`
   fi
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$EXIST'"
@@ -314,12 +310,12 @@ if [[ $CONTINUE == true ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
-  SIZE=`printf '%s\n' "$TS" | awk '{print $1}'`
+  SIZE=`printf '%s\n' "$TS" | cut -d' ' -f1`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$SIZE'"
   fi
 
-  TYPE=`printf '%s\n' "$TS" | awk '{print $2}'`
+  TYPE=`printf '%s\n' "$TS" | cut -d' ' -f2`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$TYPE'"
   fi
@@ -329,7 +325,7 @@ if [[ $CONTINUE == true ]] ; then
       OUTPUT="Tablespace size is OK (SMS)."
       RETURN=$OK
     else
-      CONTENT=`printf '%s\n' "$TS" | awk '{print $3}'`
+      CONTENT=`printf '%s\n' "$TS" | cut -d' ' -f3`
       if [[ $VERBOSE -ge 3 ]] ; then
         echo "RESULT:'$CONTENT'"
       fi
@@ -343,12 +339,12 @@ if [[ $CONTINUE == true ]] ; then
     fi
   elif [[ $TYPE == "DMS" ]] ; then
     # Tablespace should be DMS
-    AUTO=`printf '%s\n' "$TS" | awk '{print $4}'`
+    AUTO=`printf '%s\n' "$TS" | cut -d' ' -f4`
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "RESULT:'$AUTO'"
     fi
 
-    RESIZE=`printf '%s\n' "$TS" | awk '{print $5}'`
+    RESIZE=`printf '%s\n' "$TS" | cut -d' ' -f5`
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "RESULT:'$RESIZE'"
     fi
@@ -385,7 +381,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
   
   #Availability
-  STATUS=`printf '%s\n' "$TS" | awk '{print $6}'`
+  STATUS=`printf '%s\n' "$TS" | cut -d' ' -f6`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$STATUS'"
   fi
@@ -409,7 +405,7 @@ fi
 if [[ $CONTINUE == true ]] ; then
   # Performance data
   ## Allocated size
-  TB_ALLOCATED=`printf '%s\n' "$TS" | awk '{print $7}'`
+  TB_ALLOCATED=`printf '%s\n' "$TS" | cut -d' ' -f7`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$TB_ALLOCATED'"
   fi
@@ -417,14 +413,14 @@ if [[ $CONTINUE == true ]] ; then
   LONG_PERFORMANCE="Allocated=${TB_ALLOCATED} "
 
   ## Used size
-  TB_SIZE=`printf '%s\n' "$TS" | awk '{print $8}'`
+  TB_SIZE=`printf '%s\n' "$TS" | cut -d' ' -f8`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$TB_SIZE'"
   fi
   PERFORMANCE="Tablespace=${TB_SIZE} "
 
   ## High water mark
-  TB_HWM=`printf '%s\n' "$TS" | awk '{print $9}'`
+  TB_HWM=`printf '%s\n' "$TS" | cut -d' ' -f9`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$TB_HWM'"
   fi

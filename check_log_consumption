@@ -149,9 +149,9 @@ if [[ $CONTINUE == true ]] ; then
   UPDATE_MON=false
   while true; do
     case "$1" in
-      -d | --database ) DATABASE_NAME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | awk '{print $1}'`; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       --update ) UPDATE_MON=true; shift ;;
@@ -193,10 +193,6 @@ if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
-  # Trims the characters.
-  INSTANCE_HOME=`echo $INSTANCE_HOME | awk '{print $1}'`
-  DATABASE_NAME=`echo $DATABASE_NAME | awk '{print $1}'`
-
   if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . $INSTANCE_HOME/sqllib/db2profile
@@ -250,10 +246,10 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE -ge 2 ]] ; then
       echo "COMMAND: $COMMAND_DB_CFG"
     fi
-    ARCHIVE=`$COMMAND_DB_CFG | awk '/LOGARCHMETH1/ {print $7}' | awk -F: '{print $2}'`
-    MONTH=`date | awk '{print $2}'`
-    DAY=`date | awk '{print $3}'`
-    ARCHIVE_SIZE=`ls -lR $ARCHIVE | grep "$MONTH\s*$DAY" | awk '{sum +=$5}END{print sum/1024/1024}' | awk -F. '{print $1}'`
+    ARCHIVE=`$COMMAND_DB_CFG | awk '/LOGARCHMETH1/ {print $7}' | cut -d: -f2`
+    MONTH=`date | cut -d' ' -f2`
+    DAY=`date | cut -d' ' -f3`
+    ARCHIVE_SIZE=`ls -lR $ARCHIVE | grep "$MONTH\s*$DAY" | awk '{sum +=$5}END{print sum/1024/1024}' | cut -d. -f1`
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "RESULT ARCHIVE:'$ARCHIVE'"
       echo "RESULT MONTH:'$MONTH'"
