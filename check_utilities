@@ -23,7 +23,36 @@
 #
 # Here comes the documentation
 #
-# TODO Nagios usage.
+# In order to be used in Nagios, you have to configure the following.
+#
+# # 'check_utilities' command definition
+# define command {
+#         command_name    check_utilities
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_utilities -i '$ARG1$'"
+# }
+# define service{
+#         host_name               db2server
+#         service_description     List of utilities
+#         check_command           check_utilities!/home/db2inst1
+#         use                     generic-service
+# }
+#
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_utilities]=/home/nagios/scripts/check_utilities -i /home/db2inst1
+#
+# Then modify the path according to your script location and instance home dir.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     List of utilities
+#         check_command           check_nrpe_1arg!check_utilities
+#         use                     generic-service
+# }
 #
 # Parameters:
 # -c | --critical : Quantity of utilities is critical.
