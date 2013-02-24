@@ -234,6 +234,17 @@ if [[ $CONTINUE == true ]] ; then
     echo "COMMAND: $COMMAND_UTILITIES"
   fi
   OUTPUT_UTILITIES=`$COMMAND_UTILITIES`
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "OUTPUT: $OUTPUT_UTILITIES"
+  fi
+  ERROR=`printf '%s\n' "$OUTPUT_UTILITIES" | grep SQL1092`
+  if [[ $ERROR != "" ]] ; then
+    OUTPUT="The current user cannot execute this script: $OUTPUT_UTILITIES"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+fi
+if [[ $CONTINUE == true ]] ; then
   RESTORE_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep RESTORE | wc -l`
   if [[ $RESTORE_QTY -ge 1 ]] ; then
     OUTPUT="Performing $RESTORE_QTY restore(s). "
@@ -258,7 +269,7 @@ if [[ $CONTINUE == true ]] ; then
       RETURN=$OK
     fi
   fi
-  OTHERS=`printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | awk -F= '{print $2}'`
+  OTHERS=`printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | grep -v "ROLLFORWARD RECOVERY" | awk -F= '{print $2}'`
   if [[ $OTHERS != "" ]] ; then
     OUTPUT="${OUTPUT}Other utilities are running: $OTHERS"
     RETURN=$WARNING
