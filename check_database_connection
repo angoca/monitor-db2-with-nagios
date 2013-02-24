@@ -229,11 +229,11 @@ if [[ $CONTINUE == true ]] ; then
   fi
   
   if [[ $ACTIVE == "" ]] ; then
-    OUTPUT_ACTIVE="The database is not active"
+    OUTPUT_ACTIVE="The database is not active. "
     LONG_OUTPUT="$OUTPUT_ACTIVE"
     LONG_PERFORMANCE="'Database Active'=0.2;0.5;;0.1;1 "
   else
-    OUTPUT_ACTIVE="The database is active"
+    OUTPUT_ACTIVE="The database is active. "
     LONG_OUTPUT="$OUTPUT_ACTIVE"
     LONG_PERFORMANCE="'Database Active'=0.8;0.5;;0.1;1 "
   fi

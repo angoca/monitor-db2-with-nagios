@@ -220,7 +220,7 @@ if [[ $CONTINUE == true ]] ; then
   if ! [[ $SVCNAME =~ ^[0-9]+$ ]] ; then
     # SVCNAME is a text, thus replace portnum.
     REGEXP="^$SVCNAME\s"
-    PORTNUM=`grep -P $REGEXP /etc/services | cut -d' ' -f2 | cut -d/ -f1`
+    PORTNUM=`grep -P $REGEXP /etc/services | awk '{print $2}' | cut -d/ -f1`
   fi
 
   MAX_DB=`printf '%s\n' "$OUTPUT_CONF" | awk '/NUMDB/ {print $9}'`
