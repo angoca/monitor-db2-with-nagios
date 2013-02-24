@@ -1,0 +1,264 @@
+#! /usr/bin/env bash
+
+###############################################################################
+# Monitor DB2 with Nagios
+# Copyright 2013 Andres Gomez Casanova
+# https://github.com/angoca/monitor-db2-with-nagios
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+###############################################################################
+
+# Checks the utilities that are currently running in the instance.  Throws a
+# warning if a restore or backup is being performed.
+#
+# Here comes the documentation
+#
+# TODO Nagios usage.
+#
+# Parameters:
+# -c | --critical : Quantity of utilities is critical.
+# -h | --help : Show the help of this script.
+# -i | --instance : Home directory of the instance. Usually it is
+#   /home/db2inst1
+# -V | --version : Show the current version of this script.
+# -v | --verbose : Execute the program in verbose mode.
+# -w | --warning : quantity of utilities is big.
+#
+# The exit codes are the standard for Nagios.
+#
+# 0 The plugin was able to check the service and it appeared to be functioning
+#   properly.
+# 1 The plugin was able to check the service, but it appeared to be above some
+#   "warning" threshold or did not appear to be working properly.
+# 2 The plugin detected that either the service was not running or it was above
+#   some "critical" threshold.
+# 3 Invalid command line arguments were supplied to the plugin or low-level
+#   failures internal to the plugin (such as unable to fork, or open a tcp
+#   socket) that prevent it from performing the specified operation.
+#   Higher-level errors (such as name resolution errors, socket timeouts, etc)
+#   are outside of the control of plugins and should generally NOT be reported
+#   as UNKNOWN states.
+#
+# Author: Andres Gomez Casanova
+# Version: v1.0 2013-01-18
+
+# Flag for debugging.
+#set -xv
+
+# Version of this script.
+function print_revision {
+  echo Andres Gomez Casanova - AngocA
+  echo v1.0 2013-01-18
+}
+# Function to show the help
+function print_usage {
+  echo "Usage: $1 { -i instanceHomeDirectory [-c][-w] # -h # -V } [ -v ]"
+}
+
+function print_help {
+  print_revision
+  print_usage $1
+  # Max 80 chars width.
+  /bin/cat <<__EOT
+Checks the quantity of utilities currently running in the instance.
+-c | --critical INTEGER
+   Quantity of utilities running is critical.
+-h | --help
+   Shows the current documentation.
+-i | --instance STRING
+   Instance home directory. It is usually /home/db2inst1
+-v | --verbose
+   Executes the script in verbose mode (multiple times).
+-V | --version
+   Shows the current version of this script.
+-w | --warning INTEGER
+   Quantity of utilities running is considered as a warning.
+__EOT
+}
+
+# Variable to control the flow execution. Prevent Spaghetti code.
+CONTINUE=true
+
+# Nagios return codes
+OK=0
+WARNING=1
+CRITICAL=2
+UNKNOWN=3
+# This is the returned code.
+RETURN=$UNKNOWN
+
+# Nagios Output
+# Text output 80 chars | Optional Perf Data Line 1
+# Long text Line 1
+# Long text Line 2 | Optional Perf Data Line 2
+# Optional Perf Data Line 3
+OUTPUT=
+PERFORMANCE=
+LONG_OUTPUT=
+LONG_PERFORMANCE=
+
+APPL_NAME=$0
+
+if [[ $# -eq 0 ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+# The following requieres GNU getopt. See the following discusion.
+# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+
+TEMP=`getopt -o hVvi:c:w: --long help,version,verbose,instance:,critical:,warning: \
+             -n $APPL_NAME -- "$@"`
+
+if [[ $? -ne 0 ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  # Note the quotes around $TEMP: they are essential!
+  eval set -- "$TEMP"
+
+  HELP=false
+  VERSION=false
+  # Verbosity level
+  VERBOSE=0
+  INSTANCE_HOME=
+  WARNING_THRES=5
+  CRITICAL_THRES=10
+  while true; do
+    case "$1" in
+      -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -h | --help ) HELP=true; shift ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -V | --version ) VERSION=true; shift ;;
+      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
+      -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -- ) shift; break ;;
+      * ) break ;;
+    esac
+  done
+fi
+
+if [[ $VERBOSE -ge 2 ]] ; then
+  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
+  ECHO=$ECHO"directory:$INSTANCE_HOME "
+  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
+  echo $ECHO
+fi
+
+if [[ $CONTINUE == true && $HELP == true ]] ; then
+  print_help $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $VERSION == true ]] ; then
+  print_revision $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
+    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
+    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
+    || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
+  print_usage $APPL_NAME
+  echo "Warning threshold should be less than critical threshold."
+  echo "Threshold should be greater than 0."
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+    # Load the DB2 profile.
+    . $INSTANCE_HOME/sqllib/db2profile
+  else
+    OUTPUT="Instance directory is invalid."
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  COMMAND_UTILITIES="db2 list utilities"
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_UTILITIES"
+  fi
+  OUTPUT_UTILITIES=`$COMMAND_UTILITIES`
+  RESTORE_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep RESTORE | wc -l`
+  if [[ $RESTORE_QTY -ge 1 ]] ; then
+    OUTPUT="Performing $RESTORE_QTY restore(s). "
+    RETURN=$WARNING
+  fi
+  BACKUP_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep BACKUP | wc -l`
+  if [[ $BACKUP_QTY -ge 1 ]] ; then
+    OUTPUT="${OUTPUT}Performing $BACKUP_QTY backup(s). "
+    RETURN=$WARNING
+  fi
+  RUNSTATS_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep RUNSTATS | wc -l`
+  if [[ $RUNSTATS_QTY -ge 1 ]] ; then
+    OUTPUT="${OUTPUT}Performing $RUNSTATS_QTY runstats(s). "
+    if [[ $RETURN == $UNKNOWN ]] ; then
+      RETURN=$OK
+    fi
+  fi
+  REORGS_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep REORG | wc -l`
+  if [[ $REORGS_QTY -ge 1 ]] ; then
+    OUTPUT="${OUTPUT}Performing $REORGS_QTY reorg(s). "
+    if [[ $RETURN == $UNKNOWN ]] ; then
+      RETURN=$OK
+    fi
+  fi
+  OTHERS=`printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | awk -F= '{print $2}'`
+  if [[ $OTHERS != "" ]] ; then
+    OUTPUT="${OUTPUT}Other utilities are running: $OTHERS"
+    RETURN=$WARNING
+  fi
+  if [[ $RETURN == $UNKNOWN ]] ; then
+    OUTPUT="No utilities are currently runing."
+    RETURN=$OK
+  fi
+  QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | wc -l`
+  if [[ $QTY -ge $CRITICAL ]] ; then
+    RETURN=$CRITICAL
+    OUTPUT="Quantity  of utilities currently running is critical: $QTY. ${OUTPUT}"
+  elif [[ $QTY -ge $WARNING ]] ; then
+    RETURN=$WARNING
+    OUTPUT="Quantity of utilities currently running is: $QTY. ${OUTPUT}"
+  fi
+  PERFORMANCE="Utilities=$QTY;$WARNING_THRES;$CRITICAL_THRES"
+  LONG_PERFORMANCE="Restore=$RESTORE_QTY Backup=$BACKUP_QTY Runstats=$RUNSTATS_QTY Reorgs=$REORGS_QTY "
+fi
+
+# Prints the output.
+if [[ $OUTPUT == "" ]] ; then
+  OUTPUT="Note: The test was not executed."
+fi
+# Builds the output.
+echo "$OUTPUT|$PERFORMANCE
+$LONG_OUTPUT|$LONG_PERFORMANCE"
+# Returns the error code.
+if [[ $VERBOSE -ge 2 ]] ; then
+  echo "Return code: $RETURN"
+fi
+exit $RETURN
