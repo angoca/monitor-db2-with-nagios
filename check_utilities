@@ -258,25 +258,16 @@ if [[ $CONTINUE == true ]] ; then
   RUNSTATS_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep RUNSTATS | wc -l`
   if [[ $RUNSTATS_QTY -ge 1 ]] ; then
     OUTPUT="${OUTPUT}Performing $RUNSTATS_QTY runstats(s). "
-    if [[ $RETURN == $UNKNOWN ]] ; then
-      RETURN=$OK
-    fi
   fi
   REORGS_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep REORG | wc -l`
   if [[ $REORGS_QTY -ge 1 ]] ; then
     OUTPUT="${OUTPUT}Performing $REORGS_QTY reorg(s). "
-    if [[ $RETURN == $UNKNOWN ]] ; then
-      RETURN=$OK
-    fi
   fi
   OTHERS=`printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | grep -v "ROLLFORWARD RECOVERY" | awk -F= '{print $2}'`
+  OTHERS_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | wc -l`
   if [[ $OTHERS != "" ]] ; then
     OUTPUT="${OUTPUT}Other utilities are running: $OTHERS"
     RETURN=$WARNING
-  fi
-  if [[ $RETURN == $UNKNOWN ]] ; then
-    OUTPUT="No utilities are currently runing."
-    RETURN=$OK
   fi
   QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | wc -l`
   if [[ $QTY -ge $CRITICAL ]] ; then
@@ -285,9 +276,14 @@ if [[ $CONTINUE == true ]] ; then
   elif [[ $QTY -ge $WARNING ]] ; then
     RETURN=$WARNING
     OUTPUT="Quantity of utilities currently running is: $QTY. ${OUTPUT}"
+  else
+    if [[ $RETURN == $UNKNOWN ]] ; then
+      RETURN=$OK
+    fi
+    OUTPUT="Quantity of utilities is normal: $QTY."
   fi
-  PERFORMANCE="Utilities=$QTY;$WARNING_THRES;$CRITICAL_THRES"
-  LONG_PERFORMANCE="Restore=$RESTORE_QTY Backup=$BACKUP_QTY Runstats=$RUNSTATS_QTY Reorgs=$REORGS_QTY "
+  PERFORMANCE="Utilities=$QTY;$WARNING_THRES;$CRITICAL_THRES "
+  LONG_PERFORMANCE="Restore=$RESTORE_QTY Backup=$BACKUP_QTY Runstats=$RUNSTATS_QTY Reorgs=$REORGS_QTY Others=$OTHERS_QTY "
 fi
 
 # Prints the output.
