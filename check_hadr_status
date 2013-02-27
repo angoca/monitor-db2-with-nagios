@@ -63,6 +63,9 @@
 # Flag for debugging.
 #set -xv
 
+# Locale to print messages in English. Prevent language problems.
+export LANG=en_US
+
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
