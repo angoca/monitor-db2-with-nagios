@@ -38,6 +38,20 @@
 #         use                     generic-service
 # }
 #
+# command[check_connection_qty]=/home/nagios/scripts/check_connection_qty -i /home/db2inst1 -d sample -w 10 -c 20
+#
+# Then modify the path according to your script location, instance home dir,
+# database, filter and thresholds.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     Quantity of current connections
+#         check_command           check_nrpe_1arg!check_connection_qty
+#         use                     generic-service
+# }
+#
 # Parameters:
 # -c | --critical : Critical threshold in milliseconds.
 # -d | --database : Database name.
@@ -70,6 +84,9 @@
 
 # Flag for debugging.
 #set -xv
+
+# Locale to print messages in English. Prevent language problems.
+export LANG=en_US
 
 # Version of this script.
 function print_revision {
