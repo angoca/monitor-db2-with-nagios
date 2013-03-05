@@ -250,8 +250,8 @@ if [[ $CONTINUE == true ]] ; then
       echo "COMMAND: $COMMAND_DB_CFG"
     fi
     ARCHIVE=`$COMMAND_DB_CFG | awk '/LOGARCHMETH1/ {print $7}' | cut -d: -f2`
-    MONTH=`date | cut -d' ' -f2`
-    DAY=`date | cut -d' ' -f3`
+    MONTH=`date | awk '{print $2}'`
+    DAY=`date | awk '{print $3}'`
     ARCHIVE_SIZE=`ls -lR $ARCHIVE | grep "$MONTH\s*$DAY" | awk '{sum +=$5}END{print sum/1024/1024}' | cut -d. -f1`
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "RESULT ARCHIVE:'$ARCHIVE'"
