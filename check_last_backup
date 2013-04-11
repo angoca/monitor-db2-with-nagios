@@ -1,0 +1,329 @@
+#! /usr/bin/env bash
+
+###############################################################################
+# Monitor DB2 with Nagios
+# Copyright 2013 Andres Gomez Casanova
+# https://github.com/angoca/monitor-db2-with-nagios
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+###############################################################################
+
+# TODO This is a template for script. The script has to be silent, it means it
+# should not generate any output different to the OUTPUT variable.
+#
+# Here comes the documentation
+#
+# TODO Nagios usage.
+#
+# Parameters:
+# -c | --critical : TODO What is critical
+# -d | --database : Database name.
+# -h | --help : Show the help of this script.
+# -i | --instance : Home directory of the instance. Usually it is
+#   /home/db2inst1
+# -V | --version : Show the current version of this script.
+# -v | --verbose : Execute the program in verbose mode.
+# -w | --warning : TODO What is critical
+#
+# The exit codes are the standard for Nagios.
+#
+# 0 The plugin was able to check the service and it appeared to be functioning
+#   properly.
+# 1 The plugin was able to check the service, but it appeared to be above some
+#   "warning" threshold or did not appear to be working properly.
+# 2 The plugin detected that either the service was not running or it was above
+#   some "critical" threshold.
+# 3 Invalid command line arguments were supplied to the plugin or low-level
+#   failures internal to the plugin (such as unable to fork, or open a tcp
+#   socket) that prevent it from performing the specified operation.
+#   Higher-level errors (such as name resolution errors, socket timeouts, etc)
+#   are outside of the control of plugins and should generally NOT be reported
+#   as UNKNOWN states.
+#
+# Author: Andres Gomez Casanova
+# Version: v1.0 2013-01-18
+
+# Flag for debugging.
+#set -xv
+
+# Locale to print messages in English. Prevent language problems.
+export LANG=en_US
+
+# Version of this script.
+function print_revision {
+  echo Andres Gomez Casanova - AngocA
+  echo v1.0 2013-01-18
+}
+# Function to show the help
+function print_usage {
+  # TODO Add arguments.
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w] # -h # -V } 
+[ -v ]"
+}
+
+function print_help {
+  print_revision
+  print_usage $1
+  # Max 80 chars width.
+  /bin/cat <<__EOT
+TODO Add a global description.
+TODO Add arguments in detail.
+-c | --critical INTEGER
+   TODO What is critical
+-d | --database STRING
+   Database name.
+-h | --help
+   Shows the current documentation.
+-i | --instance STRING
+   Instance home directory. It is usually /home/db2inst1
+-v | --verbose
+   Executes the script in verbose mode (multiple times).
+-V | --version
+   Shows the current version of this script.
+-w | --warning INTEGER
+   TODO What is warning
+__EOT
+}
+
+# Variable to control the flow execution. Prevent Spaghetti code.
+CONTINUE=true
+
+# Nagios return codes
+OK=0
+WARNING=1
+CRITICAL=2
+UNKNOWN=3
+# This is the returned code.
+RETURN=$UNKNOWN
+
+# Nagios Output
+# Text output 80 chars | Optional Perf Data Line 1
+# Long text Line 1
+# Long text Line 2 | Optional Perf Data Line 2
+# Optional Perf Data Line 3
+OUTPUT=
+PERFORMANCE=
+LONG_OUTPUT=
+LONG_PERFORMANCE=
+
+APPL_NAME=$0
+
+if [[ $# -eq 0 ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+# The following requieres GNU getopt. See the following discusion.
+# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+
+# TODO Add the arguments here. One char in -o, multiple char in -long.
+TEMP=`getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,critical:,warning: \
+             -n $APPL_NAME -- "$@"`
+
+if [[ $? -ne 0 ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  # Note the quotes around $TEMP: they are essential!
+  eval set -- "$TEMP"
+
+  HELP=false
+  VERSION=false
+  # Verbosity level
+  VERBOSE=0
+  INSTANCE_HOME=
+  DATABASE_NAME=
+  WARNING_THRES=1
+  CRITICAL_THRES=2
+  while true; do
+    case "$1" in
+      -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -h | --help ) HELP=true; shift ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -V | --version ) VERSION=true; shift ;;
+      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
+      -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      # TODO Validate any new argument.
+      -- ) shift; break ;;
+      * ) break ;;
+    esac
+  done
+fi
+
+if [[ $VERBOSE -ge 2 ]] ; then
+  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
+  ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
+  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
+  echo $ECHO
+fi
+
+if [[ $CONTINUE == true && $HELP == true ]] ; then
+  print_help $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $VERSION == true ]] ; then
+  print_revision $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
+    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
+    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
+    || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
+  print_usage $APPL_NAME
+  echo "Warning threshold should be less than critical threshold."
+  echo "Threshold should be greater than 0."
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+    # Load the DB2 profile.
+    . $INSTANCE_HOME/sqllib/db2profile
+  else
+    OUTPUT="Instance directory is invalid."
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  COMMAND_DATABASE="db2 list db directory"
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_DATABASE"
+  fi
+  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "RESULT:'$DATABASE'"
+  fi
+
+  if [[ $DATABASE == "" ]] ; then
+    OUTPUT="The database $DATABASE_NAME is not cataloged."
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  COMMAND_LIST="db2 -x with hist(start_time, operationtype) as ( select start_time, operationtype from sysibmadm.db_history where operation = 'B' ) select 'delta', operationtype, start_time, timestampdiff(8, current timestamp - char(timestamp(start_time))) from hist where start_time = ( select max(start_time) from hist where operationtype = 'D' or operationtype = 'E') union all select 'incremental', operationtype, start_time, timestampdiff(8, current timestamp - char(timestamp(start_time))) from hist where start_time = ( select max(start_time) from hist where operationtype = 'I' or operationtype = 'O') union all select 'full', operationtype, start_time, timestampdiff(8, current timestamp - char(timestamp(start_time))) from hist where start_time = ( select max(start_time) from hist where operationtype = 'F' or operationtype = 'N') order by 1"
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_LIST"
+  fi
+  LIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_LIST ; db2 connect reset > /dev/null`
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "RESULT:'$LIST'"
+  fi
+  # Substring para ver si hubo un error
+  EXIST_ERROR=`echo $LIST | cut -c 1-5`
+  HADR_ERROR=`echo $LIST | grep SQL1773`
+  if [[ $EXIST_ERROR == "error" ]] ; then
+    OUTPUT="Connection problem"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  elif [[ $HADR_ERROR != "" ]] ; then
+    OUTPUT="Trying to update calculation in Standby database"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  elif [[ $LIST == "" ]] ; then
+    OUTPUT="Empty output, check the command"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  else
+    INDEX=0
+    while IFS= read LINE ; do
+      if [[ $INDEX -eq 2 ]] ; then
+        FULL=$LINE
+      elif [[ $INDEX -eq 3 ]] ; then
+        INCREMENTAL=$LINE
+      elif [[ $INDEX -eq 1 ]] ; then
+        DELTA=$LINE
+      fi
+      INDEX=$(($INDEX+1))
+    done < <( printf '%s\n' "$LIST" )
+
+    DIFF_FULL=`echo $FULL | awk '{print $4}'`
+    DIFF_INCR=`echo $FULL | awk '{print $4}'`
+    DIFF_DELT=`echo $FULL | awk '{print $4}'`
+    # Compares with thresholds.
+    if [[ $DIFF_FULL -ge $CRIT_FULL ]] ; then
+      OUTPUT="Full backup is too old. "
+      RETURN=$CRITICAL
+    elif [[ $DIFF_FULL -ge $WARN_FULL ]] ; then
+      OUTPUT="Full backup is getting old. "
+      RETURN=$WARNING
+    else
+      OUTPUT="Full OK. "
+      RETURN=$OK
+    fi
+    if [[ $DIFF_INCR -ge $CRIT_INCR ]] ; then
+      OUTPUT="Incremental backup is too old. "
+      RETURN=$CRITICAL
+    elif [[ $DIFF_INCR -ge $WARN_INCR ]] ; then
+      OUTPUT="Incremental backup is getting old. "
+      if [[ $RETURN -ne $CRITICAL ]] ; then
+        RETURN=$WARNING
+      fi
+    else
+      OUTPUT="Incremental OK. "
+    fi
+    if [[ $DIFF_DELT -ge $CRIT_DELT ]] ; then
+      OUTPUT="Delta backup is too old."
+      RETURN=$CRITICAL
+    elif [[ $DIFF_DELT -ge $WARN_DELT ]] ; then
+      OUTPUT="Delta backup is getting old."
+      if [[ $RETURN -ne $CRITICAL ]] ; then
+        RETURN=$WARNING
+      fi
+    else
+      OUTPUT="Delta OK."
+    fi
+
+    # Performance data
+    PERFORMANCE="'Full backup'=$DIFF_FULL "
+    LONG_PERFORMANCE="'Incremental backup'=$DIFF_INCR 'Delta backup'=$DIFF_DELT "
+  fi
+fi
+
+# Prints the output.
+if [[ $OUTPUT == "" ]] ; then
+  OUTPUT="Note: The test was not executed."
+fi
+# Builds the output.
+echo "$OUTPUT|$PERFORMANCE
+$LONG_OUTPUT|$LONG_PERFORMANCE"
+# Returns the error code.
+if [[ $VERBOSE -ge 2 ]] ; then
+  echo "Return code: $RETURN"
+fi
+exit $RETURN
