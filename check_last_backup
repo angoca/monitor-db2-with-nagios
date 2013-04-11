@@ -334,8 +334,8 @@ where start_time = (
     fi
 
     # Performance data
-    PERFORMANCE="'Full backup'=$DIFF_FULL "
-    LONG_PERFORMANCE="'Incremental backup'=$DIFF_INCR 'Delta backup'=$DIFF_DELT "
+    PERFORMANCE="'Full backup'=$DIFF_FULL;$WARN_FULL;$CRIT_FULL "
+    LONG_PERFORMANCE="'Incremental backup'=$DIFF_INCR;$WARN_INCR;$CRIT_INCR 'Delta backup'=$DIFF_DELT;$WARN_DELT;$CRIT_DELT "
   fi
 fi
 
