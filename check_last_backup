@@ -196,15 +196,27 @@ if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
   CONTINUE=false
 fi
 
-if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
-    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
-    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
-    || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
-  print_usage $APPL_NAME
-  echo "Warning threshold should be less than critical threshold."
-  echo "Threshold should be greater than 0."
-  RETURN=$UNKNOWN
-  CONTINUE=false
+if [[ $CONTINUE == true ]] ; then
+  CRIT_FULL=$(echo $CRITICAL_THRES | awk -F: '{print $1}')
+  CRIT_INCR=$(echo $CRITICAL_THRES | awk -F: '{print $2}')
+  CRIT_DELT=$(echo $CRITICAL_THRES | awk -F: '{print $3}')
+  WARN_FULL=$(echo $WARNING_THRES | awk -F: '{print $1}')
+  WARN_INCR=$(echo $WARNING_THRES | awk -F: '{print $2}')
+  WARN_DELT=$(echo $WARNING_THRES | awk -F: '{print $3}')
+
+  if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
+      || $WARN_FULL -le 0 || $CRIT_FULL -le 0
+      || $WARN_FULL -ge $CRIT_FULL 
+      || $WARN_INCR -le 0 || $CRIT_INCR -le 0
+      || $WARN_INCR -ge $CRIT_INCR 
+      || $WARN_DELT -le 0 || $CRIT_DELT -le 0
+      || $WARN_DELT -ge $CRIT_DELT ]] ; then
+    print_usage $APPL_NAME
+    echo "Warning threshold should be less than critical threshold."
+    echo "Threshold should be greater than 0."
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
 fi
 
 if [[ $CONTINUE == true ]] ; then
