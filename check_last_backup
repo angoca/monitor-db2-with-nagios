@@ -95,6 +95,50 @@ TODO Add arguments in detail.
 __EOT
 }
 
+function query {
+  PARAM=$1
+  RET=1
+
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "Params: '$PARAM'"
+  fi
+  COMMAND_LIST="db2 -x 
+with hist(start_time, operationtype) as (
+ select start_time, operationtype
+ from sysibmadm.db_history
+ where operation = 'B' )
+select timestampdiff(8, current timestamp - char(timestamp(max(start_time))))
+from hist
+where operationtype in ($PARAM)
+order by 1"
+  if [[ $VERBOSE -ge 2 ]] ; then
+    echo "COMMAND: $COMMAND_LIST"
+  fi
+  LIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_LIST ; db2 connect reset > /dev/null`
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "RESULT:'$LIST'"
+  fi
+  # Substring para ver si hubo un error
+  EXIST_ERROR=`echo $LIST | cut -c 1-5`
+  HADR_ERROR=`echo $LIST | grep SQL1773`
+  if [[ $EXIST_ERROR == "error" ]] ; then
+    OUTPUT="Connection problem"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  elif [[ $HADR_ERROR != "" ]] ; then
+    OUTPUT="Trying to update calculation in Standby database"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  elif [[ $LIST == "" ]] ; then
+    OUTPUT="Empty output, check the command"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  else
+    RET=0
+  fi
+  return $RET
+}
+
 # Variable to control the flow execution. Prevent Spaghetti code.
 CONTINUE=true
 
@@ -248,69 +292,20 @@ if [[ $CONTINUE == true ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
-  COMMAND_LIST="db2 -x 
-with hist(start_time, operationtype) as ( 
- select start_time, operationtype 
- from sysibmadm.db_history 
- where operation = 'B' ) 
-select 'delta', operationtype, start_time, timestampdiff(8, current timestamp - char(timestamp(start_time))) 
-from hist 
-where start_time = ( 
- select max(start_time) 
- from hist 
- where operationtype = 'D' or operationtype = 'E') 
-union all 
-select 'incremental', operationtype, start_time, timestampdiff(8, current timestamp - char(timestamp(start_time))) 
-from hist 
-where start_time = ( 
- select max(start_time) 
- from hist 
- where operationtype = 'I' or operationtype = 'O') 
-union all 
-select 'full', operationtype, start_time, timestampdiff(8, current timestamp - char(timestamp(start_time))) 
-from hist 
-where start_time = ( 
- select max(start_time) 
- from hist 
- where operationtype = 'F' or operationtype = 'N') order by 1"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_LIST"
-  fi
-  LIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_LIST ; db2 connect reset > /dev/null`
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$LIST'"
-  fi
-  # Substring para ver si hubo un error
-  EXIST_ERROR=`echo $LIST | cut -c 1-5`
-  HADR_ERROR=`echo $LIST | grep SQL1773`
-  if [[ $EXIST_ERROR == "error" ]] ; then
-    OUTPUT="Connection problem"
-    RETURN=$UNKNOWN
-    CONTINUE=false
-  elif [[ $HADR_ERROR != "" ]] ; then
-    OUTPUT="Trying to update calculation in Standby database"
-    RETURN=$UNKNOWN
-    CONTINUE=false
-  elif [[ $LIST == "" ]] ; then
-    OUTPUT="Empty output, check the command"
-    RETURN=$UNKNOWN
-    CONTINUE=false
-  else
-    INDEX=0
-    while IFS= read LINE ; do
-      if [[ $INDEX -eq 1 ]] ; then
-        FULL=$LINE
-      elif [[ $INDEX -eq 2 ]] ; then
-        INCREMENTAL=$LINE
-      elif [[ $INDEX -eq 0 ]] ; then
-        DELTA=$LINE
-      fi
-      INDEX=$(($INDEX+1))
-    done < <( printf '%s\n' "$LIST" )
-
-    DIFF_FULL=`echo $FULL | awk '{print $4}'`
-    DIFF_INCR=`echo $INCREMENTAL | awk '{print $4}'`
-    DIFF_DELT=`echo $DELTA | awk '{print $4}'`
+  # There could be just one query, but 'union all' is no allowed in HADRm thus three calls.
+  query "'D', 'E'"
+  RET1=$?
+  DELTA=$LIST
+  query "'D', 'E', 'I', 'O'"
+  RET2=$?
+  INCREMENTAL=$LIST
+  query "'D', 'E', 'I', 'O', 'F', 'N'"
+  RET3=$?
+  FULL=$LIST
+  if [[ $RET1 -eq 0 || $RET2 -eq 0 || $RET3 -eq 0 ]] ; then
+    DIFF_FULL=`echo $FULL | awk '{print $1}'`
+    DIFF_INCR=`echo $INCREMENTAL | awk '{print $1}'`
+    DIFF_DELT=`echo $DELTA | awk '{print $1}'`
     # Compares with thresholds.
     if [[ $DIFF_FULL -ge $CRIT_FULL ]] ; then
       OUTPUT="Full backup is too old."
@@ -348,6 +343,9 @@ where start_time = (
     # Performance data
     PERFORMANCE="'Full backup'=$DIFF_FULL;$WARN_FULL;$CRIT_FULL "
     LONG_PERFORMANCE="'Incremental backup'=$DIFF_INCR;$WARN_INCR;$CRIT_INCR 'Delta backup'=$DIFF_DELT;$WARN_DELT;$CRIT_DELT "
+  else
+    OUTPUT="There are problems retreiving the data."
+    RETURN=$UNKNOWN
   fi
 fi
 
