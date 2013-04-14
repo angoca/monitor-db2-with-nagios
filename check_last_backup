@@ -288,12 +288,19 @@ if [[ $CONTINUE == true ]] ; then
   WARN_DELT=$(echo $WARNING_THRES | awk -F: '{print $3}')
 
   if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
+      || $WARN_FULL == "" || $CRIT_FULL == ""
       || $WARN_FULL -le 0 || $CRIT_FULL -le 0
       || $WARN_FULL -ge $CRIT_FULL 
-      || $WARN_INCR -le 0 || $CRIT_INCR -le 0
-      || $WARN_INCR -ge $CRIT_INCR 
-      || $WARN_DELT -le 0 || $CRIT_DELT -le 0
-      || $WARN_DELT -ge $CRIT_DELT ]] ; then
+      || ( $WARN_INCR != "" && $CRIT_INCR == "" )
+      || ( $WARN_INCR == "" && $CRIT_INCR != "" )
+      || ( $WARN_INCR != "" && $CRIT_INCR != ""
+      && ( $WARN_INCR -le 0 || $CRIT_INCR -le 0
+      || $WARN_INCR -ge $CRIT_INCR ))
+      || ( $WARN_DELT != "" && $CRIT_DELT == "" )
+      || ( $WARN_DELT == "" && $CRIT_DELT != "" )
+      || ( $WARN_DELT != "" && $CRIT_DELT != ""
+      && ( $WARN_DELT -le 0 || $CRIT_DELT -le 0
+      || $WARN_DELT -ge $CRIT_DELT )) ]] ; then
     print_usage $APPL_NAME
     echo "Warning threshold should be less than critical threshold."
     echo "Threshold should be greater than 0."
@@ -331,67 +338,83 @@ if [[ $CONTINUE == true ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
+  # Checks HADR role.
+  HADR_ROLE=$(db2 get db cfg for wfscpd | grep "HADR database role")
+  if [[ $VERBOSE -ge 3 ]] ; then
+    echo "RESULT HADR: $HADR_ROLE"
+  fi
   # There could be just one query, but 'union all' is no allowed in HADRm thus three calls.
-  query "'D', 'E', 'I', 'O', 'F', 'N'"
-  RET1=$?
-  DELTA=$LIST
-  query "'I', 'O', 'F', 'N'"
-  RET2=$?
-  INCREMENTAL=$LIST
+  if [[ ! -z $CRIT_DELT ]] ; then
+    query "'D', 'E', 'I', 'O', 'F', 'N'"
+    RET1=$?
+    DELTA=$LIST
+    if [[ $RET1 -eq 0 ]] ; then
+      DIFF_DELT=`echo $DELTA | awk '{print $1}'`
+      if [[ $HADR_ROLE != "STANDBY" ]] ; then
+        if [[ $DIFF_DELT -ge $CRIT_DELT ]] ; then
+          OUTPUT="Delta backup is too old."
+          RETURN=$CRITICAL
+        elif [[ $DIFF_DELT -ge $WARN_DELT ]] ; then
+          OUTPUT="Delta backup is getting old."
+          if [[ $RETURN -ne $CRITICAL ]] ; then
+            RETURN=$WARNING
+          fi
+        else
+          OUTPUT="Delta OK."
+        fi
+      fi
+    fi
+  fi
+  if [[ ! -z $CRIT_INCR ]] ; then
+    query "'I', 'O', 'F', 'N'"
+    RET2=$?
+    INCREMENTAL=$LIST
+    if [[ $RET2 -eq 0 ]] ; then
+      DIFF_INCR=`echo $INCREMENTAL | awk '{print $1}'`
+      if [[ $HADR_ROLE != "STANDBY" ]] ; then
+        if [[ $DIFF_INCR -ge $CRIT_INCR ]] ; then
+          OUTPUT="Incremental backup is too old. $OUTPUT"
+          RETURN=$CRITICAL
+        elif [[ $DIFF_INCR -ge $WARN_INCR ]] ; then
+           OUTPUT="Incremental backup is getting old. $OUTPUT"
+          if [[ $RETURN -ne $CRITICAL ]] ; then
+            RETURN=$WARNING
+          fi
+        else
+          OUTPUT="Incremental OK. $OUTPUT"
+        fi
+      fi
+    fi
+  fi
   query "'F', 'N'"
   RET3=$?
   FULL=$LIST
-  if [[ $RET1 -eq 0 || $RET2 -eq 0 || $RET3 -eq 0 ]] ; then
+  if [[ $RET3 -eq 0 ]] ; then
     DIFF_FULL=`echo $FULL | awk '{print $1}'`
-    DIFF_INCR=`echo $INCREMENTAL | awk '{print $1}'`
-    DIFF_DELT=`echo $DELTA | awk '{print $1}'`
-    # Checks HADR role.
-    HADR_ROLE=$(db2 get db cfg for wfscpd | grep "HADR database role")
-    if [[ $VERBOSE -ge 3 ]] ; then
-      echo "RESULT HADR: $HADR_ROLE"
-    fi
     if [[ $HADR_ROLE != "STANDBY" ]] ; then
-      # Compares with thresholds.
       if [[ $DIFF_FULL -ge $CRIT_FULL ]] ; then
-        OUTPUT="Full backup is too old."
+        OUTPUT="Full backup is too old. $OUTPUT"
         RETURN=$CRITICAL
       elif [[ $DIFF_FULL -ge $WARN_FULL ]] ; then
-        OUTPUT="Full backup is getting old."
+        OUTPUT="Full backup is getting old. $OUTPUT"
         RETURN=$WARNING
       else
-        OUTPUT="Full OK."
+        OUTPUT="Full OK. $OUTPUT"
         RETURN=$OK
       fi
-      if [[ $DIFF_INCR -ge $CRIT_INCR ]] ; then
-        OUTPUT="$OUTPUT Incremental backup is too old."
-        RETURN=$CRITICAL
-      elif [[ $DIFF_INCR -ge $WARN_INCR ]] ; then
-        OUTPUT="$OUTPUT Incremental backup is getting old."
-        if [[ $RETURN -ne $CRITICAL ]] ; then
-          RETURN=$WARNING
-        fi
-      else
-        OUTPUT="$OUTPUT Incremental OK."
-      fi
-      if [[ $DIFF_DELT -ge $CRIT_DELT ]] ; then
-        OUTPUT="$OUTPUT Delta backup is too old."
-        RETURN=$CRITICAL
-      elif [[ $DIFF_DELT -ge $WARN_DELT ]] ; then
-        OUTPUT="$OUTPUT Delta backup is getting old."
-        if [[ $RETURN -ne $CRITICAL ]] ; then
-          RETURN=$WARNING
-        fi
-      else
-        OUTPUT="$OUTPUT Delta OK."
-      fi
     else
-      OUTPUT="Standby database, check values in primary"
+      OUTPUT="Standby database, check values in primary."
       RETURN=$UNKNOWN
     fi
 
     # Performance data
     PERFORMANCE="'Full backup'=$DIFF_FULL;$WARN_FULL;$CRIT_FULL "
-    LONG_PERFORMANCE="'Incremental backup'=$DIFF_INCR;$WARN_INCR;$CRIT_INCR 'Delta backup'=$DIFF_DELT;$WARN_DELT;$CRIT_DELT "
+    if [[ ! -z $CRIT_DELT ]] ; then
+      LONG_PERFORMANCE="'Delta backup'=$DIFF_DELT;$WARN_DELT;$CRIT_DELT "
+    fi
+    if [[ ! -z $CRIT_INCR ]] ; then
+      LONG_PERFORMANCE="'Incremental backup'=$DIFF_INCR;$WARN_INCR;$CRIT_INCR $LONG_PERFORMANCE"
+    fi
   else
     OUTPUT="There are problems retreiving the data."
     RETURN=$UNKNOWN
