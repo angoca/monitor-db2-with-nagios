@@ -330,7 +330,10 @@ if [[ $CONTINUE == true ]] ; then
     DIFF_DELT=`echo $DELTA | awk '{print $1}'`
     # Checks HADR role.
     HADR_ROLE=$(db2 get db cfg for wfscpd | grep "HADR database role")
-    if [[ $HADR_ROLE -ne "STANDBY" ]] ; then
+    if [[ $VERBOSE -ge 3 ]] ; then
+      echo "RESULT HADR: $HADR_ROLE"
+    fi
+    if [[ $HADR_ROLE != "STANDBY" ]] ; then
       # Compares with thresholds.
       if [[ $DIFF_FULL -ge $CRIT_FULL ]] ; then
         OUTPUT="Full backup is too old."
@@ -364,7 +367,7 @@ if [[ $CONTINUE == true ]] ; then
       else
         OUTPUT="$OUTPUT Delta OK."
       fi
-    elif
+    else
       OUTPUT="Standby database, check values in primary"
       RETURN=$UNKNOWN
     fi
