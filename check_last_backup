@@ -218,7 +218,7 @@ if [[ $CONTINUE == true ]] ; then
   VERBOSE=0
   # Debug activated
   DEBUG=false
-  LOG=/tmp/${0}.log
+  LOG=/tmp/$(basename ${0}).log
   INSTANCE_HOME=
   DATABASE_NAME=
   WARNING_THRES=1
