@@ -18,22 +18,48 @@
 # limitations under the License.
 ###############################################################################
 
-# TODO This is a template for script. The script has to be silent, it means it
-# should not generate any output different to the OUTPUT variable.
+# This scripts checks the elderly of the last backup. If throw alerts if the
+# last backups are too old.
 #
 # Here comes the documentation
 #
-# TODO Nagios usage.
+# In order to be used in Nagios, you have to configure the following.
+#
+# # 'check_last_backup' command definition
+# define command {
+#         command_name    check_last_backup
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_last_backup -i '$ARG1$' -d '$ARG2$' -w '$ARG3$' -c '$ARG4$'"
+# }
+# define service{
+#         host_name               db2server
+#         service_description     Last backup
+#         check_command           check_last_backup!/home/db2inst1!sample!240:140:50!168:96:25
+#         use                     generic-service
+# }
+#
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_last_backup]=/home/nagios/scripts/check_last_backup -i /home/db2inst1 -d sample -c 240:140:50 -w 168:96:25
 #
 # Parameters:
-# -c | --critical : TODO What is critical
+# -c | --critical : Time in hours to consider the last backup age as critical.
+#    This checks the full, incremental and delta backups.
+#    Notation for these three type are times separated by colons
+#    FF:II:DD = Full : Incremental : Delta.
+#    Full is obligatory, other two are optionals.
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
-# -w | --warning : TODO What is critical
+# -w | --warning : Time in hours to consider the last backup age as critical.
+#    This checks the full, incremental and delta backups.
+#    Notation for these three type are times separated by colons
+#    FF:II:DD = Full : Incremental : Delta.
+#    Full is obligatory, other two are optionals.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -66,7 +92,6 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  # TODO Add arguments.
   echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w] # -h # -V } 
 [ -v ]"
 }
@@ -76,10 +101,9 @@ function print_help {
   print_usage $1
   # Max 80 chars width.
   /bin/cat <<__EOT
-TODO Add a global description.
-TODO Add arguments in detail.
--c | --critical INTEGER
-   TODO What is critical
+Checks the elderly of the last backup of the database.
+-c | --critical INTEGER:INTEGER:INTEGER
+   Time in hours of the last backup to considered as critical.
 -d | --database STRING
    Database name.
 -h | --help
@@ -90,8 +114,8 @@ TODO Add arguments in detail.
    Executes the script in verbose mode (multiple times).
 -V | --version
    Shows the current version of this script.
--w | --warning INTEGER
-   TODO What is warning
+-w | --warning INTEGER:INTEGER:INTEGER
+   Time in hours of the last backup to considered as warning
 __EOT
 }
 
@@ -171,7 +195,6 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-# TODO Add the arguments here. One char in -o, multiple char in -long.
 TEMP=`getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,critical:,warning: \
              -n $APPL_NAME -- "$@"`
 
@@ -202,7 +225,6 @@ if [[ $CONTINUE == true ]] ; then
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      # TODO Validate any new argument.
       -- ) shift; break ;;
       * ) break ;;
     esac
@@ -306,38 +328,45 @@ if [[ $CONTINUE == true ]] ; then
     DIFF_FULL=`echo $FULL | awk '{print $1}'`
     DIFF_INCR=`echo $INCREMENTAL | awk '{print $1}'`
     DIFF_DELT=`echo $DELTA | awk '{print $1}'`
-    # Compares with thresholds.
-    if [[ $DIFF_FULL -ge $CRIT_FULL ]] ; then
-      OUTPUT="Full backup is too old."
-      RETURN=$CRITICAL
-    elif [[ $DIFF_FULL -ge $WARN_FULL ]] ; then
-      OUTPUT="Full backup is getting old."
-      RETURN=$WARNING
-    else
-      OUTPUT="Full OK."
-      RETURN=$OK
-    fi
-    if [[ $DIFF_INCR -ge $CRIT_INCR ]] ; then
-      OUTPUT="$OUTPUT Incremental backup is too old."
-      RETURN=$CRITICAL
-    elif [[ $DIFF_INCR -ge $WARN_INCR ]] ; then
-      OUTPUT="$OUTPUT Incremental backup is getting old."
-      if [[ $RETURN -ne $CRITICAL ]] ; then
+    # Checks HADR role.
+    HADR_ROLE=$(db2 get db cfg for wfscpd | grep "HADR database role")
+    if [[ $HADR_ROLE -ne "STANDBY" ]] ; then
+      # Compares with thresholds.
+      if [[ $DIFF_FULL -ge $CRIT_FULL ]] ; then
+        OUTPUT="Full backup is too old."
+        RETURN=$CRITICAL
+      elif [[ $DIFF_FULL -ge $WARN_FULL ]] ; then
+        OUTPUT="Full backup is getting old."
         RETURN=$WARNING
+      else
+        OUTPUT="Full OK."
+        RETURN=$OK
       fi
-    else
-      OUTPUT="$OUTPUT Incremental OK."
-    fi
-    if [[ $DIFF_DELT -ge $CRIT_DELT ]] ; then
-      OUTPUT="$OUTPUT Delta backup is too old."
-      RETURN=$CRITICAL
-    elif [[ $DIFF_DELT -ge $WARN_DELT ]] ; then
-      OUTPUT="$OUTPUT Delta backup is getting old."
-      if [[ $RETURN -ne $CRITICAL ]] ; then
-        RETURN=$WARNING
+      if [[ $DIFF_INCR -ge $CRIT_INCR ]] ; then
+        OUTPUT="$OUTPUT Incremental backup is too old."
+        RETURN=$CRITICAL
+      elif [[ $DIFF_INCR -ge $WARN_INCR ]] ; then
+        OUTPUT="$OUTPUT Incremental backup is getting old."
+        if [[ $RETURN -ne $CRITICAL ]] ; then
+          RETURN=$WARNING
+        fi
+      else
+        OUTPUT="$OUTPUT Incremental OK."
       fi
-    else
-      OUTPUT="$OUTPUT Delta OK."
+      if [[ $DIFF_DELT -ge $CRIT_DELT ]] ; then
+        OUTPUT="$OUTPUT Delta backup is too old."
+        RETURN=$CRITICAL
+      elif [[ $DIFF_DELT -ge $WARN_DELT ]] ; then
+        OUTPUT="$OUTPUT Delta backup is getting old."
+        if [[ $RETURN -ne $CRITICAL ]] ; then
+          RETURN=$WARNING
+        fi
+      else
+        OUTPUT="$OUTPUT Delta OK."
+      fi
+    elif
+      OUTPUT="Standby database, check values in primary"
+      RETURN=$UNKNOWN
     fi
 
     # Performance data
