@@ -315,13 +315,13 @@ fi
 
 if [[ $CONTINUE == true ]] ; then
   # There could be just one query, but 'union all' is no allowed in HADRm thus three calls.
-  query "'D', 'E'"
+  query "'D', 'E', 'I', 'O', 'F', 'N'"
   RET1=$?
   DELTA=$LIST
-  query "'D', 'E', 'I', 'O'"
+  query "'I', 'O', 'F', 'N'"
   RET2=$?
   INCREMENTAL=$LIST
-  query "'D', 'E', 'I', 'O', 'F', 'N'"
+  query "'F', 'N'"
   RET3=$?
   FULL=$LIST
   if [[ $RET1 -eq 0 || $RET2 -eq 0 || $RET3 -eq 0 ]] ; then
