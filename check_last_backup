@@ -89,7 +89,7 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-01-18
+  echo v1.0 2013-04-14
 }
 # Function to show the help
 function print_usage {
@@ -107,6 +107,8 @@ Checks the elderly of the last backup of the database.
    Time in hours of the last backup to considered as critical.
 -d | --database STRING
    Database name.
+-D | --debug
+   Debug mode: writes date and output in /tmp
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
