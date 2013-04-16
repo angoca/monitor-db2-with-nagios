@@ -149,12 +149,17 @@ order by 1"
   # Substring para ver si hubo un error
   EXIST_ERROR=`echo $LIST | cut -c 1-5`
   HADR_ERROR=`echo $LIST | grep SQL1773`
+  HADR_REPLAY=`echo $LIST | grep SQL1224`
   if [[ $EXIST_ERROR == "error" ]] ; then
     OUTPUT="Connection problem"
     RETURN=$UNKNOWN
     CONTINUE=false
   elif [[ $HADR_ERROR != "" ]] ; then
     OUTPUT="Trying to update calculation in Standby database"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  elif [[ $HADR_REPLAY != "" ]] ; then
+    OUTPUT="HADR replaying"
     RETURN=$UNKNOWN
     CONTINUE=false
   elif [[ $LIST == "" ]] ; then
@@ -365,6 +370,9 @@ if [[ $CONTINUE == true ]] ; then
       fi
     fi
   fi
+fi
+
+if [[ $CONTINUE == true ]] ; then
   if [[ ! -z $CRIT_INCR ]] ; then
     query "'I', 'O', 'F', 'N'"
     RET2=$?
@@ -386,6 +394,9 @@ if [[ $CONTINUE == true ]] ; then
       fi
     fi
   fi
+fi
+
+if [[ $CONTINUE == true ]] ; then
   query "'F', 'N'"
   RET3=$?
   FULL=$LIST
@@ -435,6 +446,6 @@ fi
 if [[ $DEBUG == true ]] ; then
   echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
   date >> $LOG
-  echo "<<<<<" >> $LOG
+  echo -e "<<<<<\n" >> $LOG
 fi
 exit $RETURN
