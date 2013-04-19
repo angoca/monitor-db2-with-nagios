@@ -158,8 +158,8 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,critical:,warning:,filter:,inverted \
-             -n $APPL_NAME -- "$@"`
+TEMP=$(getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,critical:,warning:,filter:,inverted \
+             -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
   print_usage $APPL_NAME
@@ -183,14 +183,14 @@ if [[ $CONTINUE == true ]] ; then
   FILTER_INVERTED=false
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      --filter ) FILTER=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      --filter ) FILTER=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       --inverted ) FILTER_INVERTED=true ; shift ;;
       -- ) shift; break ;;
       * ) break ;;
@@ -257,7 +257,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DATABASE"
   fi
-  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  DATABASE=$($COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$DATABASE'"
   fi
@@ -274,33 +274,55 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $QTY_COMMAND"
   fi
-  if [[ $FILTER != "" ]] ; then
-    if [[ $FILTER_INVERTED == true ]] ; then
-      QTY=`$QTY_COMMAND | grep $DATABASE | grep -iv $FILTER | wc -l`
-    else 
-      QTY=`$QTY_COMMAND | grep $DATABASE | grep -i $FILTER | wc -l`
-    fi
-  else
-    QTY=`$QTY_COMMAND | grep $DATABASE | wc -l`
-  fi
-
+  QTY_RESULT=$($QTY_COMMAND)
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$QTY'"
+    echo "RESULT:'$QTY_RESULT'"
   fi
+  NO_APPS=$(echo $QTY_RESULT | grep SQL1611W)
+  if [[ $NO_APPS == "" ]] ; then
 
-  if [[ $QTY -lt $WARNING_THRES ]] ; then
-     OUTPUT="Normal quantity of connections ($QTY)."
-     RETURN=$OK
-  elif [[ $QTY -lt $CRITICAL_THRES ]] ; then
-     OUTPUT="Quantity of connections is increasing, currently $QTY."
-     RETURN=$WARNING
+    if [[ $FILTER != "" ]] ; then
+      if [[ $FILTER_INVERTED == true ]] ; then
+        CONNS=$(printf '%s\n' "$QTY_RESULT" | grep $DATABASE | grep -iv $FILTER | awk "{print \$1}")
+      else 
+        CONNS=$(printf '%s\n' "$QTY_RESULT" | grep $DATABASE | grep -i $FILTER | awk "{print \$1}")
+      fi
+    else
+      CONNS=$(printf '%s\n' "$QTY_RESULT" | awk "/$DATABASE/ {print \$1}")
+    fi
+    QTY=$(printf '%s\n' "$CONNS" | wc -l)
+    QTY_FILTERED=$(printf '%s\n' "$CONNS" | sort | uniq -c)
+    if [[ $VERBOSE -ge 3 ]] ; then
+      echo "RESULT FILTER:'$QTY_FILTERED'"
+    fi
+    AGREGATE=0
+    while IFS= read LINE ; do
+      USERNAME=$(echo $LINE | awk '{print $2}')
+      QTY_USER=$(echo $LINE | awk '{print $1}')
+      AGREGATE=$(($AGREGATE + $QTY_USER))
+      LONG_PERFORMANCE="$LONG_PERFORMANCE '$USERNAME'=$AGREGATE"
+    done < <( printf '%s\n' "$QTY_FILTERED" )
+    if [[ $VERBOSE -ge 3 ]] ; then
+      echo "RESULT:'$QTY'"
+    fi
+
+    if [[ $QTY -lt $WARNING_THRES ]] ; then
+       OUTPUT="OK Normal quantity of connections ($QTY)."
+       RETURN=$OK
+    elif [[ $QTY -lt $CRITICAL_THRES ]] ; then
+       OUTPUT="Quantity of connections is increasing, currently $QTY."
+       RETURN=$WARNING
+    else
+       OUTPUT="Quantity of connections is critical, currently $QTY."
+       RETURN=$CRITICAL
+    fi
+    PERFORMANCE="'Connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES "
+
+    # TODO Add the status of the connection (UOW, Connected, ...)
   else
-     OUTPUT="Quantity of connections is critical, currently $QTY."
-     RETURN=$CRITICAL
+    OUTPUT="Problem retreiving the applications list"
+    RETURN=$UNKNOWN
   fi
-  PERFORMANCE="'Connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES "
-
-  # TODO Add the status of the connection (UOW, Connected, ...)
 fi
 
 # Prints the output.
