@@ -55,6 +55,7 @@
 # Parameters:
 # -c | --critical : Critical threshold in milliseconds.
 # -d | --database : Database name.
+# -D | --debug : Debug mode. Writes output in /tmp
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
@@ -95,8 +96,8 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w][--filter
-[--inverted]] # -h # -V } [ -v ]"
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w][--filter \
+\n [--inverted]] ! -h ! -V } [ -D ] [ -v ]"
 }
 
 function print_help {
@@ -109,6 +110,8 @@ This script check the quantity of established connections.
    Quantity of connections to consider as critical.
 -d | --database STRING
    Database name.
+-D | --debug
+   Debug mode: writes date and output in /tmp
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
@@ -158,7 +161,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=$(getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,critical:,warning:,filter:,inverted \
+TEMP=$(getopt -o hVvi:d:c:w:D --long help,version,verbose,instance:,database:,critical:,warning:,filter:,inverted,debug \
              -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
@@ -175,6 +178,9 @@ if [[ $CONTINUE == true ]] ; then
   VERSION=false
   # Verbosity level
   VERBOSE=0
+  # Debug activated
+  DEBUG=false
+  LOG=/tmp/$(basename ${0}).log
   INSTANCE_HOME=
   DATABASE_NAME=
   WARNING_THRES=5
@@ -185,6 +191,7 @@ if [[ $CONTINUE == true ]] ; then
     case "$1" in
       -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -D | --debug ) DEBUG=true ; shift ;;
       -h | --help ) HELP=true; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
@@ -198,12 +205,21 @@ if [[ $CONTINUE == true ]] ; then
   done
 fi
 
+if [[ $DEBUG == true ]] ; then
+  echo ">>>>>" >> $LOG
+  date >> $LOG
+fi
+
+ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
+ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
+ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES, "
+ECHO=$ECHO"filter:$FILTER, inverted:$FILTER_INVERTED"
+
 if [[ $VERBOSE -ge 2 ]] ; then
-  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-  ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES, "
-  ECHO=$ECHO"filter:$FILTER, inverted:$FILTER_INVERTED"
   echo $ECHO
+fi
+if [[ $DEBUG == TRUE ]] ; then
+  echo "PARAMS:$ECHO" >> $LOG
 fi
 
 if [[ $CONTINUE == true && $HELP == true ]] ; then
@@ -278,6 +294,9 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$QTY_RESULT'"
   fi
+  if [[ $DEBUG == true ]] ; then
+    echo "RESULT:'$QTY_RESULT'" >> $LOG
+  fi
   NO_APPS=$(echo $QTY_RESULT | grep SQL1611W)
   if [[ $NO_APPS == "" ]] ; then
 
@@ -335,5 +354,10 @@ $LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
 if [[ $VERBOSE -ge 2 ]] ; then
   echo "Return code: $RETURN"
+fi
+if [[ $DEBUG == true ]] ; then
+  echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
+  date >> $LOG
+  echo -e "<<<<<\n" >> $LOG
 fi
 exit $RETURN
