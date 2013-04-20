@@ -21,6 +21,12 @@
 # This script checks the quantity of connections on the database. The quantity
 # can be filtered by a given criterion, and inverted if wanted.
 #
+# The connection state is based on the 'list application' output. However, it
+# is unknown how all states are expressed. For this reason, unknown states are
+# sent to a file in /tmp directory in order to catch the text. Please send us
+# the content of that file in order to improve this script. Currently, those
+# unknown states are listed as 'other'.
+#
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
 #
@@ -59,6 +65,8 @@
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
+# -s | --state : Shows the connection state in the performance output.
+#   Normally it show the distribution of connections by users.
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
 # -w | --warning : Warning threshold in milliseconds.
@@ -97,7 +105,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w][--filter \
-\n [--inverted]] ! -h ! -V } [ -D ] [ -v ]"
+\n [--inverted]] ! -s ! -h ! -V } [ -D ] [ -v ]"
 }
 
 function print_help {
@@ -116,6 +124,9 @@ This script check the quantity of established connections.
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1
+-s | --state
+   Shows the connections states in the performance output. Normally, it shows
+   the distribution of connections per user.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -161,7 +172,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=$(getopt -o hVvi:d:c:w:D --long help,version,verbose,instance:,database:,critical:,warning:,filter:,inverted,debug \
+TEMP=$(getopt -o hVvi:d:c:w:Ds --long help,version,verbose,instance:,database:,critical:,warning:,filter:,inverted,debug,state \
              -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
@@ -185,6 +196,7 @@ if [[ $CONTINUE == true ]] ; then
   DATABASE_NAME=
   WARNING_THRES=5
   CRITICAL_THRES=10
+  STATE=false
   FILTER=
   FILTER_INVERTED=false
   while true; do
@@ -194,6 +206,7 @@ if [[ $CONTINUE == true ]] ; then
       -D | --debug ) DEBUG=true ; shift ;;
       -h | --help ) HELP=true; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -s | --state ) STATE=true ; shift ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
@@ -213,12 +226,12 @@ fi
 ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
 ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
 ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES, "
-ECHO=$ECHO"filter:$FILTER, inverted:$FILTER_INVERTED"
+ECHO=$ECHO"filter:$FILTER, inverted:$FILTER_INVERTED, state:$STATE"
 
 if [[ $VERBOSE -ge 2 ]] ; then
   echo $ECHO
 fi
-if [[ $DEBUG == TRUE ]] ; then
+if [[ $DEBUG == true ]] ; then
   echo "PARAMS:$ECHO" >> $LOG
 fi
 
@@ -286,7 +299,7 @@ if [[ $CONTINUE == true ]] ; then
 fi
 
 if [[ $CONTINUE == true ]] ; then
-  QTY_COMMAND="db2 list applications"
+  QTY_COMMAND="db2 list applications show detail"
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $QTY_COMMAND"
   fi
@@ -302,25 +315,49 @@ if [[ $CONTINUE == true ]] ; then
 
     if [[ $FILTER != "" ]] ; then
       if [[ $FILTER_INVERTED == true ]] ; then
-        CONNS=$(printf '%s\n' "$QTY_RESULT" | grep $DATABASE | grep -iv $FILTER | awk "{print \$1}")
+        CONNS=$(printf '%s\n' "$QTY_RESULT" | grep $DATABASE | grep -iv $FILTER)
       else 
-        CONNS=$(printf '%s\n' "$QTY_RESULT" | grep $DATABASE | grep -i $FILTER | awk "{print \$1}")
+        CONNS=$(printf '%s\n' "$QTY_RESULT" | grep $DATABASE | grep -i $FILTER)
       fi
     else
-      CONNS=$(printf '%s\n' "$QTY_RESULT" | awk "/$DATABASE/ {print \$1}")
+      CONNS=$(printf '%s\n' "$QTY_RESULT" | grep $DATABASE)
     fi
     QTY=$(printf '%s\n' "$CONNS" | wc -l)
-    QTY_FILTERED=$(printf '%s\n' "$CONNS" | sort | uniq -c)
-    if [[ $VERBOSE -ge 3 ]] ; then
-      echo "RESULT FILTER:'$QTY_FILTERED'"
+    if [[ $STATE == true ]] ; then
+      CONNECTED=0
+      UOW_EXECUTING=0
+      UOW_WAITING=0
+      OTHER=0
+      while IFS= read LINE ; do
+        STATE=$(printf '%s\n' "$LINE" | cut -c 275-304)
+        if [[ $DEBUG == true ]] ; then
+          echo "RESULT:'$STATE'"
+        fi
+        if [[ $STATE == "Connect Completed             " ]] ; then
+          CONNECTED=$(($CONNECTED + 1))
+        elif [[ $STATE == "UOW Executing                 " ]] ; then
+          UOW_EXECUTING=$(($UOW_EXECUTING + 1))
+        elif [[ $STATE == "UOW Waiting                   " ]] ; then
+          UOW_WAITING=$(($UOW_WAITING + 1))
+        else
+          OTHER=$(($OTHER + 1))
+          echo $STATE >> /tmp/db2_nagios_connections_unknown_state.log
+        fi
+      done < <( printf '%s\n' "$CONNS" )
+      LONG_PERFORMANCE="'Connect Completed'=$CONNECTED 'UOW Executing'=$UOW_EXECUTING 'UOW waiting'=$UOW_WAITING 'Other'=$OTHER "
+    else
+      QTY_FILTERED=$(printf '%s\n' "$CONNS" | awk '{print $1}' | sort | uniq -c)
+      if [[ $VERBOSE -ge 3 ]] ; then
+        echo "RESULT FILTER:'$QTY_FILTERED'"
+      fi
+      AGREGATE=0
+      while IFS= read LINE ; do
+        USERNAME=$(echo $LINE | awk '{print $2}')
+        QTY_USER=$(echo $LINE | awk '{print $1}')
+        AGREGATE=$(($AGREGATE + $QTY_USER))
+        LONG_PERFORMANCE="$LONG_PERFORMANCE '$USERNAME'=$AGREGATE"
+      done < <( printf '%s\n' "$QTY_FILTERED" )
     fi
-    AGREGATE=0
-    while IFS= read LINE ; do
-      USERNAME=$(echo $LINE | awk '{print $2}')
-      QTY_USER=$(echo $LINE | awk '{print $1}')
-      AGREGATE=$(($AGREGATE + $QTY_USER))
-      LONG_PERFORMANCE="$LONG_PERFORMANCE '$USERNAME'=$AGREGATE"
-    done < <( printf '%s\n' "$QTY_FILTERED" )
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "RESULT:'$QTY'"
     fi
@@ -336,8 +373,6 @@ if [[ $CONTINUE == true ]] ; then
        RETURN=$CRITICAL
     fi
     PERFORMANCE="'Connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES "
-
-    # TODO Add the status of the connection (UOW, Connected, ...)
   else
     OUTPUT="Problem retreiving the applications list"
     RETURN=$UNKNOWN
