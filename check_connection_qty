@@ -384,11 +384,12 @@ if [[ $CONTINUE == true ]] ; then
          OUTPUT="Quantity of connections is critical, currently $QTY."
          RETURN=$CRITICAL
       fi
+      PERFORMANCE="'Connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES "
     else
-       OUTPUT="OK Threshold ignored."
-       RETURN=$OK
+      OUTPUT="OK Threshold ignored."
+      RETURN=$OK
+      PERFORMANCE="'Connections'=$QTY "
     fi
-    PERFORMANCE="'Connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES "
   else
     OUTPUT="Problem retreiving the applications list"
     RETURN=$UNKNOWN
