@@ -61,12 +61,14 @@
 # Parameters:
 # -c | --critical : Critical threshold in milliseconds.
 # -d | --database : Database name.
-# -D | --debug : Debug mode. Writes output in /tmp
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
+# -I | --ignore : Do not check threshold, only informative. It is useful
+# when only graphs want to be created with the data from this script.
 # -s | --state : Shows the connection state in the performance output.
 #   Normally it show the distribution of connections by users.
+# -T | --trace : Trace mode. Writes output in /tmp
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
 # -w | --warning : Warning threshold in milliseconds.
@@ -89,7 +91,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.0 2013-01-18
+# Version: v1.1 2013-04-21
 
 # Flag for debugging.
 #set -xv
@@ -105,7 +107,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w][--filter \
-\n [--inverted]] ! -s ! -h ! -V } [ -D ] [ -v ]"
+\n [--inverted]] [-I] ! -s ! -h ! -V } [ -T ] [ -v ]"
 }
 
 function print_help {
@@ -118,15 +120,18 @@ This script check the quantity of established connections.
    Quantity of connections to consider as critical.
 -d | --database STRING
    Database name.
--D | --debug
-   Debug mode: writes date and output in /tmp
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1
+-I | --ignore
+   Ignore thresholds, show only informative information. Useful to create
+   graphs descriving the activity.
 -s | --state
    Shows the connections states in the performance output. Normally, it shows
    the distribution of connections per user.
+-T | --debug
+   Debug mode: writes date and output in /tmp
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -172,7 +177,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=$(getopt -o hVvi:d:c:w:Ds --long help,version,verbose,instance:,database:,critical:,warning:,filter:,inverted,debug,state \
+TEMP=$(getopt -o hVvi:d:c:w:TsI --long help,version,verbose,instance:,database:,critical:,warning:,filter:,inverted,trace,state,ignore \
              -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
@@ -189,9 +194,10 @@ if [[ $CONTINUE == true ]] ; then
   VERSION=false
   # Verbosity level
   VERBOSE=0
-  # Debug activated
-  DEBUG=false
+  # Trace activated
+  TRACE=false
   LOG=/tmp/$(basename ${0}).log
+  IGNORE_THRES=false
   INSTANCE_HOME=
   DATABASE_NAME=
   WARNING_THRES=5
@@ -203,9 +209,10 @@ if [[ $CONTINUE == true ]] ; then
     case "$1" in
       -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -D | --debug ) DEBUG=true ; shift ;;
+      -T | --trace ) TRACE=true ; shift ;;
       -h | --help ) HELP=true; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -I | --ignore ) IGNORE_THRES=true ; shift ;;
       -s | --state ) STATE=true ; shift ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
@@ -218,7 +225,7 @@ if [[ $CONTINUE == true ]] ; then
   done
 fi
 
-if [[ $DEBUG == true ]] ; then
+if [[ $TRACE == true ]] ; then
   echo ">>>>>" >> $LOG
   date >> $LOG
 fi
@@ -226,12 +233,13 @@ fi
 ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
 ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
 ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES, "
-ECHO=$ECHO"filter:$FILTER, inverted:$FILTER_INVERTED, state:$STATE"
+ECHO=$ECHO"filter:$FILTER, inverted:$FILTER_INVERTED, state:$STATE, "
+ECHO=$ECHO"ignore:$IGNORE_THRES "
 
 if [[ $VERBOSE -ge 2 ]] ; then
   echo $ECHO
 fi
-if [[ $DEBUG == true ]] ; then
+if [[ $TRACE == true ]] ; then
   echo "PARAMS:$ECHO" >> $LOG
 fi
 
@@ -307,7 +315,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$QTY_RESULT'"
   fi
-  if [[ $DEBUG == true ]] ; then
+  if [[ $TRACE == true ]] ; then
     echo "RESULT:'$QTY_RESULT'" >> $LOG
   fi
   NO_APPS=$(echo $QTY_RESULT | grep SQL1611W)
@@ -324,13 +332,14 @@ if [[ $CONTINUE == true ]] ; then
     fi
     QTY=$(printf '%s\n' "$CONNS" | wc -l)
     if [[ $STATE == true ]] ; then
+      BACKUP=0
       CONNECTED=0
       UOW_EXECUTING=0
       UOW_WAITING=0
       OTHER=0
       while IFS= read LINE ; do
         STATE=$(printf '%s\n' "$LINE" | cut -c 275-304)
-        if [[ $DEBUG == true ]] ; then
+        if [[ $TRACE == true ]] ; then
           echo "RESULT:'$STATE'"
         fi
         if [[ $STATE == "Connect Completed             " ]] ; then
@@ -339,12 +348,14 @@ if [[ $CONTINUE == true ]] ; then
           UOW_EXECUTING=$(($UOW_EXECUTING + 1))
         elif [[ $STATE == "UOW Waiting                   " ]] ; then
           UOW_WAITING=$(($UOW_WAITING + 1))
+        elif [[ $STATE == "Performing a Backup           " ]] ; then
+          BACKUP=$(($BACKUP + 1))
         else
           OTHER=$(($OTHER + 1))
           echo $STATE >> /tmp/db2_nagios_connections_unknown_state.log
         fi
       done < <( printf '%s\n' "$CONNS" )
-      LONG_PERFORMANCE="'Connect Completed'=$CONNECTED 'UOW Executing'=$UOW_EXECUTING 'UOW waiting'=$UOW_WAITING 'Other'=$OTHER "
+      LONG_PERFORMANCE="'Connect Completed'=$CONNECTED 'UOW Executing'=$UOW_EXECUTING 'UOW waiting'=$UOW_WAITING 'Backup'=$BACKUP 'Other'=$OTHER "
     else
       QTY_FILTERED=$(printf '%s\n' "$CONNS" | awk '{print $1}' | sort | uniq -c)
       if [[ $VERBOSE -ge 3 ]] ; then
@@ -362,15 +373,20 @@ if [[ $CONTINUE == true ]] ; then
       echo "RESULT:'$QTY'"
     fi
 
-    if [[ $QTY -lt $WARNING_THRES ]] ; then
-       OUTPUT="OK Normal quantity of connections ($QTY)."
-       RETURN=$OK
-    elif [[ $QTY -lt $CRITICAL_THRES ]] ; then
-       OUTPUT="Quantity of connections is increasing, currently $QTY."
-       RETURN=$WARNING
+    if [[ $IGNORE_THRES == false ]] ; then
+      if [[ $QTY -lt $WARNING_THRES ]] ; then
+         OUTPUT="OK Normal quantity of connections ($QTY)."
+         RETURN=$OK
+      elif [[ $QTY -lt $CRITICAL_THRES ]] ; then
+         OUTPUT="Quantity of connections is increasing, currently $QTY."
+         RETURN=$WARNING
+      else
+         OUTPUT="Quantity of connections is critical, currently $QTY."
+         RETURN=$CRITICAL
+      fi
     else
-       OUTPUT="Quantity of connections is critical, currently $QTY."
-       RETURN=$CRITICAL
+       OUTPUT="OK Threshold ignored."
+       RETURN=$OK
     fi
     PERFORMANCE="'Connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES "
   else
@@ -390,7 +406,7 @@ $LONG_OUTPUT|$LONG_PERFORMANCE"
 if [[ $VERBOSE -ge 2 ]] ; then
   echo "Return code: $RETURN"
 fi
-if [[ $DEBUG == true ]] ; then
+if [[ $TRACE == true ]] ; then
   echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
   date >> $LOG
   echo -e "<<<<<\n" >> $LOG
