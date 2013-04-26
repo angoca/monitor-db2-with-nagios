@@ -333,6 +333,8 @@ if [[ $CONTINUE == true ]] ; then
     QTY=$(printf '%s\n' "$CONNS" | wc -l)
     if [[ $STATE == true ]] ; then
       BACKUP=0
+      COMMIT=0
+      COMPILING=0
       CONNECTED=0
       UOW_EXECUTING=0
       UOW_WAITING=0
@@ -344,10 +346,14 @@ if [[ $CONTINUE == true ]] ; then
         fi
         if [[ $STATE == "Connect Completed             " ]] ; then
           CONNECTED=$(($CONNECTED + 1))
-        elif [[ $STATE == "UOW Executing                 " ]] ; then
-          UOW_EXECUTING=$(($UOW_EXECUTING + 1))
         elif [[ $STATE == "UOW Waiting                   " ]] ; then
           UOW_WAITING=$(($UOW_WAITING + 1))
+        elif [[ $STATE == "UOW Executing                 " ]] ; then
+          UOW_EXECUTING=$(($UOW_EXECUTING + 1))
+        elif [[ $STATE == "Commit Active                 " ]] ; then
+          COMMIT=$(($COMMIT + 1))
+        elif [[ $STATE == "Compiling                     " ]] ; then
+          COMPILING=$(($COMPILING + 1))
         elif [[ $STATE == "Performing a Backup           " ]] ; then
           BACKUP=$(($BACKUP + 1))
         else
@@ -355,7 +361,7 @@ if [[ $CONTINUE == true ]] ; then
           echo $STATE >> /tmp/db2_nagios_connections_unknown_state.log
         fi
       done < <( printf '%s\n' "$CONNS" )
-      LONG_PERFORMANCE="'Connect Completed'=$CONNECTED 'UOW Executing'=$UOW_EXECUTING 'UOW waiting'=$UOW_WAITING 'Backup'=$BACKUP 'Other'=$OTHER "
+      LONG_PERFORMANCE="'Connect Completed'=$CONNECTED 'UOW Executing'=$UOW_EXECUTING 'UOW Waiting'=$UOW_WAITING 'Commit Active'=$COMMIT 'Compiling'=$COMPILING 'Backup'=$BACKUP 'Other'=$OTHER "
     else
       QTY_FILTERED=$(printf '%s\n' "$CONNS" | awk '{print $1}' | sort | uniq -c)
       if [[ $VERBOSE -ge 3 ]] ; then
