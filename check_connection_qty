@@ -336,6 +336,7 @@ if [[ $CONTINUE == true ]] ; then
       COMMIT=0
       COMPILING=0
       CONNECTED=0
+      RESTORE=0
       UOW_EXECUTING=0
       UOW_WAITING=0
       OTHER=0
@@ -356,12 +357,14 @@ if [[ $CONTINUE == true ]] ; then
           COMPILING=$(($COMPILING + 1))
         elif [[ $STATE == "Performing a Backup           " ]] ; then
           BACKUP=$(($BACKUP + 1))
+        elif [[ $STATE == "Restoring Database            " ]] ; then
+          RESTORE=$(($RESTORE + 1))
         else
           OTHER=$(($OTHER + 1))
           echo $STATE >> /tmp/db2_nagios_connections_unknown_state.log
         fi
       done < <( printf '%s\n' "$CONNS" )
-      LONG_PERFORMANCE="'Connect Completed'=$CONNECTED 'UOW Executing'=$UOW_EXECUTING 'UOW Waiting'=$UOW_WAITING 'Commit Active'=$COMMIT 'Compiling'=$COMPILING 'Backup'=$BACKUP 'Other'=$OTHER "
+      LONG_PERFORMANCE="'Connect Completed'=$CONNECTED 'UOW Executing'=$UOW_EXECUTING 'UOW Waiting'=$UOW_WAITING 'Commit Active'=$COMMIT 'Compiling'=$COMPILING 'Backup'=$BACKUP 'Restore'=$RESTORE 'Other'=$OTHER "
     else
       QTY_FILTERED=$(printf '%s\n' "$CONNS" | awk '{print $1}' | sort | uniq -c)
       if [[ $VERBOSE -ge 3 ]] ; then
