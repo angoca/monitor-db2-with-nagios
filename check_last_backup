@@ -417,7 +417,7 @@ if [[ $CONTINUE == true ]] ; then
       fi
     else
       OUTPUT="Standby database, check values in primary."
-      RETURN=$UNKNOWN
+      RETURN=$OK
     fi
 
     # Performance data
