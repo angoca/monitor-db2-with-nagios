@@ -346,11 +346,11 @@ fi
 
 if [[ $CONTINUE == true ]] ; then
   # Checks HADR role.
-  HADR_ROLE=$(db2 get db cfg for wfscpd | grep "HADR database role")
+  HADR_ROLE=$(db2 get db cfg for wfscpd | awk '/HADR database role/ {print $5}')
   if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT HADR: $HADR_ROLE"
+    echo "RESULT HADR: '$HADR_ROLE'"
   fi
-  # There could be just one query, but 'union all' is no allowed in HADRm thus three calls.
+  # There could be just one query, but 'union all' is no allowed in HADR, thus three calls.
   if [[ ! -z $CRIT_DELT ]] ; then
     query "'D', 'E', 'I', 'O', 'F', 'N'"
     RET1=$?
