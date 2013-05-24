@@ -339,6 +339,7 @@ if [[ $CONTINUE == true ]] ; then
       DISCONNECTING=0
       LOCK_WAIT=0
       RESTORE=0
+      ROLLBACK=0
       UOW_EXECUTING=0
       UOW_WAITING=0
       OTHER=0
@@ -357,6 +358,8 @@ if [[ $CONTINUE == true ]] ; then
           LOCK_WAIT=$(($LOCK_WAIT + 1))
         elif [[ $STATE == "Commit Active                 " ]] ; then
           COMMIT=$(($COMMIT + 1))
+        elif [[ $STATE == "Rollback Active               " ]] ; then
+          ROLLBACK=$(($ROLLBACK + 1))
         elif [[ $STATE == "Compiling                     " ]] ; then
           COMPILING=$(($COMPILING + 1))
         elif [[ $STATE == "Disconnect Pending            " ]] ; then
@@ -370,7 +373,7 @@ if [[ $CONTINUE == true ]] ; then
           echo $STATE >> /tmp/db2_nagios_connections_unknown_state.log
         fi
       done < <( printf '%s\n' "$CONNS" )
-      LONG_PERFORMANCE="'Connect Completed'=$CONNECTED 'UOW Executing'=$UOW_EXECUTING 'UOW Waiting'=$UOW_WAITING 'Lock Wait'=$LOCK_WAIT 'Commit Active'=$COMMIT 'Compiling'=$COMPILING 'Disconnecting'=$DISCONNECTING 'Backup'=$BACKUP 'Restore'=$RESTORE 'Other'=$OTHER "
+      LONG_PERFORMANCE="'Connect Completed'=$CONNECTED 'UOW Executing'=$UOW_EXECUTING 'UOW Waiting'=$UOW_WAITING 'Lock Wait'=$LOCK_WAIT 'Commit Active'=$COMMIT 'Rollback'=$ROLLBACK 'Compiling'=$COMPILING 'Disconnecting'=$DISCONNECTING 'Backup'=$BACKUP 'Restore'=$RESTORE 'Other'=$OTHER "
     else
       QTY_FILTERED=$(printf '%s\n' "$CONNS" | awk '{print $1}' | sort | uniq -c)
       if [[ $VERBOSE -ge 3 ]] ; then
