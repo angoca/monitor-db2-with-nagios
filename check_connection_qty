@@ -232,7 +232,7 @@ fi
 if [[ $TRACE == true ]] ; then
   echo ">>>>>" >> $LOG
   date >> $LOG
-  echo $$ >> $LOG
+  echo "PID $$" >> $LOG
 fi
 
 ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
