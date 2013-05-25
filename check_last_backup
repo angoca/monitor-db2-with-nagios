@@ -18,10 +18,8 @@
 # limitations under the License.
 ###############################################################################
 
-# This scripts checks the elderly of the last backup. If throw alerts if the
+# This scripts checks the elderly of the last backup. It throws alerts if the
 # last backups are too old.
-#
-# Here comes the documentation
 #
 # In order to be used in Nagios, you have to configure the following.
 #
@@ -42,6 +40,18 @@
 # In the database server:
 #
 # command[check_last_backup]=/home/nagios/scripts/check_last_backup -i /home/db2inst1 -d sample -c 240:140:50 -w 168:96:25
+#
+# Then modify the path according to your script location, instance home dir,
+# database and thresholds.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     Last backup
+#         check_command           check_nrpe_1arg!check_last_backup
+#         use                     generic-service
+# }
 #
 # Parameters:
 # -c | --critical : Time in hours to consider the last backup age as critical.
@@ -78,7 +88,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.0 2013-01-18
+# Version: v1.1 2013-05-25
 
 # Flag for debugging.
 #set -xv
@@ -89,7 +99,7 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-04-14
+  echo v1.1 2013-05-25
 }
 # Function to show the help
 function print_usage {
@@ -240,8 +250,8 @@ if [[ $CONTINUE == true ]] ; then
       -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -T | --trace ) TRACE=true ; shift ;;
       -h | --help ) HELP=true; shift ;;
+      -T | --trace ) TRACE=true ; shift ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
