@@ -37,14 +37,31 @@
 #         use                     generic-service
 # }
 #
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_last_backup]=/home/nagios/scripts/check_database_connection -i /home/db2inst1 -d sample
+#
+# Then modify the path according to your script location, instance home dir,
+# database and thresholds.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     Database conectivity
+#         check_command           check_nrpe_1arg!check_database_connection
+#         use                     generic-service
+# }
 #
 # Parameters:
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
-# -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
+# -V | --version : Show the current version of this script.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -62,7 +79,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.0 2013-01-18
+# Version: v1.1 2013-05-25
 
 # Flag for debugging.
 #set -xv
@@ -73,11 +90,11 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-01-18
+  echo v1.1 2013-05-25
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName # -h # -V } [ -v ]"
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName ! -h ! -V } [ -v ]"
 }
 
 function print_help {
@@ -131,8 +148,8 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d: --long help,version,verbose,instance:,datbase: \
-             -n $APPL_NAME -- "$@"`
+TEMP=$(getopt -o d:hi:vV --long database:,help,instance:,verbose,version \
+             -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
   print_usage $APPL_NAME
@@ -152,15 +169,21 @@ if [[ $CONTINUE == true ]] ; then
   DATABASE_NAME=
   while true; do
     case "$1" in
-      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -V | --version ) VERSION=true; shift ;;
+      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
+      -V | --version ) VERSION=true; shift ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
   done
+fi
+
+if [[ $TRACE == true ]] ; then
+  echo ">>>>>" >> $LOG
+  date >> $LOG
+  echo "PID $$" >> $LOG
 fi
 
 if [[ $VERBOSE -ge 2 ]] ; then
@@ -209,7 +232,11 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DATABASE"
   fi
-  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  DATABASE=$($COMMAND_DATABASE)
+  if [[ $TRACE == true ]] ; then
+    echo "RESULT:'$DATABASE'" >> $LOG
+  fi
+  DATABASE=$(echo $DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$DATABASE'"
   fi
@@ -226,7 +253,11 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_ACTIVE"
   fi
-  ACTIVE=`$COMMAND_ACTIVE | awk '/Database name/ {print $4}' |  grep -iw $DATABASE_NAME`
+  ACTIVE=$($COMMAND_ACTIVE)
+  if [[ $TRACE == true ]] ; then
+    echo "RESULT:'$ACTIVE'" >> $LOG
+  fi
+  ACTIVE=$(echo $ACTIVE | awk '/Database name/ {print $4}' |  grep -iw $DATABASE_NAME)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$ACTIVE'"
   fi
@@ -245,13 +276,17 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_CONNECTABLE"
   fi
-  CONNECTABLE=`$COMMAND_CONNECTABLE | awk '/sqlcode/ {print $7} ; db2 connect reset > /dev/null'`
+  CONNECTABLE=$($COMMAND_CONNECTABLE)
+  if [[ $TRACE == true ]] ; then
+    echo "RESULT:'$ACTIVE'" >> $LOG
+  fi
+  CONNECTABLE=$(echo $CONNECTABLE | awk '/sqlcode/ {print $7}')
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$CONNECTABLE'"
   fi
 
   if [[ $CONNECTABLE -eq 0 ]] ; then
-    OUTPUT="Connection to database $DATABASE_NAME is OK. "$OUTPUT_ACTIVE
+    OUTPUT="OK Connection to database $DATABASE_NAME. "$OUTPUT_ACTIVE
     RETURN=$OK
     PERFORMANCE="'Connectable Database'=1.8;1.6;1.3;1.1;2 "
   elif [[ $CONNECTABLE -eq -20157 ]] ; then
@@ -269,7 +304,11 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_ROLE"
   fi
-  ROLE=`$COMMAND_ROLE | awk '/HADR database role/ {print $5}'`
+  ROLE=$($COMMAND_ROLE)
+  if [[ $TRACE == true ]] ; then
+    echo "RESULT:'$ROLE'" >> $LOG
+  fi
+  ROLE=$(echo $ROLE | awk '/HADR database role/ {print $5}')
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$ROLE'"
   fi
@@ -278,7 +317,11 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE -ge 2 ]] ; then
       echo "COMMAND: $COMMAND_REPLAY"
     fi
-    REPLAY=`$COMMAND_REPLAY | awk '/^Active/ {print "active"}'`
+    REPLAY=$($COMMAND_REPLAY)
+    if [[ $TRACE == true ]] ; then
+      echo "RESULT:'$REPLAY'" >> $LOG
+    fi
+    REPLAY=$(echo $REPLAY | awk '/^Active/ {print "active"}')
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "RESULT:'$REPLAY'"
     fi
@@ -300,5 +343,10 @@ $LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
 if [[ $VERBOSE -ge 2 ]] ; then
   echo "Return code: $RETURN"
+fi
+if [[ $TRACE == true ]] ; then
+  echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
+  date >> $LOG
+  echo -e "<<<<<\n" >> $LOG
 fi
 exit $RETURN
