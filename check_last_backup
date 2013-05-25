@@ -141,7 +141,7 @@ order by 1"
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_LIST"
   fi
-  LIST=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_LIST ; db2 connect reset > /dev/null`
+  LIST=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_LIST ; db2 connect reset > /dev/null`
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$LIST'"
   fi
@@ -149,11 +149,16 @@ order by 1"
     echo "RESULT:'$LIST'" >> $LOG
   fi
   # Substring para ver si hubo un error
-  EXIST_ERROR=`echo $LIST | cut -c 1-5`
+  CONN_ERROR=`echo $LIST | grep SQL1024`
+  HIST_ERROR=`echo $LIST | grep SQL0443`
   HADR_ERROR=`echo $LIST | grep SQL1773`
   HADR_REPLAY=`echo $LIST | grep SQL1224`
-  if [[ $EXIST_ERROR == "error" ]] ; then
+  if [[ $CONN_ERROR != "" ]] ; then
     OUTPUT="Connection problem"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  elif [[ $HIST_ERROR != "" ]] ; then
+    OUTPUT="History file modified"
     RETURN=$UNKNOWN
     CONTINUE=false
   elif [[ $HADR_ERROR != "" ]] ; then
@@ -350,7 +355,10 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT HADR: '$HADR_ROLE'"
   fi
-  # There could be just one query, but 'union all' is no allowed in HADR, thus three calls.
+  # There could be just one query, but 'union all' is no allowed in HADR, thus 
+  # three calls.
+  # There is a problem when accessing the db_view, and the script hangs in any
+  # of the three calls.
   if [[ ! -z $CRIT_DELT ]] ; then
     query "'D', 'E', 'I', 'O', 'F', 'N'"
     RET1=$?
