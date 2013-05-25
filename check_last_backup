@@ -104,7 +104,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w] ! -h \
-! -V }\n [ -D ] [ -v ]"
+! -V }\n [ -T ] [ -v ]"
 }
 
 function print_help {
@@ -151,7 +151,7 @@ order by 1"
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_LIST"
   fi
-  LIST=`db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_LIST ; db2 connect reset > /dev/null`
+  LIST=$(db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_LIST ; db2 connect reset > /dev/null)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$LIST'"
   fi
@@ -159,10 +159,10 @@ order by 1"
     echo "RESULT:'$LIST'" >> $LOG
   fi
   # Check for errors
-  CONN_ERROR=`echo $LIST | grep SQL1024`
-  HIST_ERROR=`echo $LIST | grep SQL2155`
-  HADR_ERROR=`echo $LIST | grep SQL1773`
-  HADR_REPLAY=`echo $LIST | grep SQL1224`
+  CONN_ERROR=$(echo $LIST | grep SQL1024)
+  HIST_ERROR=$(echo $LIST | grep SQL2155)
+  HADR_ERROR=$(echo $LIST | grep SQL1773)
+  HADR_REPLAY=$(echo $LIST | grep SQL1224)
   if [[ $CONN_ERROR != "" ]] ; then
     OUTPUT="Connection problem"
     RETURN=$UNKNOWN
@@ -221,8 +221,8 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o c:d:hi:TVvw: --long critical:,database:,help,instance:,trace,version,verbose,warning: \
-             -n $APPL_NAME -- "$@"`
+TEMP=$(getopt -o c:d:hi:TVvw: --long critical:,database:,help,instance:,trace,version,verbose,warning: \
+             -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
   print_usage $APPL_NAME
@@ -247,14 +247,14 @@ if [[ $CONTINUE == true ]] ; then
   CRITICAL_THRES=2
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -V | --version ) VERSION=true; shift ;;
-      -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
@@ -348,7 +348,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DATABASE"
   fi
-  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  DATABASE=$($COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$DATABASE'"
   fi
@@ -375,7 +375,7 @@ if [[ $CONTINUE == true ]] ; then
     RET1=$?
     DELTA=$LIST
     if [[ $RET1 -eq 0 ]] ; then
-      DIFF_DELT=`echo $DELTA | awk '{print $1}'`
+      DIFF_DELT=$(echo $DELTA | awk '{print $1}')
       if [[ $HADR_ROLE != "STANDBY" ]] ; then
         if [[ $DIFF_DELT -ge $CRIT_DELT ]] ; then
           OUTPUT="Delta backup is too old."
@@ -399,7 +399,7 @@ if [[ $CONTINUE == true ]] ; then
     RET2=$?
     INCREMENTAL=$LIST
     if [[ $RET2 -eq 0 ]] ; then
-      DIFF_INCR=`echo $INCREMENTAL | awk '{print $1}'`
+      DIFF_INCR=$(echo $INCREMENTAL | awk '{print $1}')
       if [[ $HADR_ROLE != "STANDBY" ]] ; then
         if [[ $DIFF_INCR -ge $CRIT_INCR ]] ; then
           OUTPUT="Incremental backup is too old. $OUTPUT"
@@ -422,7 +422,7 @@ if [[ $CONTINUE == true ]] ; then
   RET3=$?
   FULL=$LIST
   if [[ $RET3 -eq 0 ]] ; then
-    DIFF_FULL=`echo $FULL | awk '{print $1}'`
+    DIFF_FULL=$(echo $FULL | awk '{print $1}')
     if [[ $HADR_ROLE != "STANDBY" ]] ; then
       if [[ $DIFF_FULL -ge $CRIT_FULL ]] ; then
         OUTPUT="Full backup is too old. $OUTPUT"
