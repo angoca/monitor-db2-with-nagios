@@ -64,8 +64,8 @@
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
 # -T | --trace : Trace mode. Writes output in /tmp
-# -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
+# -V | --version : Show the current version of this script.
 # -w | --warning : Time in hours to consider the last backup age as critical.
 #    This checks the full, incremental and delta backups.
 #    Notation for these three type are times separated by colons
@@ -221,7 +221,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d:c:w:T --long help,version,verbose,instance:,database:,critical:,warning:,trace \
+TEMP=`getopt -o c:d:hi:TVvw: --long critical:,database:,help,instance:,trace,version,verbose,warning: \
              -n $APPL_NAME -- "$@"`
 
 if [[ $? -ne 0 ]] ; then
@@ -249,11 +249,11 @@ if [[ $CONTINUE == true ]] ; then
     case "$1" in
       -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
+      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -T | --trace ) TRACE=true ; shift ;;
-      -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
+      -V | --version ) VERSION=true; shift ;;
       -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -- ) shift; break ;;
       * ) break ;;
