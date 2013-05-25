@@ -44,7 +44,11 @@
 #         use                     generic-service
 # }
 #
-# command[check_connection_qty]=/home/nagios/scripts/check_connection_qty -i /home/db2inst1 -d sample -w 10 -c 20
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_connection_qty]=/home/nagios/scripts/check_connection_qty -i /home/db2inst1 -d sample -w 5 -c 10
 #
 # Then modify the path according to your script location, instance home dir,
 # database, filter and thresholds.
@@ -59,19 +63,19 @@
 # }
 #
 # Parameters:
-# -c | --critical : Critical threshold in milliseconds.
+# -c | --critical : Quantity of connections to be considered as critical.
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
 # -I | --ignore : Do not check threshold, only informative. It is useful
-# when only graphs want to be created with the data from this script.
+#   when only graphs want to be created with the data from this script.
 # -s | --state : Shows the connection state in the performance output.
-#   Normally it show the distribution of connections by users.
+#   Normally it shows the distribution of connections by users.
 # -T | --trace : Trace mode. Writes output in /tmp
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
-# -w | --warning : Warning threshold in milliseconds.
+# -w | --warning :  Quantity of connections to be considered as a warning.
 # --filter : Extra filter for the grep.
 # --inverted : Filter inverted.
 #
@@ -91,7 +95,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.1 2013-04-21
+# Version: v1.2 2013-05-25
 
 # Flag for debugging.
 #set -xv
@@ -102,7 +106,7 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-01-18
+  echo v1.0 2013-05-25
 }
 # Function to show the help
 function print_usage {
@@ -130,8 +134,8 @@ This script check the quantity of established connections.
 -s | --state
    Shows the connections states in the performance output. Normally, it shows
    the distribution of connections per user.
--T | --debug
-   Debug mode: writes date and output in /tmp
+-T | --trace
+   Trace mode: writes date and output in /tmp
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -209,11 +213,11 @@ if [[ $CONTINUE == true ]] ; then
     case "$1" in
       -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -T | --trace ) TRACE=true ; shift ;;
       -h | --help ) HELP=true; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -I | --ignore ) IGNORE_THRES=true ; shift ;;
       -s | --state ) STATE=true ; shift ;;
+      -T | --trace ) TRACE=true ; shift ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
@@ -228,6 +232,7 @@ fi
 if [[ $TRACE == true ]] ; then
   echo ">>>>>" >> $LOG
   date >> $LOG
+  echo $$ >> $LOG
 fi
 
 ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
@@ -267,10 +272,11 @@ if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
   CONTINUE=false
 fi
 
-if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
+if [[ $CONTINUE == true && (
+    $WARNING_THRES == "" || $CRITICAL_THRES == ""
     || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
     || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
-    || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
+    || $WARNING_THRES -ge $CRITICAL_THRES ) ]] ; then
   print_usage $APPL_NAME
   echo "Warning threshold should be less than critical threshold."
   echo "Threshold should be greater than 0."
