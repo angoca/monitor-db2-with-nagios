@@ -50,10 +50,10 @@
 #    FF:II:DD = Full : Incremental : Delta.
 #    Full is obligatory, other two are optionals.
 # -d | --database : Database name.
-# -D | --debug : Debug mode. Writes output in /tmp
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
+# -T | --trace : Trace mode. Writes output in /tmp
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
 # -w | --warning : Time in hours to consider the last backup age as critical.
@@ -107,12 +107,12 @@ Checks the elderly of the last backup of the database.
    Time in hours of the last backup to considered as critical.
 -d | --database STRING
    Database name.
--D | --debug
-   Debug mode: writes date and output in /tmp
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1
+-T | --trace
+   Trace mode: writes date and output in /tmp
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -145,7 +145,7 @@ order by 1"
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$LIST'"
   fi
-  if [[ $DEBUG == true ]] ; then
+  if [[ $TRACE == true ]] ; then
     echo "RESULT:'$LIST'" >> $LOG
   fi
   # Check for errors
@@ -211,7 +211,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d:c:w:D --long help,version,verbose,instance:,database:,critical:,warning:,debug \
+TEMP=`getopt -o hVvi:d:c:w:T --long help,version,verbose,instance:,database:,critical:,warning:,trace \
              -n $APPL_NAME -- "$@"`
 
 if [[ $? -ne 0 ]] ; then
@@ -228,8 +228,8 @@ if [[ $CONTINUE == true ]] ; then
   VERSION=false
   # Verbosity level
   VERBOSE=0
-  # Debug activated
-  DEBUG=false
+  # Trace activated
+  TRACE=false
   LOG=/tmp/$(basename ${0}).log
   INSTANCE_HOME=
   DATABASE_NAME=
@@ -239,9 +239,9 @@ if [[ $CONTINUE == true ]] ; then
     case "$1" in
       -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
       -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -D | --debug ) DEBUG=true ; shift ;;
-      -h | --help ) HELP=true; shift ;;
       -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -T | --trace ) TRACE=true ; shift ;;
+      -h | --help ) HELP=true; shift ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
@@ -251,10 +251,10 @@ if [[ $CONTINUE == true ]] ; then
   done
 fi
 
-if [[ $DEBUG == true ]] ; then
+if [[ $TRACE == true ]] ; then
   echo ">>>>>" >> $LOG
   date >> $LOG
-  $$ >> $LOG
+  echo $$ >> $LOG
 fi
 
 ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
@@ -264,7 +264,7 @@ ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
 if [[ $VERBOSE -ge 2 ]] ; then
   echo $ECHO
 fi
-if [[ $DEBUG == TRUE ]] ; then
+if [[ $TRACE == TRUE ]] ; then
   echo "PARAMS:$ECHO" >> $LOG
 fi
 
@@ -454,7 +454,7 @@ $LONG_OUTPUT|$LONG_PERFORMANCE"
 if [[ $VERBOSE -ge 2 ]] ; then
   echo "Return code: $RETURN"
 fi
-if [[ $DEBUG == true ]] ; then
+if [[ $TRACE == true ]] ; then
   echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
   date >> $LOG
   echo -e "<<<<<\n" >> $LOG
