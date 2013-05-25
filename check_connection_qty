@@ -73,8 +73,8 @@
 # -s | --state : Shows the connection state in the performance output.
 #   Normally it shows the distribution of connections by users.
 # -T | --trace : Trace mode. Writes output in /tmp
-# -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
+# -V | --version : Show the current version of this script.
 # -w | --warning :  Quantity of connections to be considered as a warning.
 # --filter : Extra filter for the grep.
 # --inverted : Filter inverted.
@@ -181,7 +181,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=$(getopt -o hVvi:d:c:w:TsI --long help,version,verbose,instance:,database:,critical:,warning:,filter:,inverted,trace,state,ignore \
+TEMP=$(getopt -o c:d:hi:IsTVvw: --long critical:,database:,filter:,help,instance:,ignore,inverted,state,trace,version,verbose,warning: \
              -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
