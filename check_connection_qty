@@ -399,7 +399,7 @@ if [[ $CONTINUE == true ]] ; then
 
     if [[ $IGNORE_THRES == false ]] ; then
       if [[ $QTY -lt $WARNING_THRES ]] ; then
-         OUTPUT="OK Normal quantity of connections ($QTY)."
+         OUTPUT="OK. Normal quantity of connections ($QTY)."
          RETURN=$OK
       elif [[ $QTY -lt $CRITICAL_THRES ]] ; then
          OUTPUT="Quantity of connections is increasing, currently $QTY."
@@ -410,7 +410,7 @@ if [[ $CONTINUE == true ]] ; then
       fi
       PERFORMANCE="'Connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES "
     else
-      OUTPUT="OK Threshold ignored."
+      OUTPUT="OK. Threshold ignored."
       RETURN=$OK
       PERFORMANCE="'Connections'=$QTY "
     fi

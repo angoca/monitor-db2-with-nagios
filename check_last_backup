@@ -386,7 +386,7 @@ if [[ $CONTINUE == true ]] ; then
             RETURN=$WARNING
           fi
         else
-          OUTPUT="Delta OK."
+          OUTPUT="OK Delta."
         fi
       fi
     fi
@@ -410,7 +410,7 @@ if [[ $CONTINUE == true ]] ; then
             RETURN=$WARNING
           fi
         else
-          OUTPUT="Incremental OK. $OUTPUT"
+          OUTPUT="OK Incremental. $OUTPUT"
         fi
       fi
     fi
@@ -431,11 +431,11 @@ if [[ $CONTINUE == true ]] ; then
         OUTPUT="Full backup is getting old. $OUTPUT"
         RETURN=$WARNING
       else
-        OUTPUT="Full OK. $OUTPUT"
+        OUTPUT="OK Full. $OUTPUT"
         RETURN=$OK
       fi
     else
-      OUTPUT="Standby database, check values in primary."
+      OUTPUT="OK. Standby database, check values in primary."
       RETURN=$OK
     fi
 
