@@ -148,9 +148,9 @@ order by 1"
   if [[ $DEBUG == true ]] ; then
     echo "RESULT:'$LIST'" >> $LOG
   fi
-  # Substring para ver si hubo un error
+  # Check for errors
   CONN_ERROR=`echo $LIST | grep SQL1024`
-  HIST_ERROR=`echo $LIST | grep SQL0443`
+  HIST_ERROR=`echo $LIST | grep SQL2155`
   HADR_ERROR=`echo $LIST | grep SQL1773`
   HADR_REPLAY=`echo $LIST | grep SQL1224`
   if [[ $CONN_ERROR != "" ]] ; then
@@ -254,6 +254,7 @@ fi
 if [[ $DEBUG == true ]] ; then
   echo ">>>>>" >> $LOG
   date >> $LOG
+  $$ >> $LOG
 fi
 
 ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
