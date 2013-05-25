@@ -37,15 +37,33 @@
 #         use                     generic-service
 # }
 #
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_lock_wait]=/home/nagios/scripts/check_lock-wait -i /home/db2inst1 -d sample
+#
+# Then modify the path according to your script location, instance home dir,
+# database and thresholds.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     Long lock wait
+#         check_command           check_nrpe_1arg!check_lock_wait
+#         use                     generic-service
+# }
+#
 # Parameters:
 # -c | --critical : Critical threshold in milliseconds.
 # -d | --database : Database name.
-# -D | --debug : Debug mode. Writes output in /tmp
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
-# -V | --version : Show the current version of this script.
+# -T | --trace : Trace mode. Writes output in /tmp
 # -v | --verbose : Execute the program in verbose mode.
+# -V | --version : Show the current version of this script.
 # -w | --warning : Warning threshold in milliseconds.
 # --update : Update monitor switch before executing the command. It means that
 #   it does not inherit values from DBM configuration.
@@ -66,7 +84,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.0 2013-01-18
+# Version: v1.1 2013-05-25
 
 # Flag for debugging.
 #set -xv
@@ -77,12 +95,12 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-01-21
+  echo v1.2 2013-05-25
 }
 # Function to show the help
 function print_usage {
   echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w] \
-[--update] ! -h ! -V } [ -D ] [ -v ]"
+[--update] ! -h ! -V } [ -T ] [ -v ]"
 }
 
 function print_help {
@@ -90,17 +108,17 @@ function print_help {
   print_usage $1
   # Max 80 chars width.
   /bin/cat <<__EOT
-This script checks for long lock waits in the database.
+Checks for long lock waits in the database.
 -c | --critical INTEGER
    Quantity of milliseconds to consider a lock-wait as critical (Default 60000)
 -d | --database STRING
    Database name.
--D | --debug
-   Debug mode: writes date and output in /tmp
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1
+-T | --trace
+   Trace mode: writes date and output in /tmp
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -144,8 +162,8 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d:c:w:D --long help,version,verbose,instance:,database:,update,critical:,warning:,debug \
-             -n $APPL_NAME -- "$@"`
+TEMP=$(getopt -o c:d:hi:TvVw: --long critical:,database:,help,instance:,trace,update,verbose,version,warning: \
+             -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
   print_usage $APPL_NAME
@@ -161,8 +179,8 @@ if [[ $CONTINUE == true ]] ; then
   VERSION=false
   # Verbosity level
   VERBOSE=0
-   # Debug activated
-  DEBUG=false
+   # Trace activated
+  TRACE=false
   LOG=/tmp/$(basename ${0}).log
   INSTANCE_HOME=
   DATABASE_NAME=
@@ -171,14 +189,14 @@ if [[ $CONTINUE == true ]] ; then
   CRITICAL_THRES=60000
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -D | --debug ) DEBUG=true ; shift ;;
+      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -V | --version ) VERSION=true; shift ;;
+      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -V | --version ) VERSION=true; shift ;;
+      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       --update ) UPDATE_MON=true; shift ;;
       -- ) shift; break ;;
       * ) break ;;
@@ -186,9 +204,10 @@ if [[ $CONTINUE == true ]] ; then
   done
 fi
 
-if [[ $DEBUG == true ]] ; then
+if [[ $TRACE == true ]] ; then
   echo ">>>>>" >> $LOG
   date >> $LOG
+  echo "PID $$" >> $LOG
 fi
 
 ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
@@ -199,7 +218,7 @@ ECHO=$ECHO"update:$UPDATE_MON"
 if [[ $VERBOSE -ge 2 ]] ; then
   echo $ECHO
 fi
-if [[ $DEBUG == TRUE ]] ; then
+if [[ $TRACE == TRUE ]] ; then
   echo "PARAMS:$ECHO" >> $LOG
 fi
 
@@ -227,10 +246,11 @@ if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
   CONTINUE=false
 fi
 
-if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
+if [[ $CONTINUE == true && (
+       $WARNING_THRES == "" || $CRITICAL_THRES == ""
     || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
     || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
-    || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
+    || $WARNING_THRES -ge $CRITICAL_THRES ) ]] ; then
   print_usage $APPL_NAME
   echo "Warning threshold should be less than critical threshold."
   echo "Threshold should be greater than 0."
@@ -254,7 +274,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DATABASE"
   fi
-  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  DATABASE=$($COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$DATABASE'"
   fi
@@ -272,17 +292,26 @@ if [[ $CONTINUE == true ]] ; then
     echo "COMMAND: $COMMAND_LOCKS"
   fi
 
-  LOCKS=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_LOCKS | cut -d' ' -f1 ; db2 connect reset > /dev/null`
-  if [[ $VERBOSE -ge 3 ]] ; then 
-    echo "RESULT:'$LOCKS'"
+  LOCKS=$(db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_LOCKS ; db2 connect reset > /dev/null)
+  if [[ $TRACE == true ]] ; then
+    echo "RESULT:'$LOCKS'" >> $LOG
   fi
 
-  # Substring para ver si hubo un error
-  LOCKS_ERROR=`echo $LOCKS | cut -c 1-5`
-  if [[ $LOCKS_ERROR == "error" ]] ; then
+  # Check for errors
+  CONN_ERROR=$(echo $LOCKS | grep SQL1024)
+  SYS_ERROR=$(echo $LOCKS | grep SQL1042)
+  if [[ $CONN_ERROR != "" ]] ; then
     OUTPUT="Connection problem"
     RETURN=$UNKNOWN
     CONTINUE=false
+  elif [[ $SYS_ERROR != "" ]] ; then
+    OUTPUT="Unexpected error"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  fi
+  LOCKS=$(echo $LOCKS | cut -d' ' -f1)
+  if [[ $VERBOSE -ge 3 ]] ; then 
+    echo "RESULT:'$LOCKS'"
   fi
 fi
 
@@ -292,35 +321,35 @@ if [[ $CONTINUE == true ]] ; then
     echo "COMMAND: $COMMAND_LOCK"
   fi
   if [[ $UPDATE_MON == true ]] ; then
-    OUTPUT_LOCK=`db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK`
+    OUTPUT_LOCK=$(db2 update monitor switches using lock on > /dev/null ; $COMMAND_LOCK)
   else
-    OUTPUT_LOCK=`$COMMAND_LOCK`
+    OUTPUT_LOCK=$($COMMAND_LOCK)
   fi
-  if [[ $DEBUG == true ]] ; then
+  if [[ $TRACE == true ]] ; then
     echo "RESULT:'$OUTPUT_LOCK'" >> $LOG
   fi
 
-  LOCK_WAIT=`printf '%s\n' "$OUTPUT_LOCK" | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1` 
+  LOCK_WAIT=$(printf '%s\n' "$OUTPUT_LOCK" | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1) 
   if [[ $VERBOSE -ge 3 ]] ; then 
     echo "RESULT:'$LOCK_WAIT'"
   fi
 
-  # Valida que LOCKS sea un numero y que no haya habido errores.
+  # Validates that LOCKS is a number and does not contain errors.
   if [[ ! $LOCKS =~ ^[0-9]+$ ]] ; then
     OUTPUT="Problem retrieving the locks."
     RETURN=$UNKNOWN
   elif [[ $LOCKS -eq 0 ]] ; then
-    OUTPUT="There is not any application in lock-wait state."
+    OUTPUT="OK. There is not any application in lock-wait state."
     PERFORMANCE="'Long duration locks'=0;$WARNING_THRES;$CRITICAL_THRES;0 "
     RETURN=$OK
   elif [[ $LOCK_WAIT != "Not Collected" ]] ; then
-    LOCK_IDS=`printf '%s\n' "$OUTPUT_LOCK" | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u`
+    LOCK_IDS=$(printf '%s\n' "$OUTPUT_LOCK" | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u)
     if [[ $VERBOSE -ge 3 ]] ; then 
       echo "RESULT:'$LOCK_IDS'"
     fi
-    LINES=`printf '%s\n' "$LOCK_IDS" | wc -l`
+    LINES=$(printf '%s\n' "$LOCK_IDS" | wc -l)
     if [[ $LINES -gt 0 ]] ; then
-      LOCK_IDS=`printf '%s\n' "$LOCK_IDS" | sed 'N;s/\n/, /'`
+      LOCK_IDS=$(printf '%s\n' "$LOCK_IDS" | sed 'N;s/\n/, /')
     fi
 
     if [[ $LOCK_WAIT -gt $CRITICAL_THRES ]] ; then
@@ -332,7 +361,7 @@ if [[ $CONTINUE == true ]] ; then
       LONG_OUTPUT="The handles of the blocking applications are: $LOCK_IDS."
       RETURN=$WARNING
     else
-      OUTPUT="There are short time locks."
+      OUTPUT="OK. There are short time locks."
       RETURN=$OK
     fi
     if [[ $VERBOSE == true ]] ; then
@@ -357,7 +386,7 @@ $LONG_OUTPUT|$LONG_PERFORMANCE"
 if [[ $VERBOSE -ge 2 ]] ; then
   echo "Return code: $RETURN"
 fi
-if [[ $DEBUG == true ]] ; then
+if [[ $TRACE == true ]] ; then
   echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
   date >> $LOG
   echo -e "<<<<<\n" >> $LOG
