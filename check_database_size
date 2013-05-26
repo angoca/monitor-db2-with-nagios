@@ -24,7 +24,7 @@
 # the allocated size.
 #
 # The user that executes this script needs some special permission in the
-# tables associated with  storage management.
+# tables associated with storage management.
 #
 # db2 grant execute on procedure sysproc.GET_DBSIZE_INFO to user nagios
 # db2 grant select,update on table SYSTOOLS.STMG_DBSIZE_INFO to user nagios
@@ -45,6 +45,24 @@
 #         use                     generic-service
 # }
 #
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_database_size]=/home/nagios/scripts/check_database_siza -i /home/db2inst1 -d sample -r 720
+#
+# Then modify the path according to your script location, instance home dir,
+# database, refresh rate and thresholds.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     Database size
+#         check_command           check_nrpe_1arg!check_database_size
+#         use                     generic-service
+# }
+#
 # Parameters:
 # -c | --critical : Database size considered as critical.
 # -d | --database : Database name.
@@ -53,8 +71,9 @@
 #   /home/db2inst1
 # -p | --percentage : Usage percentage (size : allocated).
 # -r | --refresh : Cache minutes before refresh (Stored procedure).
-# -V | --version : Show the current version of this script.
+# -T | --trace : Trace mode. Writes output in /tmp
 # -v | --verbose : Execute the program in verbose mode.
+# -V | --version : Show the current version of this script.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -72,7 +91,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.0 2013-01-18
+# Version: v1.1 2013-05-26
 
 # Flag for debugging.
 #set -xv
@@ -83,12 +102,12 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-01-18
+  echo v1.1 2013-05-26
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-p][-r] # -h # -V } 
-[ -v ]"
+  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-p][-r] ! -h ! -V } 
+[ -T ] [ -v ]"
 }
 
 function print_help {
@@ -112,6 +131,8 @@ bigger that the provided percentage.
 -r | --refresh INTEGER
    Quantity of minutes before refresh cache values in the database.
    Used to call the stored procedure GET_DBSIZE_INFO.
+-T | --trace
+   Trace mode: writes date and output in /tmp
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -140,7 +161,7 @@ PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
 
-APPL_NAME=$0
+APPL_NAME=$(basename ${0})
 
 if [[ $# -eq 0 ]] ; then
   print_usage $APPL_NAME
@@ -151,8 +172,8 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d:c:p:r: --long help,version,verbose,instance:,database:,critical:,percentage:,refresh: \
-             -n $APPL_NAME -- "$@"`
+TEMP=$(getopt -o c:d:hi:p:r:TvV --long critical:,database:,help,instance:,percentage:,refresh:,trace,verbose:,version \
+             -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
   print_usage $APPL_NAME
@@ -168,6 +189,9 @@ if [[ $CONTINUE == true ]] ; then
   VERSION=false
   # Verbosity level
   VERBOSE=0
+  # Trace activated
+  TRACE=false
+  LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
   DATABASE_NAME=
   CRITICAL_THRES=-1
@@ -177,27 +201,38 @@ if [[ $CONTINUE == true ]] ; then
   REFRESH=-1
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; CRITICAL_SET=true ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; CRITICAL_SET=true ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -p | --percentage ) PERCENTAGE=`echo $2 | cut -d' ' -f1` ; PERCENTAGE_SET=true ; shift 2 ;;
-      -r | --refresh ) REFRESH=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -V | --version ) VERSION=true ; shift ;;
+      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -p | --percentage ) PERCENTAGE=$(echo $2 | cut -d' ' -f1) ; PERCENTAGE_SET=true ; shift 2 ;;
+      -r | --refresh ) REFRESH=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )) ; shift ;;
+      -V | --version ) VERSION=true ; shift ;;
       -- ) shift ; break ;;
       * ) break ;;
     esac
   done
 fi
 
+if [[ $TRACE == true ]] ; then
+  echo ">>>>>" >> $LOG
+  date >> $LOG
+  echo "PID $$" >> $LOG
+fi
+
+ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
+ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
+ECHO=$ECHO"percentage:$PERCENTAGE, percentage_set:$PERCENTAGE_SET, "
+ECHO=$ECHO"critical:$CRITICAL_THRES, critical_set:$CRITICAL_SET, "
+ECHO=$ECHO"refresh:$REFRESH "
+
 if [[ $VERBOSE -ge 2 ]] ; then
-  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-  ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-  ECHO=$ECHO"percentage:$PERCENTAGE, percentage_set:$PERCENTAGE_SET, "
-  ECHO=$ECHO"critical:$CRITICAL_THRES, critical_set:$CRITICAL_SET, "
-  ECHO=$ECHO"refresh:$REFRESH "
   echo $ECHO
+fi
+if [[ $TRACE == true ]] ; then
+  echo "PARAMS:$ECHO" >> $LOG
 fi
 
 if [[ $CONTINUE == true && $HELP == true ]] ; then
@@ -224,7 +259,7 @@ if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
   CONTINUE=false
 fi
 
-if [[ $CRITICAL_SET == true && ( $CRITICAL_THRES == ""
+if [[ $CONTINUE == true && $CRITICAL_SET == true && ( $CRITICAL_THRES == ""
     || ! $CRITICAL_THRES =~ ^[0-9]+$
     || $CRITICAL_THRES -lt 0 ) ]] ; then
   print_usage $APPL_NAME
@@ -233,7 +268,7 @@ if [[ $CRITICAL_SET == true && ( $CRITICAL_THRES == ""
   CONTINUE=false
 fi
 
-if [[ $PERCENTAGE_SET == true && ( $PERCENTAGE == "" 
+if [[ $CONTINUE ==  true && $PERCENTAGE_SET == true && ( $PERCENTAGE == "" 
     || ! $PERCENTAGE =~ ^[0-9]+$ 
     || $PERCENTAGE -lt 0 || $PERCENTAGE -ge 100 ) ]] ; then
   print_usage $APPL_NAME
@@ -242,7 +277,7 @@ if [[ $PERCENTAGE_SET == true && ( $PERCENTAGE == ""
   CONTINUE=false
 fi
 
-if [[ ! $REFRESH =~ ^[-0-9]+$ || $REFRESH -lt -1 ]] ; then
+if [[ $CONTINUE == true && ! $REFRESH =~ ^[-0-9]+$ || $REFRESH -lt -1 ]] ; then
   print_usage $APPL_NAME
   echo "Refresh cache should be -1 for default (30 minutes), 0 to force"
   echo "calculation, or a quantity of second (positive value)."
@@ -266,7 +301,11 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DATABASE"
   fi
-  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  DATABASE=$($COMMAND_DATABASE)
+  if [[ $TRACE == true ]] ; then
+    echo "RESULT:'$DATABASE'" >> $LOG
+  fi
+  DATABASE=$(echo $DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$DATABASE'"
   fi
@@ -283,14 +322,14 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DBSIZE"
   fi
-  DBSIZE=`db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_DBSIZE ; db2 connect reset > /dev/null`
+  DBSIZE=$(db2 connect to $DATABASE_NAME > /dev/null ; $COMMAND_DBSIZE ; db2 connect reset > /dev/null)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$DBSIZE'"
   fi
-  # Substring para ver si hubo un error
-  EXIST_ERROR=`echo $DBSIZE | cut -c 1-5`
-  HADR_ERROR=`echo $DBSIZE | grep SQL1773`
-  if [[ $EXIST_ERROR == "error" ]] ; then
+  # Check for errors
+  CONN_ERROR=$(echo $DBSIZE | grep SQL1024)
+  HADR_ERROR=$(echo $DBSIZE | grep SQL1773)
+  if [[ $CONN_ERROR == "error" ]] ; then
     OUTPUT="Connection problem"
     RETURN=$UNKNOWN
     CONTINUE=false
@@ -308,14 +347,14 @@ if [[ $CONTINUE == true ]] ; then
     SIZE=
     while IFS= read LINE ; do
       if [[ $INDEX -eq 2 ]] ; then
-        SIZE=`echo $LINE | cut -d' ' -f4`
+        SIZE=$(echo $LINE | cut -d' ' -f4)
       elif [[ $INDEX -eq 3 ]] ; then
-        ALLOCATED=`echo $LINE | cut -d' ' -f4`
+        ALLOCATED=$(echo $LINE | cut -d' ' -f4)
       fi
       INDEX=$(($INDEX+1))
     done < <( printf '%s\n' "$DBSIZE" | grep Value)
     
-    PERCENT=`echo "$SIZE * 100 / $ALLOCATED" | bc`
+    PERCENT=$(echo "$SIZE * 100 / $ALLOCATED" | bc)
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "PERCENT:'$PERCENT'"
     fi
@@ -326,6 +365,7 @@ if [[ $CONTINUE == true ]] ; then
       OUTPUT="Database size is reaching the limit ($PERCENT). "
       RETURN=$WARNING
     else
+      OUTPUT="OK. "
       RETURN=$OK
     fi
     OUTPUT="${OUTPUT}Size is ${SIZE}B allocated in ${ALLOCATED}B" 
@@ -346,5 +386,10 @@ $LONG_OUTPUT|$LONG_PERFORMANCE"
 # Returns the error code.
 if [[ $VERBOSE -ge 2 ]] ; then
   echo "Return code: $RETURN"
+fi
+if [[ $TRACE == true ]] ; then
+  echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
+  date >> $LOG
+  echo -e "<<<<<\n" >> $LOG
 fi
 exit $RETURN
