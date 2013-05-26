@@ -305,7 +305,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $TRACE == true ]] ; then
     echo "RESULT:'$DATABASE'" >> $LOG
   fi
-  DATABASE=$(echo $DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
+  DATABASE=$(printf '%s\n' "$DATABASE" | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$DATABASE'"
   fi
@@ -329,12 +329,17 @@ if [[ $CONTINUE == true ]] ; then
   # Check for errors
   CONN_ERROR=$(echo $DBSIZE | grep SQL1024)
   HADR_ERROR=$(echo $DBSIZE | grep SQL1773)
+  SELECT_ERROR=$(echo $DBSIZE | grep SQL0551)
   if [[ $CONN_ERROR == "error" ]] ; then
     OUTPUT="Connection problem"
     RETURN=$UNKNOWN
     CONTINUE=false
   elif [[ $HADR_ERROR != "" ]] ; then
     OUTPUT="Trying to update calculation in Standby database"
+    RETURN=$UNKNOWN
+    CONTINUE=false
+  elif [[ $SELECT_ERROR != "" ]] ; then
+    OUTPUT="User does not have select privilege"
     RETURN=$UNKNOWN
     CONTINUE=false
   elif [[ $DBSIZE == "" ]] ; then
