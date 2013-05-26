@@ -194,10 +194,14 @@ if [[ $TRACE == true ]] ; then
   echo "PID $$" >> $LOG
 fi
 
+ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
+ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
+
 if [[ $VERBOSE -ge 2 ]] ; then
-  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-  ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
   echo $ECHO
+fi
+if [[ $TRACE == true ]] ; then
+  echo "PARAMS:$ECHO" >> $LOG
 fi
 
 if [[ $CONTINUE == true && $HELP == true ]] ; then
