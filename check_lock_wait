@@ -151,7 +151,7 @@ PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
 
-APPL_NAME=$0
+APPL_NAME=$(basename ${0})
 
 if [[ $# -eq 0 ]] ; then
   print_usage $APPL_NAME
@@ -181,7 +181,7 @@ if [[ $CONTINUE == true ]] ; then
   VERBOSE=0
    # Trace activated
   TRACE=false
-  LOG=/tmp/$(basename ${0}).log
+  LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
   DATABASE_NAME=
   UPDATE_MON=false
@@ -218,7 +218,7 @@ ECHO=$ECHO"update:$UPDATE_MON"
 if [[ $VERBOSE -ge 2 ]] ; then
   echo $ECHO
 fi
-if [[ $TRACE == TRUE ]] ; then
+if [[ $TRACE == true ]] ; then
   echo "PARAMS:$ECHO" >> $LOG
 fi
 
