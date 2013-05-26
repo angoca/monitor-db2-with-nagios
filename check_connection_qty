@@ -170,7 +170,7 @@ PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
 
-APPL_NAME=$0
+APPL_NAME=$(basename ${0})
 
 if [[ $# -eq 0 ]] ; then
   print_usage $APPL_NAME
@@ -200,7 +200,7 @@ if [[ $CONTINUE == true ]] ; then
   VERBOSE=0
   # Trace activated
   TRACE=false
-  LOG=/tmp/$(basename ${0}).log
+  LOG=/tmp/${APPL_NAME}.log
   IGNORE_THRES=false
   INSTANCE_HOME=
   DATABASE_NAME=

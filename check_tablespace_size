@@ -132,7 +132,7 @@ PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
 
-APPL_NAME=$0
+APPL_NAME=$(basename ${0})
 
 if [[ $# -eq 0 ]] ; then
   print_usage $APPL_NAME
