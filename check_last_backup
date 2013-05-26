@@ -210,7 +210,7 @@ PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
 
-APPL_NAME=$0
+APPL_NAME=$(basename ${0})
 
 if [[ $# -eq 0 ]] ; then
   print_usage $APPL_NAME
@@ -221,7 +221,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=$(getopt -o c:d:hi:TVvw: --long critical:,database:,help,instance:,trace,version,verbose,warning: \
+TEMP=$(getopt -o c:d:hi:TvVw: --long critical:,database:,help,instance:,trace,version,verbose,warning: \
              -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
@@ -240,7 +240,7 @@ if [[ $CONTINUE == true ]] ; then
   VERBOSE=0
   # Trace activated
   TRACE=false
-  LOG=/tmp/$(basename ${0}).log
+  LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
   DATABASE_NAME=
   WARNING_THRES=1
@@ -274,7 +274,7 @@ ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
 if [[ $VERBOSE -ge 2 ]] ; then
   echo $ECHO
 fi
-if [[ $TRACE == TRUE ]] ; then
+if [[ $TRACE == true ]] ; then
   echo "PARAMS:$ECHO" >> $LOG
 fi
 
