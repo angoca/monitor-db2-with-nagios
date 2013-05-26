@@ -376,6 +376,7 @@ if [[ $CONTINUE == true ]] ; then
           RESTORE=$(($RESTORE + 1))
         else
           OTHER=$(($OTHER + 1))
+          echo "Please report the following to AngocA" >> /tmp/db2_nagios_connections_unknown_state.log
           echo $STATE >> /tmp/db2_nagios_connections_unknown_state.log
         fi
       done < <( printf '%s\n' "$CONNS" )
