@@ -262,7 +262,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $TRACE == true ]] ; then
     echo "RESULT:'$ROLE'" >> $LOG
   fi
-  ROLE=$(echo $ROLE | awk '/HADR database role/ {print $5}')
+  ROLE=$(printf '%s\n' "$ROLE" | awk '/HADR database role/ {print $5}')
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$ROLE'"
   fi
