@@ -311,7 +311,7 @@ if [[ $CONTINUE == true ]] ; then
         OUTPUT="StandBy in remote catchup pending. Make sure database primary is reachable ($CONNECTED)."
         RETRUN=$WARNING
       else
-        OUTPUT="Database is standby and not peer: $HADR_STATUS ($CONNECTED)."
+        OUTPUT="Database is standby and not peer. $HADR_STATUS $CONNECTED"
         RETURN=$UNKNOWN
       fi
     else
