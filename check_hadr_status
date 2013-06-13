@@ -292,7 +292,7 @@ if [[ $CONTINUE == true ]] ; then
         OUTPUT="Standby database is not reachable ($CONNECTED)."
         RETURN=$CRITICAL
       else
-        OUTPUT="Database is primary and not peer: $HADR_STATUS ($CONNECTED)."
+        OUTPUT="Database is primary and not peer. $HADR_STATUS $CONNECTED"
         RETURN=$UNKNOWN
       fi
     elif [[ $ROLE == "STANDBY" ]] ; then
