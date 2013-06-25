@@ -329,7 +329,7 @@ if [[ $CONTINUE == true ]] ; then
   LOG_DIFF=$(printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $1}' | cut -d. -f1 | sed 's/^.//' | sed 'N;s/\n/-/' | bc)
   if [[ ${PAGE_DIFF} -lt 0 ]] ; then
     # The 2000 value is based on observation, but not sure.
-    PAGE_DIFF=${PAGE_DIFF}+2000
+    PAGE_DIFF=$((${PAGE_DIFF}+2000))
   fi
   LONG_PERFORMANCE="PageDiff=${PAGE_DIFF} LogDiff=${LOG_DIFF} " 
 fi
