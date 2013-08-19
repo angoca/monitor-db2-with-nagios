@@ -142,8 +142,8 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,critical:,warning: \
-             -n $APPL_NAME -- "$@"`
+TEMP=$(getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,critical:,warning: \
+             -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
   print_usage $APPL_NAME
@@ -166,13 +166,13 @@ if [[ $CONTINUE == true ]] ; then
   CRITICAL_THRES=50
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       --update ) UPDATE_MON=true; shift ;;
       -- ) shift; break ;;
       * ) break ;;
@@ -239,7 +239,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DATABASE"
   fi
-  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  DATABASE=$($COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$DATABASE'"
   fi
@@ -256,22 +256,22 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DB_CFG"
   fi
-  COMMAND_OUTPUT=`$COMMAND_DB_CFG` 
+  COMMAND_OUTPUT=$($COMMAND_DB_CFG) 
   while IFS= read -r LINE ; do
-    LOG_PRI_GREP=`echo $LINE | grep LOGPRIMARY`
+    LOG_PRI_GREP=$(echo $LINE | grep LOGPRIMARY)
     if [[ $LOG_PRI == "" || $LOG_PRI_GREP != "" ]] ; then
-      LOG_PRI=`echo $LOG_PRI_GREP | awk -F"= " '{print $2}' | tail -1`
+      LOG_PRI=$(echo $LOG_PRI_GREP | awk -F"= " '{print $2}' | tail -1)
     fi
-    LOG_SEC_GREP=`echo $LINE | grep LOGSECOND`
+    LOG_SEC_GREP=$(echo $LINE | grep LOGSECOND)
     if [[ $LOG_SEC == "" || $LOG_SEC_GREP != "" ]] ; then
-      LOG_SEC=`echo $LOG_SEC_GREP | awk -F"= " '{print $2}' | tail -1`
+      LOG_SEC=$(echo $LOG_SEC_GREP | awk -F"= " '{print $2}' | tail -1)
     fi
-    LOG_PATH_GREP=`echo $LINE | grep "Path to log files"`
+    LOG_PATH_GREP=$(echo $LINE | grep "Path to log files")
     if [[ $LOG_PATH == "" || $LOG_PATH_GREP != "" ]] ; then
-      LOG_PATH=`echo $LOG_PATH_GREP | awk -F"= " '{print $2}' | tail -1`
+      LOG_PATH=$(echo $LOG_PATH_GREP | awk -F"= " '{print $2}' | tail -1)
     fi
   done < <( printf '%s\n' "$COMMAND_OUTPUT" | grep -i log )
-  LOG_TOTAL=`echo "$LOG_PRI+$LOG_SEC" | bc`
+  LOG_TOTAL=$(echo "$LOG_PRI+$LOG_SEC" | bc)
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT LOG_PRI:'$LOG_PRI'"
@@ -280,9 +280,9 @@ if [[ $CONTINUE == true ]] ; then
     echo "RESULT LOG_PATH:'$LOG_PATH'"
   fi
 
-  LOG_USED=`ls -l $LOG_PATH*LOG | wc -l`
-  LOG_WARN=`echo "$LOG_PRI+$WARNING_THRES" | bc`
-  LOG_CRIT=`echo "$LOG_PRI+$CRITICAL_THRES" | bc`
+  LOG_USED=$(ls -l $LOG_PATH*LOG | wc -l)
+  LOG_WARN=$(echo "$LOG_PRI+$WARNING_THRES" | bc)
+  LOG_CRIT=$(echo "$LOG_PRI+$CRITICAL_THRES" | bc)
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT LOG_USED:'$LOG_USED'"
@@ -294,7 +294,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_HADR"
   fi
-  RESULT_HARD=`$COMMAND_HADR | awk '/Standby/ && !/Active/ {print $1}'`
+  RESULT_HARD=$($COMMAND_HADR | awk '/Standby/ && !/Active/ {print $1}')
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT HADR:'$RESULT_HARD'"
@@ -316,8 +316,8 @@ if [[ $CONTINUE == true ]] ; then
       RETURN=$WARNING
     else
       COMMAND_LOG_ID="db2diag -readfile -gi msg:=ADM1823E"
-      LOG_ID=`$COMMAND_LOG_ID | grep "\"." | sort | uniq | awk -F\" '{print $2}'`
-      LOG_COUNT=`printf '%s\n' "$LOG_ID" | wc -l`
+      LOG_ID=$($COMMAND_LOG_ID | grep "\"." | sort | uniq | awk -F\" '{print $2}')
+      LOG_COUNT=$(printf '%s\n' "$LOG_ID" | wc -l)
 
       if [[ $VERBOSE -ge 2 ]] ; then
         echo "COMMAND: $COMMAND_LOG_ID"

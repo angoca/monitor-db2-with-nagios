@@ -130,8 +130,8 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:d: --long help,version,verbose,instance:,database: \
-             -n $APPL_NAME -- "$@"`
+TEMP=$(getopt -o hVvi:d: --long help,version,verbose,instance:,database: \
+             -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
   print_usage $APPL_NAME
@@ -152,9 +152,9 @@ if [[ $CONTINUE == true ]] ; then
   UPDATE_MON=false
   while true; do
     case "$1" in
-      -d | --database ) DATABASE_NAME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       --update ) UPDATE_MON=true; shift ;;
@@ -211,7 +211,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_DATABASE"
   fi
-  DATABASE=`$COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME`
+  DATABASE=$($COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT:'$DATABASE'"
   fi
@@ -228,7 +228,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_HADR"
   fi
-  RESULT_HARD=`$COMMAND_HADR | awk '/Standby/ && !/Active/ {print $1}'`
+  RESULT_HARD=$($COMMAND_HADR | awk '/Standby/ && !/Active/ {print $1}')
 
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "RESULT HADR:'$RESULT_HARD'"
@@ -249,10 +249,10 @@ if [[ $CONTINUE == true ]] ; then
     if [[ $VERBOSE -ge 2 ]] ; then
       echo "COMMAND: $COMMAND_DB_CFG"
     fi
-    ARCHIVE=`$COMMAND_DB_CFG | awk '/LOGARCHMETH1/ {print $7}' | cut -d: -f2`
-    MONTH=`date | awk '{print $2}'`
-    DAY=`date | awk '{print $3}'`
-    ARCHIVE_SIZE=`ls -lR $ARCHIVE | grep "$MONTH\s*$DAY" | awk '{sum +=$5}END{print sum/1024/1024}' | cut -d. -f1`
+    ARCHIVE=$($COMMAND_DB_CFG | awk '/LOGARCHMETH1/ {print $7}' | cut -d: -f2)
+    MONTH=$(date | awk '{print $2}')
+    DAY=$(date | awk '{print $3}')
+    ARCHIVE_SIZE=$(ls -lR $ARCHIVE | grep "$MONTH\s*$DAY" | awk '{sum +=$5}END{print sum/1024/1024}' | cut -d. -f1)
     if [[ $VERBOSE -ge 3 ]] ; then
       echo "RESULT ARCHIVE:'$ARCHIVE'"
       echo "RESULT MONTH:'$MONTH'"
