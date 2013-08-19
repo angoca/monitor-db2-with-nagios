@@ -115,6 +115,7 @@ function print_help {
 Checks the elderly of the last backup of the database.
 -c | --critical INTEGER:INTEGER:INTEGER
    Time in hours of the last backup to considered as critical.
+   Default 2.
 -d | --database STRING
    Database name.
 -h | --help
@@ -129,6 +130,7 @@ Checks the elderly of the last backup of the database.
    Shows the current version of this script.
 -w | --warning INTEGER:INTEGER:INTEGER
    Time in hours of the last backup to considered as warning
+   Default 1.
 __EOT
 }
 

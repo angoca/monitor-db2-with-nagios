@@ -120,6 +120,7 @@ alarms if the size is bigger that the provided one (critical) or if it
 bigger that the provided percentage.
 -c | --critical INTEGER
    Database usage size to be consider as critical. Value in bytes.
+   Default unlimited (-1)
 -d | --database STRING
    Database name.
 -h | --help

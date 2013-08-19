@@ -122,6 +122,7 @@ function print_help {
 This script check the quantity of established connections.
 -c | --critical INTEGER
    Quantity of connections to consider as critical.
+   Default 10.
 -d | --database STRING
    Database name.
 -h | --help
@@ -142,6 +143,7 @@ This script check the quantity of established connections.
    Shows the current version of this script.
 -w | --warning INTEGER
    Quantity of connections to consider as warning.
+   Default.
 --filter STRING
    Criterion to filter the data on.
 --inverted STRING

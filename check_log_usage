@@ -106,7 +106,7 @@ This script checks for long lock waits in the database.
    Shows the current version of this script.
 -w | --warning INTEGER
    Quantity or percentage of secundary log files to consider as warning.
-   Default 0.
+   Default 1.
 __EOT
 }
 

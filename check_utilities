@@ -105,6 +105,7 @@ function print_help {
 Checks the quantity of utilities currently running in the instance.
 -c | --critical INTEGER
    Quantity of utilities running is critical.
+   Default 10.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
@@ -115,6 +116,7 @@ Checks the quantity of utilities currently running in the instance.
    Shows the current version of this script.
 -w | --warning INTEGER
    Quantity of utilities running is considered as a warning.
+   Default 5.
 __EOT
 }
 
@@ -150,8 +152,8 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=`getopt -o hVvi:c:w: --long help,version,verbose,instance:,critical:,warning: \
-             -n $APPL_NAME -- "$@"`
+TEMP=$(getopt -o hVvi:c:w: --long help,version,verbose,instance:,critical:,warning: \
+             -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
   print_usage $APPL_NAME
@@ -172,12 +174,12 @@ if [[ $CONTINUE == true ]] ; then
   CRITICAL_THRES=10
   while true; do
     case "$1" in
-      -c | --critical ) CRITICAL_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=`echo $2 | cut -d' ' -f1` ; shift 2 ;;
+      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
@@ -236,11 +238,11 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_UTILITIES"
   fi
-  OUTPUT_UTILITIES=`$COMMAND_UTILITIES`
+  OUTPUT_UTILITIES=$($COMMAND_UTILITIES)
   if [[ $VERBOSE -ge 3 ]] ; then
     echo "OUTPUT: $OUTPUT_UTILITIES"
   fi
-  ERROR=`printf '%s\n' "$OUTPUT_UTILITIES" | grep SQL1092`
+  ERROR=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep SQL1092)
   if [[ $ERROR != "" ]] ; then
     OUTPUT="The current user cannot execute this script: $OUTPUT_UTILITIES"
     RETURN=$UNKNOWN
@@ -248,31 +250,33 @@ if [[ $CONTINUE == true ]] ; then
   fi
 fi
 if [[ $CONTINUE == true ]] ; then
-  RESTORE_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep RESTORE | wc -l`
+  RESTORE_QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep RESTORE | wc -l)
+  # A Restore or a Backup is synonime of a warning.
   if [[ $RESTORE_QTY -ge 1 ]] ; then
     OUTPUT="Performing $RESTORE_QTY restore(s). "
     RETURN=$WARNING
   fi
-  BACKUP_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep BACKUP | wc -l`
+  BACKUP_QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep BACKUP | wc -l)
   if [[ $BACKUP_QTY -ge 1 ]] ; then
     OUTPUT="${OUTPUT}Performing $BACKUP_QTY backup(s). "
     RETURN=$WARNING
   fi
-  RUNSTATS_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep RUNSTATS | wc -l`
+
+  RUNSTATS_QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep RUNSTATS | wc -l)
   if [[ $RUNSTATS_QTY -ge 1 ]] ; then
     OUTPUT="${OUTPUT}Performing $RUNSTATS_QTY runstats(s). "
   fi
-  REORGS_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep REORG | wc -l`
+  REORGS_QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep REORG | wc -l)
   if [[ $REORGS_QTY -ge 1 ]] ; then
     OUTPUT="${OUTPUT}Performing $REORGS_QTY reorg(s). "
   fi
-  OTHERS=`printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | grep -v "ROLLFORWARD RECOVERY" | awk -F= '{print $2}'`
-  OTHERS_QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | wc -l`
+  OTHERS=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | grep -v "ROLLFORWARD RECOVERY" | awk -F= '{print $2}')
+  OTHERS_QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | wc -l)
   if [[ $OTHERS != "" ]] ; then
     OUTPUT="${OUTPUT}Other utilities are running: $OTHERS"
     RETURN=$WARNING
   fi
-  QTY=`printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | wc -l`
+  QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | wc -l)
   if [[ $QTY -ge $CRITICAL_THRES ]] ; then
     RETURN=$CRITICAL
     OUTPUT="Quantity  of utilities currently running is critical: $QTY. ${OUTPUT}"

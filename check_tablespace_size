@@ -92,6 +92,7 @@ function print_help {
 This script check the usage of a tablespace.
 -c | --critical INTEGER
    Critical percentage of usage.
+   Default 90.
 -d | --database STRING
    Database name.
 -h | --help
@@ -106,6 +107,7 @@ This script check the usage of a tablespace.
    Shows the current version of this script.
 -w | --warning INTEGER
    Warning level of usage.
+   Default 80.
 --id
    ID of the tablespace. This should be usage when the name is unknown.
 __EOT

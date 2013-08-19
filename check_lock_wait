@@ -110,7 +110,8 @@ function print_help {
   /bin/cat <<__EOT
 Checks for long lock waits in the database.
 -c | --critical INTEGER
-   Quantity of milliseconds to consider a lock-wait as critical (Default 60000)
+   Quantity of milliseconds to consider a lock-wait as critical.
+   Default 60000.
 -d | --database STRING
    Database name.
 -h | --help
@@ -124,7 +125,8 @@ Checks for long lock waits in the database.
 -V | --version
    Shows the current version of this script.
 -w | --warning INTEGER
-   Quantity of milliseconds to consider a lock-wait as warning. (Default 10000)
+   Quantity of milliseconds to consider a lock-wait as warning.
+   Default 10000.
 --update
    Update the monitor switch for lock before query.
 __EOT
