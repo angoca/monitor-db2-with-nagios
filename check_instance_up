@@ -56,6 +56,9 @@
 #         use                     generic-service
 # }
 #
+# It is necessary to execute this script with a user with at least SYSMON authority, in
+# order to execute db2pd.
+#
 # Parameters:
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
