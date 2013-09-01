@@ -55,6 +55,8 @@
 #         use                     generic-service
 # }
 #
+# It is necessary to execute this script with a user with connect privilege.
+#
 # Parameters:
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
@@ -290,7 +292,7 @@ if [[ $CONTINUE == true ]] ; then
   fi
   CONNECTABLE=$($COMMAND_CONNECTABLE)
   if [[ $TRACE == true ]] ; then
-    echo "RESULT:'$ACTIVE'" >> $LOG
+    echo "RESULT:'$CONNECTABLE'" >> $LOG
   fi
   CONNECTABLE=$(printf '%s\n' "$CONNECTABLE" | awk '/sqlcode/ {print $7}')
   if [[ $VERBOSE -ge 3 ]] ; then
@@ -307,6 +309,7 @@ if [[ $CONTINUE == true ]] ; then
     PERFORMANCE="'Connectable Database'=1.5;1.6;1.3;1.1;2 "
   else
     OUTPUT="A connection to database $DATABASE_NAME was not succesful. "$OUTPUT_ACTIVE
+    LONG_OUTPUT="${LONG_OUTPUT} ${CONNECTABLE}"
     RETURN=$CRITICAL
     PERFORMANCE="'Connectable Database'=1.2;1.6;1.3;1.1;2 "
   fi
