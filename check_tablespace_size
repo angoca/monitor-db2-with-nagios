@@ -327,7 +327,7 @@ if [[ $CONTINUE == true ]] ; then
 
   if [[ $TYPE == "SMS" ]] ; then
     if [[ $SIZE -lt $WARNING_THRES ]] ; then
-      OUTPUT="Tablespace size is OK (SMS)."
+      OUTPUT="OK tablespace size (SMS)."
       RETURN=$OK
     else
       CONTENT=$(printf '%s\n' "$TS" | awk '{print $3}')
@@ -359,7 +359,7 @@ if [[ $CONTINUE == true ]] ; then
       RETURN=$UNKNOWN
     elif [[ $AUTO -eq "1" || $RESIZE -eq "1" ]] ; then
       if [[ $SIZE -lt $WARNING_THRES ]] ; then
-        OUTPUT="Tablespace size is OK ($SIZE% - Auto resize)."
+        OUTPUT="OK tablespace size ($SIZE% - Auto resize)."
         RETURN=$OK
       elif [[ $SIZE -lt $CRITICAL_THRES ]] ; then
         OUTPUT="Tablespace size is getting bigger ($SIZE% - Auto resize)."
@@ -370,7 +370,7 @@ if [[ $CONTINUE == true ]] ; then
       fi
     else
       if [[ $SIZE -lt $WARNING_THRES ]] ; then
-        OUTPUT="Tablespace size is OK ($SIZE%)."
+        OUTPUT="OK tablespace size ($SIZE%)."
         RETURN=$OK
       elif [[ $SIZE -lt $CRITICAL_THRES ]] ; then
         OUTPUT="Tablespace size is getting bigger ($SIZE%)."
