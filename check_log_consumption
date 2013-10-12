@@ -18,8 +18,10 @@
 # limitations under the License.
 ###############################################################################
 
-# This script only retrieves performance data. It always returns OK it the
-# value could be retrieved.
+# This script helps to create a graph of how many transaction logs have been
+# used in the day, and it only retrieves performance data by returning always
+# OK if the value could be retrieved. It allows to identify the period of the
+# day when transaction consumes the most of transaction logs.
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
