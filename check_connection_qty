@@ -329,17 +329,17 @@ if [[ $CONTINUE == true ]] ; then
   NO_APPS=$(echo $QTY_RESULT | grep SQL1611W)
   if [[ $NO_APPS == "" ]] ; then
 
-    if [[ $FILTER != "" ]] ; then
-      if [[ $FILTER_INVERTED == true ]] ; then
-        CONNS=$(printf '%s\n' "$QTY_RESULT" | grep $DATABASE | grep -iv $FILTER)
+    if [[ ${FILTER} != "" ]] ; then
+      if [[ ${FILTER_INVERTED} == true ]] ; then
+        CONNS=$(printf '%s\n' "${QTY_RESULT}" | grep ${DATABASE} | grep -iv ${FILTER})
       else 
-        CONNS=$(printf '%s\n' "$QTY_RESULT" | grep $DATABASE | grep -i $FILTER)
+        CONNS=$(printf '%s\n' "${QTY_RESULT}" | grep ${DATABASE} | grep -i ${FILTER})
       fi
     else
-      CONNS=$(printf '%s\n' "$QTY_RESULT" | grep $DATABASE)
+      CONNS=$(printf '%s\n' "${QTY_RESULT}" | grep ${DATABASE})
     fi
-    QTY=$(printf '%s\n' "$CONNS" | wc -l)
-    if [[ $STATE == true ]] ; then
+    QTY=$(printf '%s\n' "${CONNS}" | wc -l)
+    if [[ ${STATE} == true ]] ; then
       BACKUP=0
       COMMIT=0
       COMPILING=0
@@ -348,41 +348,45 @@ if [[ $CONTINUE == true ]] ; then
       LOCK_WAIT=0
       RESTORE=0
       ROLLBACK=0
+      ROLLBACK_TO_SAVEPOINT=0
       UOW_EXECUTING=0
       UOW_WAITING=0
       OTHER=0
       while IFS= read LINE ; do
-        STATE=$(printf '%s\n' "$LINE" | cut -c 275-304)
-        if [[ $TRACE == true ]] ; then
-          echo "RESULT:'$STATE'"
+        STATE=$(printf '%s\n' "${LINE}" | cut -c 275-304)
+        if [[ ${TRACE} == true ]] ; then
+          echo "RESULT:'${STATE}'"
         fi
-        if [[ $STATE == "Connect Completed             " ]] ; then
-          CONNECTED=$(($CONNECTED + 1))
-        elif [[ $STATE == "UOW Waiting                   " ]] ; then
-          UOW_WAITING=$(($UOW_WAITING + 1))
-        elif [[ $STATE == "UOW Executing                 " ]] ; then
-          UOW_EXECUTING=$(($UOW_EXECUTING + 1))
-        elif [[ $STATE == "Lock-wait                     " ]] ; then
-          LOCK_WAIT=$(($LOCK_WAIT + 1))
-        elif [[ $STATE == "Commit Active                 " ]] ; then
-          COMMIT=$(($COMMIT + 1))
-        elif [[ $STATE == "Rollback Active               " ]] ; then
-          ROLLBACK=$(($ROLLBACK + 1))
-        elif [[ $STATE == "Compiling                     " ]] ; then
-          COMPILING=$(($COMPILING + 1))
-        elif [[ $STATE == "Disconnect Pending            " ]] ; then
-          DISCONNECTING=$(($DISCONNECTING + 1))
-        elif [[ $STATE == "Performing a Backup           " ]] ; then
-          BACKUP=$(($BACKUP + 1))
-        elif [[ $STATE == "Restoring Database            " ]] ; then
-          RESTORE=$(($RESTORE + 1))
+        if [[ ${STATE} == "Connect Completed             " ]] ; then
+          CONNECTED=$((${CONNECTED} + 1))
+        elif [[ ${STATE} == "UOW Waiting                   " ]] ; then
+          UOW_WAITING=$((${UOW_WAITING} + 1))
+        elif [[ ${STATE} == "UOW Executing                 " ]] ; then
+          UOW_EXECUTING=$((${UOW_EXECUTING} + 1))
+        elif [[ ${STATE} == "Lock-wait                     " ]] ; then
+          LOCK_WAIT=$((${LOCK_WAIT} + 1))
+        elif [[ ${STATE} == "Commit Active                 " ]] ; then
+          COMMIT=$((${COMMIT} + 1))
+        elif [[ ${STATE} == "Rollback Active               " ]] ; then
+          ROLLBACK=$((${ROLLBACK} + 1))
+        elif [[ ${STATE} == "Rollback to Savepoint         " ]] ; then
+          ROLLBACK_TO_SAVEPOINT=$((${ROLLBACK_TO_SAVEPOINT} + 1))
+        elif [[ ${STATE} == "Compiling                     " ]] ; then
+          COMPILING=$((${COMPILING} + 1))
+        elif [[ ${STATE} == "Disconnect Pending            " ]] ; then
+          DISCONNECTING=$((${DISCONNECTING} + 1))
+        elif [[ ${STATE} == "Performing a Backup           " ]] ; then
+          BACKUP=$((${BACKUP} + 1))
+        elif [[ ${STATE} == "Restoring Database            " ]] ; then
+          RESTORE=$((${RESTORE} + 1))
         else
-          OTHER=$(($OTHER + 1))
+          OTHER=$((${OTHER} + 1))
           echo "Please report the following to AngocA" >> /tmp/db2_nagios_connections_unknown_state.log
-          echo $STATE >> /tmp/db2_nagios_connections_unknown_state.log
+          date >> /tmp/db2_nagios_connections_unknown_state.log
+          echo "'${STATE}'" >> /tmp/db2_nagios_connections_unknown_state.log
         fi
-      done < <( printf '%s\n' "$CONNS" )
-      LONG_PERFORMANCE="'Connect Completed'=$CONNECTED 'UOW Executing'=$UOW_EXECUTING 'UOW Waiting'=$UOW_WAITING 'Lock Wait'=$LOCK_WAIT 'Commit Active'=$COMMIT 'Rollback'=$ROLLBACK 'Compiling'=$COMPILING 'Disconnecting'=$DISCONNECTING 'Backup'=$BACKUP 'Restore'=$RESTORE 'Other'=$OTHER "
+      done < <( printf '%s\n' "${CONNS}" )
+      LONG_PERFORMANCE="'Connect Completed'=${CONNECTED} 'UOW Executing'=${UOW_EXECUTING} 'UOW Waiting'=${UOW_WAITING} 'Lock Wait'=${LOCK_WAIT} 'Commit Active'=${COMMIT} 'Rollback'=${ROLLBACK} 'Rollback to savepoint'=${ROLLBACK_TO_SAVEPOINT} 'Compiling'=${COMPILING} 'Disconnecting'=${DISCONNECTING} 'Backup'=${BACKUP} 'Restore'=${RESTORE} 'Other'=${OTHER} "
     else
       QTY_FILTERED=$(printf '%s\n' "$CONNS" | awk '{print $1}' | sort | uniq -c)
       if [[ $VERBOSE -ge 3 ]] ; then
