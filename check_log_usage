@@ -294,6 +294,7 @@ if [[ $CONTINUE == true ]] ; then
   if [[ $VERBOSE -ge 2 ]] ; then
     echo "COMMAND: $COMMAND_HADR"
   fi
+  # Check that the command is not executed in the Standby server.
   RESULT_HARD=$($COMMAND_HADR | awk '/Standby/ && !/Active/ {print $1}')
 
   if [[ $VERBOSE -ge 3 ]] ; then
@@ -316,7 +317,9 @@ if [[ $CONTINUE == true ]] ; then
       RETURN=$WARNING
     else
       COMMAND_LOG_ID="db2diag -readfile -gi msg:=ADM1823E"
-      LOG_ID=$($COMMAND_LOG_ID | grep "\"." | sort | uniq | awk -F\" '{print $2}')
+      # The AppID has two dots in the db2diag.log file, thus they are removed
+      # (i.e. It appears 2380.. and it becomes 2380)
+      LOG_ID=$($COMMAND_LOG_ID | grep "\"." | sort | uniq | awk -F\" '{print $2}' | sed 's/\.\.//')
       LOG_COUNT=$(printf '%s\n' "$LOG_ID" | wc -l)
 
       if [[ $VERBOSE -ge 2 ]] ; then
