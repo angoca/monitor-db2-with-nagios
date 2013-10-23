@@ -25,12 +25,40 @@
 #
 # Here comes the documentation
 #
-# TODO Nagios usage.
+# In order to be used in Nagios, you have to configure the following.
 #
-# TODO Nagios with NRPE.
+# # 'check_log_usage' command definition
+# define command {
+#         command_name    check_db2diag
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_db2diag -i '$ARG1$'"
+# }
+# define service{
+#         host_name               db2server
+#         service_description     Diagnostic messages
+#         check_command           check_db2diag!/home/db2inst1
+#         use                     generic-service
+# }
+#
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_db2diag]=/home/nagios/scripts/check_db2diag -i /home/db2inst1
+#
+# Then modify the path according to your script location, instance home dir,
+# database and thresholds.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     Diagnostic messages
+#         check_command           check_nrpe_1arg!check_db2diag
+#         use                     generic-service
+# }
 #
 # Parameters:
-# -c | --critical : TODO What is critical
+# -c | --critical : Quantity of messages produced to be considered as critical.
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
@@ -38,7 +66,8 @@
 # -T | --trace : Trace mode. Writes output in /tmp
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
-# -w | --warning : TODO What is critical
+# -w | --warning : Quantity of messages written in the db2diag.log file to be
+#    considered as critical.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -67,12 +96,11 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-05-26
+  echo v1.0 2013-10-23
 }
 # Function to show the help
 function print_usage {
-  # TODO Add arguments.
-  echo "Usage: $1 { -i instanceHomeDirectory [-c][-w] ! -h ! -V } [ -T ]\n [ -v ]"
+  echo "Usage: $1 { -i instanceHomeDirectory [-c][-w] ! -h ! -V } [ -T ] \ [ -v ]"
 }
 
 function print_help {
@@ -81,9 +109,8 @@ function print_help {
   # Max 80 chars width.
   /bin/cat <<__EOT
 Checks the quantity of messages written in the db2diag.log since the last check.
-TODO Add arguments in detail.
 -c | --critical INTEGER
-   TODO What is critical
+   Quantity of messages to be considered as critical.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
@@ -95,7 +122,7 @@ TODO Add arguments in detail.
 -V | --version
    Shows the current version of this script.
 -w | --warning INTEGER
-   TODO What is warning
+   Quantity of messages to be considered as warning.
 __EOT
 }
 
@@ -131,7 +158,6 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-# TODO Add the arguments here. One char in -o, multiple char in -long.
 TEMP=$(getopt -o c:hi:TvVw: --long critical:,instance:,help,trace,verbose,version,warning: \
              -n $APPL_NAME -- "$@")
 
@@ -164,7 +190,6 @@ if [[ $CONTINUE == true ]] ; then
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      # TODO Validate any new argument.
       -- ) shift; break ;;
       * ) break ;;
     esac
@@ -230,12 +255,13 @@ fi
 
 if [[ ${CONTINUE} == true ]] ; then
   DATE_FILE=/tmp/last_date_check_db2diag_$(echo ${INSTANCE_HOME} | sed 's/\//\\/g')
-  COMMAND_QTY=". ${INSTANCE_HOME}/sqllib/db2profile ; db2diag -readfile -time $(cat ${DATE_FILE}) | grep -cvP '\S'"
+  DATE_VALUE=$(cat ${DATE_FILE})
+  COMMAND_QTY="db2diag -readfile -time ${DATE_VALUE}"
   if [[ -f ${DATE_FILE} ]] ; then
     if [[ ${VERBOSE} -ge 2 ]] ; then
       echo "COMMAND: ${COMMAND_QTY}"
     fi
-    QTY=$(${COMMAND_QTY})
+    QTY=$(${COMMAND_QTY} | grep -cvP '\S')
     if [[ ${VERBOSE} -ge 3 ]] ; then
       echo "Result: ${QTY}"
     fi
@@ -246,22 +272,23 @@ if [[ ${CONTINUE} == true ]] ; then
       RETURN=${UNKNOWN}
     else
       if [[ ${QTY} -lt ${WARNING_THRES} ]] ; then
-        OUTPUT="OK, quantity is normal."
+        OUTPUT="OK, quantity is normal since ${DATE_VALUE}."
         RETURN=${OK}
       elif [[ ${QTY} -lt ${CRITICAL_THRES} ]] ; then
-        OUTPUT="Quantity is increasing, please check the db2diag.log."
+        OUTPUT="Quantity is increasing since ${DATE_VALUE}, please check the db2diag.log."
         RETURN=${WARNING}
       else
-        OUTPUT="Quantity is too high, please check the db2diag.log right now."
+        OUTPUT="Quantity is too high since ${DATE_VALUE}, please check the db2diag.log right now."
         RETURN=${CRITICAL}
       fi
+      date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
     fi
     PERFORMANCE="'logs'=${QTY}"
   else
     OUTPUT="First execution, there is not a reference point."
     RETURN=${UNKNOWN}
+    date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
   fi
-  date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
 fi
 
 # Prints the output.
