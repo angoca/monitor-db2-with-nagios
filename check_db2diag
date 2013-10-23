@@ -59,6 +59,7 @@
 #
 # Parameters:
 # -c | --critical : Quantity of messages produced to be considered as critical.
+#    Default 40 between two calls.
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
@@ -67,7 +68,7 @@
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
 # -w | --warning : Quantity of messages written in the db2diag.log file to be
-#    considered as critical.
+#    considered as critical. Default 20 between to calls.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -100,7 +101,7 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory [-c][-w] ! -h ! -V } [ -T ] \ [ -v ]"
+  echo "Usage: $1 { -i instanceHomeDirectory [-c][-w] ! -h ! -V } [ -T ] [ -v ]"
 }
 
 function print_help {
@@ -110,7 +111,7 @@ function print_help {
   /bin/cat <<__EOT
 Checks the quantity of messages written in the db2diag.log since the last check.
 -c | --critical INTEGER
-   Quantity of messages to be considered as critical.
+   Quantity of messages to be considered as critical. Default 40 between calls.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
@@ -122,7 +123,7 @@ Checks the quantity of messages written in the db2diag.log since the last check.
 -V | --version
    Shows the current version of this script.
 -w | --warning INTEGER
-   Quantity of messages to be considered as warning.
+   Quantity of messages to be considered as warning. Default 20 between calls.
 __EOT
 }
 
@@ -179,8 +180,8 @@ if [[ $CONTINUE == true ]] ; then
   TRACE=false
   LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
-  WARNING_THRES=1
-  CRITICAL_THRES=2
+  WARNING_THRES=20
+  CRITICAL_THRES=40
   while true; do
     case "$1" in
       -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
@@ -255,9 +256,9 @@ fi
 
 if [[ ${CONTINUE} == true ]] ; then
   DATE_FILE=/tmp/last_date_check_db2diag_$(echo ${INSTANCE_HOME} | sed 's/\//\\/g')
-  DATE_VALUE=$(cat ${DATE_FILE})
-  COMMAND_QTY="db2diag -readfile -time ${DATE_VALUE}"
   if [[ -f ${DATE_FILE} ]] ; then
+    DATE_VALUE=$(cat ${DATE_FILE})
+    COMMAND_QTY="db2diag -readfile -time ${DATE_VALUE}"
     if [[ ${VERBOSE} -ge 2 ]] ; then
       echo "COMMAND: ${COMMAND_QTY}"
     fi
@@ -272,18 +273,18 @@ if [[ ${CONTINUE} == true ]] ; then
       RETURN=${UNKNOWN}
     else
       if [[ ${QTY} -lt ${WARNING_THRES} ]] ; then
-        OUTPUT="OK, quantity is normal since ${DATE_VALUE}."
+        OUTPUT="OK, quantity is normal (${QTY}) since ${DATE_VALUE}."
         RETURN=${OK}
       elif [[ ${QTY} -lt ${CRITICAL_THRES} ]] ; then
-        OUTPUT="Quantity is increasing since ${DATE_VALUE}, please check the db2diag.log."
+        OUTPUT="Quantity is increasing (${QTY}) since ${DATE_VALUE}, please check the db2diag.log."
         RETURN=${WARNING}
       else
-        OUTPUT="Quantity is too high since ${DATE_VALUE}, please check the db2diag.log right now."
+        OUTPUT="Quantity is too high (${QTY}) since ${DATE_VALUE}, please check the db2diag.log right now."
         RETURN=${CRITICAL}
       fi
       date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
     fi
-    PERFORMANCE="'logs'=${QTY}"
+    PERFORMANCE="'logs'=${QTY};${WARNING_THRES};${CRITICAL_THRES};0"
   else
     OUTPUT="First execution, there is not a reference point."
     RETURN=${UNKNOWN}
