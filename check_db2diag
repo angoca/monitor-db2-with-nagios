@@ -69,6 +69,7 @@
 # -V | --version : Show the current version of this script.
 # -w | --warning : Quantity of messages written in the db2diag.log file to be
 #    considered as critical. Default 20 between to calls.
+# -x | --extra : Shows extra information for the performance values.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -124,6 +125,8 @@ Checks the quantity of messages written in the db2diag.log since the last check.
    Shows the current version of this script.
 -w | --warning INTEGER
    Quantity of messages to be considered as warning. Default 20 between calls.
+-x | --extra INTEGER
+   Shows extra information for the performance values.
 __EOT
 }
 
@@ -159,7 +162,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=$(getopt -o c:hi:TvVw: --long critical:,instance:,help,trace,verbose,version,warning: \
+TEMP=$(getopt -o c:hi:TvVw:ix --long critical:,extra,instance:,help,trace,verbose,version,warning: \
              -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
@@ -178,6 +181,7 @@ if [[ $CONTINUE == true ]] ; then
   VERBOSE=0
   # Trace activated
   TRACE=false
+  EXTRA=false
   LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
   WARNING_THRES=20
@@ -191,6 +195,7 @@ if [[ $CONTINUE == true ]] ; then
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -x | --extra ) EXTRA=true ; shift ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
@@ -203,9 +208,9 @@ if [[ $TRACE == true ]] ; then
   echo "PID $$" >> $LOG
 fi
 
-ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-ECHO=$ECHO"directory:$INSTANCE_HOME, "
-ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
+ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}, extra: ${EXTRA}"
+ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 
 if [[ $VERBOSE -ge 2 ]] ; then
   echo $ECHO
@@ -256,22 +261,27 @@ fi
 
 if [[ ${CONTINUE} == true ]] ; then
   DATE_FILE=/tmp/last_date_check_db2diag_$(echo ${INSTANCE_HOME} | sed 's/\//\\/g')
-  if [[ -f ${DATE_FILE} ]] ; then
+  # Checks if the file can be read
+  if [[ -r ${DATE_FILE} ]] ; then
+    # Counts the blank lines base on the read date.
     DATE_VALUE=$(cat ${DATE_FILE})
     COMMAND_QTY="db2diag -readfile -time ${DATE_VALUE}"
     if [[ ${VERBOSE} -ge 2 ]] ; then
       echo "COMMAND: ${COMMAND_QTY}"
+      echo " | grep -cvP '\S'"
     fi
     QTY=$(${COMMAND_QTY} | grep -cvP '\S')
     if [[ ${VERBOSE} -ge 3 ]] ; then
       echo "Result: ${QTY}"
     fi
 
+    # Checks for a valid output.
     RE='^[0-9]+$'
     if [[ ! ${QTY} =~ ${RE} ]] ; then
       OUTPUT="Output is not a number: '${QTY}'"
       RETURN=${UNKNOWN}
     else
+      # Checks the value with the thresholds.
       if [[ ${QTY} -lt ${WARNING_THRES} ]] ; then
         OUTPUT="OK, quantity is normal (${QTY}) since ${DATE_VALUE}."
         RETURN=${OK}
@@ -282,13 +292,64 @@ if [[ ${CONTINUE} == true ]] ; then
         OUTPUT="Quantity is too high (${QTY}) since ${DATE_VALUE}, please check the db2diag.log right now."
         RETURN=${CRITICAL}
       fi
-      date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
+      # Calculates the performance values (for each level)
+      PERFORMANCE="'logs'=${QTY};${WARNING_THRES};${CRITICAL_THRES};0"
+      if [[ ${QTY} -lt $((3 * ${CRITICAL_THRES})) ]] ; then
+        COMMAND_QTY_SEVERE="db2diag -readfile -time ${DATE_VALUE} -l Severe"
+        COMMAND_QTY_ERROR="db2diag -readfile -time ${DATE_VALUE} -l Error"
+        COMMAND_QTY_WARNING="db2diag -readfile -time ${DATE_VALUE} -l Warning"
+        COMMAND_QTY_INFO="db2diag -readfile -time ${DATE_VALUE} -l Info"
+        COMMAND_QTY_EVENT="db2diag -readfile -time ${DATE_VALUE} -l Event"
+        if [[ ${VERBOSE} -ge 2 ]] ; then
+          echo "COMMAND SEVERE: ${COMMAND_QTY_SEVERE}"
+          echo "COMMAND SEVERE: ${COMMAND_QTY_ERROR}"
+          echo "COMMAND SEVERE: ${COMMAND_QTY_WARNING}"
+          echo "COMMAND SEVERE: ${COMMAND_QTY_INFO}"
+          echo "COMMAND SEVERE: ${COMMAND_QTY_EVENT}"
+        fi
+        QTY_SEVERE=$(${COMMAND_QTY_SEVERE} | grep -cvP '\S')
+        QTY_ERROR=$(${COMMAND_QTY_ERROR} | grep -cvP '\S')
+        QTY_WARNING=$(${COMMAND_QTY_WARNING} | grep -cvP '\S')
+        QTY_INFO=$(${COMMAND_QTY_INFO} | grep -cvP '\S')
+        QTY_EVENT=$(${COMMAND_QTY_EVENT} | grep -cvP '\S')
+        if [[ ${EXTRA} == true ]] ; then
+          QTY_LINES=$(${COMMAND_QTY} | wc -l)
+          QTY_CHARS=$(${COMMAND_QTY} | wc -m)
+        fi
+        if [[ ${VERBOSE} -ge 3 ]] ; then
+          echo "Result: ${QTY_SEVERE}"
+          echo "Result: ${QTY_ERROR}"
+          echo "Result: ${QTY_WARNING}"
+          echo "Result: ${QTY_INFO}"
+          echo "Result: ${QTY_EVENT}"
+          echo "Result: ${QTY_LINES}"
+          echo "Result: ${QTY_CHARS}"
+        fi
+        LONG_OUTPUT="Messages by levels. Severe: ${QTY_SEVERE}, Error: ${QTY_ERROR}, Warning: ${QTY_WARNING}, Info: ${QTY_INFO}, Event: ${QTY_EVENT}"
+        LONG_PERFORMANCE="'Severe'=${QTY_SEVERE} 'Error'=${QTY_ERROR} 'Warning'=${QTY_WARNING} 'Info'=${QTY_INFO} 'Event'=${QTY_EVENT}"
+        if [[ ${EXTRA} == true ]] ; then
+          LONG_OUTPUT="${LONG_OUTPUT}, Lines: ${QTY_LINES}, Size: $((${QTY_CHARS}/1024))"
+          LONG_PERFORMANCE="${LONG_PERFORMANCE}, 'Lines'=${QTY_LINES}, 'Size'=$((${QTY_CHARS}/1024))"
+        fi
+      fi
+      # Writes the new date in the same file.
+      if [[ -w ${DATE_FILE} ]] ; then
+        date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
+      else
+        OUTPUT="File permissions are wrong '${DATE_FILE}'. ${OUTPUT}"
+        RETURN=${CRITICAL}
+      fi
     fi
-    PERFORMANCE="'logs'=${QTY};${WARNING_THRES};${CRITICAL_THRES};0"
   else
+    # This is the first execution, thus a reference point for the date does not
+    # exist.
     OUTPUT="First execution, there is not a reference point."
     RETURN=${UNKNOWN}
-    date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
+    if [[ -w ${DATE_FILE} ]] ; then
+      date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
+    else
+      OUTPUT="File permissions are wrong '${DATE_FILE}'. ${OUTPUT}"
+    fi
   fi
 fi
 
