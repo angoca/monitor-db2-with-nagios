@@ -260,7 +260,7 @@ if [[ $CONTINUE == true ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  DATE_FILE=/tmp/last_date_check_db2diag_$(echo ${INSTANCE_HOME} | sed 's/\//\\/g')
+  DATE_FILE=/tmp/last_date_check_db2diag_$(echo ${INSTANCE_HOME} | sed 's/\//_/g')
   # Checks if the file can be read
   if [[ -r ${DATE_FILE} ]] ; then
     # Counts the blank lines base on the read date.
