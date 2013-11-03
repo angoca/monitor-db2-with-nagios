@@ -345,6 +345,7 @@ if [[ ${CONTINUE} == true ]] ; then
     # exist.
     OUTPUT="First execution, there is not a reference point."
     RETURN=${UNKNOWN}
+    touch ${DATE_FILE}
     if [[ -w ${DATE_FILE} ]] ; then
       date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
     else
