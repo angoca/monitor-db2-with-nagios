@@ -44,6 +44,7 @@
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
 # -n | --name : Tablespace name
+# -T | --trace : Trace mode. Writes output in /tmp
 # -V | --version : Show the current version of this script.
 # -v | --verbose : Execute the program in verbose mode.
 # -w | --warning : Warning threshold in milliseconds.
@@ -101,6 +102,8 @@ This script check the usage of a tablespace.
    Instance home directory. It is usually /home/db2inst1
 -n | --name STRING
    Tablespace name to check.
+-T | --trace
+   Trace mode: writes date and output in /tmp
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -145,7 +148,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=$(getopt -o hVvi:d:c:w:n: --long help,version,verbose,instance:,database:,critical:,warning:,name:,id: \
+TEMP=$(getopt -o c:d:hi:n:TvVw: --long critical:,database:,help,id:,instance:,name:,trace,version,verbose,warning: \
              -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
@@ -162,6 +165,8 @@ if [[ $CONTINUE == true ]] ; then
   VERSION=false
   # Verbosity level
   VERBOSE=0
+  # Trace activated
+  TRACE=false
   INSTANCE_HOME=
   DATABASE_NAME=
   WARNING_THRES=80
@@ -175,6 +180,7 @@ if [[ $CONTINUE == true ]] ; then
       -h | --help ) HELP=true; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -n | --name ) TABLESPACE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -T | --trace ) TRACE=true ; shift ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
       -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
@@ -185,12 +191,23 @@ if [[ $CONTINUE == true ]] ; then
   done
 fi
 
+if [[ $TRACE == true ]] ; then
+  echo ">>>>>" >> $LOG
+  date >> $LOG
+  echo "PID $$" >> $LOG
+fi
+
+ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE"
+ECHO=$ECHO", directory:$INSTANCE_HOME, database:$DATABASE_NAME"
+ECHO=$ECHO", warning:$WARNING_THRES, critical:$CRITICAL_THRES"
+ECHO=$ECHO", ts_name:$TABLESPACE_NAME, ts_id:$TABLESPACE_ID"
+
 if [[ $VERBOSE -ge 2 ]] ; then
-  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-  ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES, "
-  ECHO=$ECHO"ts_name:$TABLESPACE_NAME, ts_id:$TABLESPACE_ID"
   echo $ECHO
+fi
+
+if [[ $TRACE == true ]] ; then
+  echo "PARAMS:$ECHO" >> $LOG
 fi
 
 if [[ $CONTINUE == true && $HELP == true ]] ; then
@@ -415,7 +432,7 @@ if [[ $CONTINUE == true ]] ; then
     echo "RESULT:'$TB_ALLOCATED'"
   fi
   LONG_OUTPUT="Tablespace $TABLESPACE_NAME$TABLESPACE_ID has allocated $TB_ALLOCATED MB"
-  LONG_PERFORMANCE="Allocated=${TB_ALLOCATED} "
+  LONG_PERFORMANCE="Allocated=${TB_ALLOCATED}"
 
   ## Used size
   TB_SIZE=$(printf '%s\n' "$TS" | awk '{print $8}')
@@ -430,7 +447,7 @@ if [[ $CONTINUE == true ]] ; then
     echo "RESULT:'$TB_HWM'"
   fi
   LONG_OUTPUT="$LONG_OUTPUT and its watermark is at $TB_HWM"
-  LONG_PERFORMANCE="${LONG_PERFORMANCE}Watermark=${TB_HWM}"
+  LONG_PERFORMANCE="${LONG_PERFORMANCE} Watermark=${TB_HWM}"
   # TODO As part of the performance, display the status (backup pending, restore pending, etc.
 fi
 
@@ -445,4 +462,11 @@ $LONG_OUTPUT|$LONG_PERFORMANCE"
 if [[ $VERBOSE -ge 2 ]] ; then
   echo "Return code: $RETURN"
 fi
+if [[ $TRACE == true ]] ; then
+  echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
+  date >> $LOG
+  echo -e "<<<<<\n" >> $LOG
+fi
 exit $RETURN
+
+
