@@ -64,6 +64,8 @@
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1
+# -R | --noreplace : Do not replace the last written date. This allows you to
+#   execute the script without altering the date.
 # -T | --trace : Trace mode. Writes output in /tmp
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
@@ -102,7 +104,8 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory [-c][-w] ! -h ! -V } [ -T ] [ -v ]"
+  echo "Usage: $1 { -i instanceHomeDirectory [-c][-w] ! -h ! -V } [ -R ] [ -T ]
+  [ -v ] [ -x ]"
 }
 
 function print_help {
@@ -117,6 +120,9 @@ Checks the quantity of messages written in the db2diag.log since the last check.
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1
+-R | --noreplace
+   Do not replace the last check time of the plugin. This allows to execute the
+   script without altering oher executions.
 -T | --trace
    Trace mode: writes date and output in /tmp
 -v | --verbose
@@ -162,7 +168,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
-TEMP=$(getopt -o c:hi:TvVw:ix --long critical:,extra,instance:,help,trace,verbose,version,warning: \
+TEMP=$(getopt -o c:hi:RTvVw:x --long critical:,extra,instance:,help,noreplace,trace,verbose,version,warning: \
              -n $APPL_NAME -- "$@")
 
 if [[ $? -ne 0 ]] ; then
@@ -181,6 +187,8 @@ if [[ $CONTINUE == true ]] ; then
   VERBOSE=0
   # Trace activated
   TRACE=false
+  # Replace date.
+  REPLACE=true
   EXTRA=false
   LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
@@ -191,6 +199,7 @@ if [[ $CONTINUE == true ]] ; then
       -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -R | --noreplace ) REPLACE=false ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -V | --version ) VERSION=true; shift ;;
       -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
@@ -211,6 +220,7 @@ fi
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, extra: ${EXTRA}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
+ECHO="${ECHO}, replace:${REPLACE}"
 
 if [[ $VERBOSE -ge 2 ]] ; then
   echo $ECHO
@@ -293,21 +303,24 @@ if [[ ${CONTINUE} == true ]] ; then
         RETURN=${CRITICAL}
       fi
       # Calculates the performance values (for each level)
-      PERFORMANCE="'logs'=${QTY};${WARNING_THRES};${CRITICAL_THRES};0"
+      PERFORMANCE="'logs'=${QTY};${WARNING_THRES};${CRITICAL_THRES} "
       if [[ ${QTY} -lt $((3 * ${CRITICAL_THRES})) ]] ; then
         COMMAND_QTY_SEVERE="db2diag -readfile -time ${DATE_VALUE} -l Severe"
+        COMMAND_QTY_CRITICAL="db2diag -readfile -time ${DATE_VALUE} -l Critical"
         COMMAND_QTY_ERROR="db2diag -readfile -time ${DATE_VALUE} -l Error"
         COMMAND_QTY_WARNING="db2diag -readfile -time ${DATE_VALUE} -l Warning"
         COMMAND_QTY_INFO="db2diag -readfile -time ${DATE_VALUE} -l Info"
         COMMAND_QTY_EVENT="db2diag -readfile -time ${DATE_VALUE} -l Event"
         if [[ ${VERBOSE} -ge 2 ]] ; then
           echo "COMMAND SEVERE: ${COMMAND_QTY_SEVERE}"
-          echo "COMMAND SEVERE: ${COMMAND_QTY_ERROR}"
-          echo "COMMAND SEVERE: ${COMMAND_QTY_WARNING}"
-          echo "COMMAND SEVERE: ${COMMAND_QTY_INFO}"
-          echo "COMMAND SEVERE: ${COMMAND_QTY_EVENT}"
+          echo "COMMAND CRITICAL: ${COMMAND_QTY_CRITICAL}"
+          echo "COMMAND ERROR: ${COMMAND_QTY_ERROR}"
+          echo "COMMAND WARNING: ${COMMAND_QTY_WARNING}"
+          echo "COMMAND INFO: ${COMMAND_QTY_INFO}"
+          echo "COMMAND EVENT: ${COMMAND_QTY_EVENT}"
         fi
         QTY_SEVERE=$(${COMMAND_QTY_SEVERE} | grep -cvP '\S')
+        QTY_CRITICAL=$(${COMMAND_QTY_CRITICAL} | grep -cvP '\S')
         QTY_ERROR=$(${COMMAND_QTY_ERROR} | grep -cvP '\S')
         QTY_WARNING=$(${COMMAND_QTY_WARNING} | grep -cvP '\S')
         QTY_INFO=$(${COMMAND_QTY_INFO} | grep -cvP '\S')
@@ -316,28 +329,36 @@ if [[ ${CONTINUE} == true ]] ; then
           QTY_LINES=$(${COMMAND_QTY} | wc -l)
           QTY_CHARS=$(${COMMAND_QTY} | wc -m)
         fi
+        SUM_INFO=$((${QTY_EVENT}+${QTY_INFO}))
+        SUM_WARNING=$((${SUM_INFO}+${QTY_WARNING}))
+        SUM_ERROR=$((${SUM_WARNING}+${QTY_ERROR}))
+        SUM_CRITICAL=$((${SUM_ERROR}+${QTY_CRITICAL}))
+        SUM_SEVERE=$((${SUM_CRITICAL}+${QTY_SEVERE}))
         if [[ ${VERBOSE} -ge 3 ]] ; then
-          echo "Result: ${QTY_SEVERE}"
-          echo "Result: ${QTY_ERROR}"
-          echo "Result: ${QTY_WARNING}"
-          echo "Result: ${QTY_INFO}"
+          echo "Result: ${QTY_SEVERE} - ${SUM_SEVERE}"
+          echo "Result: ${QTY_CRITICAL} - ${SUM_CRITICAL}"
+          echo "Result: ${QTY_ERROR} - ${SUM_ERROR}"
+          echo "Result: ${QTY_WARNING} - ${SUM_WARNING}"
+          echo "Result: ${QTY_INFO} - ${SUM_INFO}"
           echo "Result: ${QTY_EVENT}"
           echo "Result: ${QTY_LINES}"
           echo "Result: ${QTY_CHARS}"
         fi
-        LONG_OUTPUT="Messages by levels. Severe: ${QTY_SEVERE}, Error: ${QTY_ERROR}, Warning: ${QTY_WARNING}, Info: ${QTY_INFO}, Event: ${QTY_EVENT}"
-        LONG_PERFORMANCE="'Severe'=${QTY_SEVERE} 'Error'=${QTY_ERROR} 'Warning'=${QTY_WARNING} 'Info'=${QTY_INFO} 'Event'=${QTY_EVENT}"
+        LONG_OUTPUT="Messages by levels. Severe: ${QTY_SEVERE}, Critical: ${QTY_CRITICAL}, Error: ${QTY_ERROR}, Warning: ${QTY_WARNING}, Info: ${QTY_INFO}, Event: ${QTY_EVENT}"
+        LONG_PERFORMANCE="'Severe'=${SUM_SEVERE} 'Critical'=${SUM_CRITICAL} 'Error'=${SUM_ERROR} 'Warning'=${SUM_WARNING} 'Info'=${SUM_INFO} 'Event'=${SUM_EVENT}"
         if [[ ${EXTRA} == true ]] ; then
           LONG_OUTPUT="${LONG_OUTPUT}, Lines: ${QTY_LINES}, Size: $((${QTY_CHARS}/1024))"
           LONG_PERFORMANCE="${LONG_PERFORMANCE}, 'Lines'=${QTY_LINES}, 'Size'=$((${QTY_CHARS}/1024))"
         fi
       fi
       # Writes the new date in the same file.
-      if [[ -w ${DATE_FILE} ]] ; then
-        date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
-      else
-        OUTPUT="File permissions are wrong '${DATE_FILE}'. ${OUTPUT}"
-        RETURN=${CRITICAL}
+      if [[ ${REPLACE} == true ]] ; then
+        if [[ -w ${DATE_FILE} ]] ; then
+          date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
+        else
+          OUTPUT="File permissions are wrong '${DATE_FILE}'. ${OUTPUT}"
+          RETURN=${CRITICAL}
+        fi
       fi
     fi
   else
