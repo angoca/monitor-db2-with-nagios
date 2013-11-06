@@ -234,6 +234,7 @@ fi
 if [[ $TRACE == true ]] ; then
   echo ">>>>>" >> $LOG
   date >> $LOG
+  echo "Instance at ${INSTANCE_HOME}"
   echo "PID $$" >> $LOG
 fi
 
@@ -397,6 +398,7 @@ if [[ $CONTINUE == true ]] ; then
         USERNAME=$(echo $LINE | awk '{print $2}')
         QTY_USER=$(echo $LINE | awk '{print $1}')
         AGREGATE=$(($AGREGATE + $QTY_USER))
+        LONG_OUTPUT="${LONG_PERFORMANCE} ${USERNAME} has ${QTY_USER},"
         LONG_PERFORMANCE="$LONG_PERFORMANCE '$USERNAME'=$AGREGATE"
       done < <( printf '%s\n' "$QTY_FILTERED" )
     fi
