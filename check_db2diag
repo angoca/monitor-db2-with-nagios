@@ -345,7 +345,7 @@ if [[ ${CONTINUE} == true ]] ; then
           echo "Result: ${QTY_CHARS}"
         fi
         LONG_OUTPUT="Messages by levels. Severe: ${QTY_SEVERE}, Critical: ${QTY_CRITICAL}, Error: ${QTY_ERROR}, Warning: ${QTY_WARNING}, Info: ${QTY_INFO}, Event: ${QTY_EVENT}"
-        LONG_PERFORMANCE="'Severe'=${SUM_SEVERE} 'Critical'=${SUM_CRITICAL} 'Error'=${SUM_ERROR} 'Warning'=${SUM_WARNING} 'Info'=${SUM_INFO} 'Event'=${SUM_EVENT}"
+        LONG_PERFORMANCE="'Severe'=${SUM_SEVERE} 'Critical'=${SUM_CRITICAL} 'Error'=${SUM_ERROR} 'Warning'=${SUM_WARNING} 'Info'=${SUM_INFO} 'Event'=${QTY_EVENT}"
         if [[ ${EXTRA} == true ]] ; then
           LONG_OUTPUT="${LONG_OUTPUT}, Lines: ${QTY_LINES}, Size: $((${QTY_CHARS}/1024))"
           LONG_PERFORMANCE="${LONG_PERFORMANCE}, 'Lines'=${QTY_LINES}, 'Size'=$((${QTY_CHARS}/1024))"
