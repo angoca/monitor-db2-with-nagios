@@ -1,0 +1,236 @@
+#! /usr/bin/env bash
+
+###############################################################################
+# Monitor DB2 with Nagios
+# Copyright 2013 Andres Gomez Casanova
+# https://github.com/angoca/monitor-db2-with-nagios
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+###############################################################################
+
+# This script checks the usage memory: total, free, usage. This script is based
+# on many other script that already do that.
+#
+# Here comes the documentation
+#
+# TODO Nagios usage.
+#
+# TODO Nagios with NRPE.
+#
+# Parameters:
+# -c | --critical : Percentage of usage memory considered as critical.
+# -h | --help : Show the help of this script.
+# -T | --trace : Trace mode. Writes output in /tmp
+# -v | --verbose : Execute the program in verbose mode.
+# -V | --version : Show the current version of this script.
+# -w | --warning : Percentage of usage memory considered as warning.
+#
+# The exit codes are the standard for Nagios.
+#
+# 0 The plugin was able to check the service and it appeared to be functioning
+#   properly.
+# 1 The plugin was able to check the service, but it appeared to be above some
+#   "warning" threshold or did not appear to be working properly.
+# 2 The plugin detected that either the service was not running or it was above
+#   some "critical" threshold.
+# 3 Invalid command line arguments were supplied to the plugin or low-level
+#   failures internal to the plugin (such as unable to fork, or open a tcp
+#   socket) that prevent it from performing the specified operation.
+#   Higher-level errors (such as name resolution errors, socket timeouts, etc)
+#   are outside of the control of plugins and should generally NOT be reported
+#   as UNKNOWN states.
+#
+# Author: Andres Gomez Casanova
+# Version: v1.0 2013-11-07
+
+# Flag for debugging.
+#set -xv
+
+# Locale to print messages in English. Prevent language problems.
+export LANG=en_US
+
+# Version of this script.
+function print_revision {
+  echo Andres Gomez Casanova - AngocA
+  echo v1.0 2013-11-07
+}
+# Function to show the help
+function print_usage {
+  echo "Usage: $1 { [-c][-w] ! -h ! -V } [ -T ] [ -v ]"
+}
+
+function print_help {
+  print_revision
+  print_usage $1
+  # Max 80 chars width.
+  /bin/cat <<__EOT
+Checks the memory usage: total, free, usage.
+-c | --critical INTEGER
+   Percentage of usage memory considered as critical.
+-h | --help
+   Shows the current documentation.
+-T | --trace
+   Trace mode: writes date and output in /tmp
+-v | --verbose
+   Executes the script in verbose mode (multiple times).
+-V | --version
+   Shows the current version of this script.
+-w | --warning INTEGER
+   Percentage of usage memory considered as warning.
+__EOT
+}
+
+# Variable to control the flow execution. Prevent Spaghetti code.
+CONTINUE=true
+
+# Nagios return codes
+OK=0
+WARNING=1
+CRITICAL=2
+UNKNOWN=3
+# This is the returned code.
+RETURN=$UNKNOWN
+
+# Nagios Output
+# Text output 80 chars | Optional Perf Data Line 1
+# Long text Line 1
+# Long text Line 2 | Optional Perf Data Line 2
+# Optional Perf Data Line 3
+OUTPUT=
+PERFORMANCE=
+LONG_OUTPUT=
+LONG_PERFORMANCE=
+
+APPL_NAME=$(basename ${0})
+
+# The following requieres GNU getopt. See the following discusion.
+# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+
+TEMP=$(getopt -o c:hTvVw: --long critical:,help,trace,verbose,version,warning: \
+             -n $APPL_NAME -- "$@")
+
+if [[ $? -ne 0 ]] ; then
+  print_usage $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true ]] ; then
+  # Note the quotes around $TEMP: they are essential!
+  eval set -- "$TEMP"
+
+  HELP=false
+  VERSION=false
+  # Verbosity level
+  VERBOSE=0
+  # Trace activated
+  TRACE=false
+  LOG=/tmp/${APPL_NAME}.log
+  WARNING_THRES=90
+  CRITICAL_THRES=95
+  while true; do
+    case "$1" in
+      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -h | --help ) HELP=true; shift ;;
+      -T | --trace ) TRACE=true ; shift ;;
+      -V | --version ) VERSION=true; shift ;;
+      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
+      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -- ) shift; break ;;
+      * ) break ;;
+    esac
+  done
+fi
+
+if [[ $TRACE == true ]] ; then
+  echo ">>>>>" >> $LOG
+  date >> $LOG
+  echo "PID $$" >> $LOG
+fi
+
+ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE"
+ECHO="$ECHO, warning:$WARNING_THRES, critical:$CRITICAL_THRES"
+
+if [[ $VERBOSE -ge 2 ]] ; then
+  echo $ECHO
+fi
+if [[ $TRACE == true ]] ; then
+  echo "PARAMS:$ECHO" >> $LOG
+fi
+
+if [[ $CONTINUE == true && $HELP == true ]] ; then
+  print_help $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && $VERSION == true ]] ; then
+  print_revision $APPL_NAME
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+
+if [[ $CONTINUE == true && ( $WARNING_THRES == "" || $CRITICAL_THRES == ""
+    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
+    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
+    || $WARNING_THRES -ge $CRITICAL_THRES ) ]] ; then
+  print_usage $APPL_NAME
+  echo "Warning threshold should be less than critical threshold."
+  echo "Threshold should be greater than 0."
+  RETURN=$UNKNOWN
+  CONTINUE=false
+fi
+if [[ $CONTINUE == true ]] ; then
+  TOTAL=$(grep '^MemTotal' /proc/meminfo | awk '{print $2}')
+  FREE=$(grep '^MemFree' /proc/meminfo | awk '{print $2}')
+  USAGE=$((${TOTAL} - ${FREE}))
+
+  USAGE_PER=$((${USAGE} * 100 / ${TOTAL}))
+  WARNING_VAL=$((${WARNING_THRES} * ${TOTAL} / 100))
+  CRITICAL_VAL=$((${CRITICAL_THRES} * ${TOTAL} / 100))
+  if [[ $VERBOSE -ge 1 ]] ; then
+    echo "Percent '${USAGE_PER}%'"
+  fi
+  if [[ ${USAGE_PER} -lt ${WARNING_THRES} ]] ; then
+    OUTPUT="Usage is normal (${USAGE_PER})."
+    RETURN=${OK}
+  elif [[ ${USAGE_PER} -lt ${CRITICAL_THRES} ]] ; then
+    OUTPUT="Usage is intensive (${USAGE_PER})."
+    RETURN=${WARNING}
+  else
+    OUTPUT="Usage is critical (${USAGE_PER})."
+    RETURN=${CRITICAL}
+  fi
+  LONG_OUTPUT="The current memory usage is ${USAGE}KB of a total of ${TOTAL}KB (Free ${FREE})."
+  PERFORMANCE="'Usage'=${USAGE}KB;${WARNING_VAL};${CRITICAL_VAL};;${TOTAL}"
+fi
+
+# Prints the output.
+if [[ $OUTPUT == "" ]] ; then
+  OUTPUT="Note: The test was not executed."
+fi
+# Builds the output.
+echo "$OUTPUT|$PERFORMANCE
+$LONG_OUTPUT|$LONG_PERFORMANCE"
+# Returns the error code.
+if [[ $VERBOSE -ge 2 ]] ; then
+  echo "Return code: $RETURN"
+fi
+if [[ $TRACE == true ]] ; then
+  echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
+  date >> $LOG
+  echo -e "<<<<<\n" >> $LOG
+fi
+exit $RETURN
+
+
