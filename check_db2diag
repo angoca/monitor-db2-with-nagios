@@ -27,7 +27,7 @@
 #
 # In order to be used in Nagios, you have to configure the following.
 #
-# # 'check_log_usage' command definition
+# 'check_db2diag' command definition
 # define command {
 #         command_name    check_db2diag
 #         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_db2diag -i '$ARG1$'"
