@@ -21,12 +21,45 @@
 # Checks the memory usage by an instance. It does not take into account the
 # bufferpools, or other memory dumps, it just takes the result of the query.
 # The query is executed agaist the first connectable database of an instance.
+# The user used to execute the script should have a special privileges in at
+# least one of the database of the instance analyzed; the privilege are:
+#  db2 grant execute on package NULLID.SQLC2H21 to user nagios
+#  db2 grant execute on specific function SYSPROC.ADMIN_GET_DBP_MEM_USAGE to user nagios
+#  db2 grant execute on specific function SYSPROC.ADMIN_GET_DBP_MEM_USAGE_AP to user nagios
+#  db2 db2 grant usage on workload SYSDEFAULTUSERWORKLOAD to user nagios
 #
-# Here comes the documentation
+# In order to be used in Nagios, you have to configure the following.
 #
-# TODO Nagios usage.
+# # 'check_connection_qty' command definition
+# define command {
+#         command_name    check_instance_memory
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "script s/check_instance_memory -i '$ARG1$'"
+# }
+# define service{
+#         host_name               db2server
+#         service_description     Memory used by the instance
+#         check_command           check_instance_memory!/home/db2inst1
+#         use                     generic-service
+# }
 #
-# TODO Nagios with NRPE.
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_instance_memory]=/home/nagios/scripts/check_instance_memory -i /home/db2inst1
+#
+# Then modify the path according to your script location, instance home dir,
+# database, filter and thresholds.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     Memory used by the instance
+#         check_command           check_nrpe_1arg!check_connection_qty
+#         use                     generic-service
+# }
+
 #
 # Parameters:
 # -c | --critical : Quantity of used memory to be considered as critical.
@@ -70,13 +103,13 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory [-l][-c][-w] ! -h ! -V } \
+  echo "Usage: ${1} { -i instanceHomeDirectory [-l][-c][-w] ! -h ! -V } \
 [-T]\n [-v]"
 }
 
 function print_help {
   print_revision
-  print_usage $1
+  print_usage ${1}
   # Max 80 chars width.
   /bin/cat <<__EOT
 Checks the memory usage at an instance (all nodes).
@@ -109,7 +142,7 @@ WARNING=1
 CRITICAL=2
 UNKNOWN=3
 # This is the returned code.
-RETURN=$UNKNOWN
+RETURN=${UNKNOWN}
 
 # Nagios Output
 # Text output 80 chars | Optional Perf Data Line 1
@@ -123,9 +156,9 @@ LONG_PERFORMANCE=
 
 APPL_NAME=$(basename ${0})
 
-if [[ $# -eq 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${#} -eq 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
@@ -133,17 +166,17 @@ fi
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 
 TEMP=$(getopt -o c:hi:ilTvVw: --long critical:,instance:,help,limit,trace,verbose,version,warning: \
-             -n $APPL_NAME -- "$@")
+             -n ${APPL_NAME} -- "${@}")
 
-if [[ $? -ne 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${?} -ne 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  # Note the quotes around $TEMP: they are essential!
-  eval set -- "$TEMP"
+if [[ ${CONTINUE} == true ]] ; then
+  # Note the quotes around ${TEMP}: they are essential!
+  eval set -- "${TEMP}"
 
   HELP=false
   VERSION=false
@@ -157,85 +190,85 @@ if [[ $CONTINUE == true ]] ; then
   WARNING_THRES=1
   CRITICAL_THRES=2
   while true; do
-    case "$1" in
-      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+    case "${1}" in
+      -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -l | --limit ) LIMIT=true ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )); shift ;;
+      -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
   done
 fi
 
-if [[ $TRACE == true ]] ; then
-  echo ">>>>>" >> $LOG
-  date >> $LOG
-  echo "PID $$" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo ">>>>>" >> ${LOG}
+  date >> ${LOG}
+  echo "PID ${$}" >> ${LOG}
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, limit:${LIMIT}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo $ECHO
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo ${ECHO}
 fi
-if [[ $TRACE == true ]] ; then
-  echo "PARAMS:$ECHO" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo "PARAMS:${ECHO}" >> ${LOG}
 fi
 
-if [[ $CONTINUE == true && $HELP == true ]] ; then
-  print_help $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${HELP} == true ]] ; then
+  print_help ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $VERSION == true ]] ; then
-  print_revision $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
+  print_revision ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && ( $WARNING_THRES == "" || $CRITICAL_THRES == ""
-    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
-    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
-    || $WARNING_THRES -ge $CRITICAL_THRES ) ]] ; then
-  print_usage $APPL_NAME
+if [[ ${CONTINUE} == true && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
+    || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
+    || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
+    || ${WARNING_THRES} -ge ${CRITICAL_THRES} ) ]] ; then
+  print_usage ${APPL_NAME}
   echo "Warning threshold should be less than critical threshold."
   echo "Threshold should be greater than 0."
-  RETURN=$UNKNOWN
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    . ${INSTANCE_HOME}/sqllib/db2profile
   else
     OUTPUT="Instance directory is invalid."
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_DATABASE="db2 list db directory"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_DATABASE"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_DATABASE}"
   fi
   DB_LIST=$(${COMMAND_DATABASE} | awk '/Database alias/ {print $4}')
-  if [[ $VERBOSE -ge 3 ]] ; then
+  if [[ ${VERBOSE} -ge 3 ]] ; then
     echo "RESULT:'${DB_LIST}'"
   fi
 
@@ -245,6 +278,9 @@ SELECT
  MAX_PARTITION_MEM/1048576 AS MAX_MEM_MB,
  CURRENT_PARTITION_MEM/1048576 AS CURRENT_MEM_MB 
 FROM TABLE (SYSPROC.ADMIN_GET_DBP_MEM_USAGE()) AS T;"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND}"
+  fi
   CONT=true
   while read -r LINE && ${CONT} == true ; do
     DATABASE=${LINE}
@@ -252,15 +288,34 @@ FROM TABLE (SYSPROC.ADMIN_GET_DBP_MEM_USAGE()) AS T;"
     if [[ ${VERBOSE} -ge 3 ]] ; then
       echo "RESULT:'${RESULT}'"
     fi
-    RESULT_ERROR=$(echo ${RESULT} | grep SQL)
-    if [[ -z ${RESULT_ERROR} ]] ; then
-      # No error for the query result, thus break the while.
-      CONT=false
+    # Check for errors
+    CONN_ERROR=$(echo ${RESULT} | grep SQL1024)
+    SELECT_ERROR=$(echo ${RESULT} | grep SQL0551)
+    if [[ ${CONN_ERROR} == "error" ]] ; then
+      LONG_OUTPUT=${RESULT}
+      unset RESULT
+      if [[ ${VERBOSE} -ge 2 ]] ; then
+        echo "Connection error at ${DATABASE}"
+      fi
+    elif [[ ${SELECT_ERROR} != "" ]] ; then
+      LONG_OUTPUT=${RESULT}
+      unset RESULT
+      if [[ ${VERBOSE} -ge 2 ]] ; then
+        echo "Lack of permissions at ${DATABASE}"
+      fi
+    else
+      RESULT_ERROR=$(echo ${RESULT} | grep SQL)
+      if [[ -z ${RESULT_ERROR} ]] ; then
+        # No error for the query result, thus break the while.
+        CONT=false
+      fi
     fi
   done < <(printf '%s\n' "${DB_LIST}" )
   # There was not any database connection. Empty result.
   if [[ -z ${RESULT} ]] ; then
     OUTPUT="No connection to the databases in the instance at ${INSTANCE_HOME}."
+    OUTPUT="${OUTPUT} Or the user does not have the requiered authorization"
+    OUTPUT="${OUTPUT} to perform the query in any database."
     RETURN=${UNKNOWN}
   else
     while read -r LINE ; do
@@ -299,21 +354,21 @@ FROM TABLE (SYSPROC.ADMIN_GET_DBP_MEM_USAGE()) AS T;"
 fi
 
 # Prints the output.
-if [[ $OUTPUT == "" ]] ; then
+if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "$OUTPUT|$PERFORMANCE
-$LONG_OUTPUT|$LONG_PERFORMANCE"
+echo "${OUTPUT}|${PERFORMANCE}
+${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 # Returns the error code.
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo "Return code: $RETURN"
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo "Return code: ${RETURN}"
 fi
-if [[ $TRACE == true ]] ; then
-  echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
-  date >> $LOG
-  echo -e "<<<<<\n" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo -e "OUTPUT:${OUTPUT}\nPERF:${PERFORMANCE}\nLONG_OUT:${LONG_OUTPUT}\nLONGPERF:${LONG_PERFORMANCE}\nRET_CODE:${RETURN}" >> ${LOG}
+  date >> ${LOG}
+  echo -e "<<<<<\n" >> ${LOG}
 fi
-exit $RETURN
+exit ${RETURN}
 
 
