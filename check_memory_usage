@@ -149,7 +149,7 @@ if [[ ${CONTINUE} == true ]] ; then
     case "${1}" in
       -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
-      -i | --ignore ) IGNORE_THRES=true ;;
+      -i | --ignore ) IGNORE_THRES=true ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
       -V | --version ) VERSION=true ; shift ;;
