@@ -67,12 +67,12 @@
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1
+#   /home/db2inst1.
 # -I | --ignore : Do not check threshold, only informative. It is useful
 #   when only graphs want to be created with the data from this script.
 # -s | --state : Shows the connection state in the performance output.
 #   Normally it shows the distribution of connections by users.
-# -T | --trace : Trace mode. Writes output in /tmp
+# -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
 # -w | --warning :  Quantity of connections to be considered as a warning.
@@ -110,16 +110,19 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w][--filter \
-\n [--inverted]] [-I] ! -s ! -h ! -V } [ -T ] [ -v ]"
+  /bin/cat <<__EOT
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w]
+[--filter][--inverted]][-I][-s] | -h | -V }[-T][-v]
+__EOT
 }
 
 function print_help {
   print_revision
-  print_usage $1
+  print_usage ${1}
   # Max 80 chars width.
   /bin/cat <<__EOT
-This script check the quantity of established connections.
+-------------------------------------------------------------------------------
+This script checks the quantity of established connections.
 -c | --critical INTEGER
    Quantity of connections to consider as critical.
    Default 15.
@@ -136,7 +139,7 @@ This script check the quantity of established connections.
    Shows the connections states in the performance output. Normally, it shows
    the distribution of connections per user.
 -T | --trace
-   Trace mode: writes date and output in /tmp
+   Trace mode: writes date and output in /tmp.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -160,7 +163,7 @@ WARNING=1
 CRITICAL=2
 UNKNOWN=3
 # This is the returned code.
-RETURN=$UNKNOWN
+RETURN=${UNKNOWN}
 
 # Nagios Output
 # Text output 80 chars | Optional Perf Data Line 1
@@ -174,27 +177,27 @@ LONG_PERFORMANCE=
 
 APPL_NAME=$(basename ${0})
 
-if [[ $# -eq 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${#} -eq 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
 # The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+# http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o c:d:hi:IsTVvw: --long critical:,database:,filter:,help,instance:,ignore,inverted,state,trace,version,verbose,warning: \
-             -n $APPL_NAME -- "$@")
+TEMP=$(getopt -o c:d:hi:IsTvVw: --long critical:,database:,filter:,help,instance:,ignore,inverted,state,trace,verbose,version,warning: \
+             -n ${APPL_NAME} -- "${@}")
 
-if [[ $? -ne 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${?} -ne 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  # Note the quotes around $TEMP: they are essential!
-  eval set -- "$TEMP"
+if [[ ${CONTINUE} == true ]] ; then
+  # Note the quotes around ${TEMP}: they are essential!
+  eval set -- "${TEMP}"
 
   HELP=false
   VERSION=false
@@ -212,18 +215,18 @@ if [[ $CONTINUE == true ]] ; then
   FILTER=
   FILTER_INVERTED=false
   while true; do
-    case "$1" in
-      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+    case "${1}" in
+      -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -h | --help ) HELP=true ; shift ;;
+      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -I | --ignore ) IGNORE_THRES=true ; shift ;;
       -s | --state ) STATE=true ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
-      -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      --filter ) FILTER=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+      -V | --version ) VERSION=true ; shift ;;
+      -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      --filter ) FILTER=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       --inverted ) FILTER_INVERTED=true ; shift ;;
       -- ) shift; break ;;
       * ) break ;;
@@ -231,104 +234,109 @@ if [[ $CONTINUE == true ]] ; then
   done
 fi
 
-if [[ $TRACE == true ]] ; then
-  echo ">>>>>" >> $LOG
-  date >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo ">>>>>" >> ${LOG}
+  date >> ${LOG}
   echo "Instance at ${INSTANCE_HOME}"
-  echo "PID $$" >> $LOG
+  echo "PID ${$}" >> ${LOG}
 fi
 
-ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES, "
-ECHO=$ECHO"filter:$FILTER, inverted:$FILTER_INVERTED, state:$STATE, "
-ECHO=$ECHO"ignore:$IGNORE_THRES "
+ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
+ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
+ECHO="${ECHO}, filter:${FILTER}, inverted:${FILTER_INVERTED}, state:${STATE}"
+ECHO="${ECHO}, ignore:${IGNORE_THRES}"
 
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo $ECHO
-fi
-if [[ $TRACE == true ]] ; then
-  echo "PARAMS:$ECHO" >> $LOG
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo ${ECHO}
 fi
 
-if [[ $CONTINUE == true && $HELP == true ]] ; then
-  print_help $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${TRACE} == true ]] ; then
+  echo "PARAMS:${ECHO}" >> ${LOG}
+fi
+
+if [[ ${CONTINUE} == true && ${HELP} == true ]] ; then
+  print_help ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $VERSION == true ]] ; then
-  print_revision $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
+  print_revision ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && (
-    $WARNING_THRES == "" || $CRITICAL_THRES == ""
-    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
-    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
-    || $WARNING_THRES -ge $CRITICAL_THRES ) ]] ; then
-  print_usage $APPL_NAME
+if [[ ${CONTINUE} == true
+    && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
+    || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
+    || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
+    || ${WARNING_THRES} -ge ${CRITICAL_THRES} ) ]] ; then
+  print_usage ${APPL_NAME}
   echo "Warning threshold should be less than critical threshold."
   echo "Threshold should be greater than 0."
-  RETURN=$UNKNOWN
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    . ${INSTANCE_HOME}/sqllib/db2profile
   else
     OUTPUT="Instance directory is invalid."
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_DATABASE="db2 list db directory"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_DATABASE"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_DATABASE}"
   fi
-  DATABASE=$($COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$DATABASE'"
+  DATABASE=$(${COMMAND_DATABASE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${DATABASE}'" >> ${LOG}
+  fi
+  DATABASE=$(printf '%s\n' "${DATABASE}" | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${DATABASE}'"
   fi
 
-  if [[ $DATABASE == "" ]] ; then
-    OUTPUT="The database $DATABASE_NAME is not cataloged."
-    RETURN=$UNKNOWN
+  if [[ ${DATABASE} == "" ]] ; then
+    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   QTY_COMMAND="db2 list applications show detail"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $QTY_COMMAND"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${QTY_COMMAND}"
   fi
-  QTY_RESULT=$($QTY_COMMAND)
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$QTY_RESULT'"
+  QTY_RESULT=$(${QTY_COMMAND})
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${QTY_RESULT}'"
   fi
-  if [[ $TRACE == true ]] ; then
-    echo "RESULT:'$QTY_RESULT'" >> $LOG
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${QTY_RESULT}'" >> ${LOG}
   fi
-  NO_APPS=$(echo $QTY_RESULT | grep SQL1611W)
-  if [[ $NO_APPS == "" ]] ; then
+  NO_APPS=$(echo ${QTY_RESULT} | grep SQL1611W)
+  if [[ ${NO_APPS} == "" ]] ; then
 
     if [[ ${FILTER} != "" ]] ; then
       if [[ ${FILTER_INVERTED} == true ]] ; then
@@ -389,60 +397,62 @@ if [[ $CONTINUE == true ]] ; then
       done < <( printf '%s\n' "${CONNS}" )
       LONG_PERFORMANCE="'Connect Completed'=${CONNECTED} 'UOW Executing'=${UOW_EXECUTING} 'UOW Waiting'=${UOW_WAITING} 'Lock Wait'=${LOCK_WAIT} 'Commit Active'=${COMMIT} 'Rollback'=${ROLLBACK} 'Rollback to savepoint'=${ROLLBACK_TO_SAVEPOINT} 'Compiling'=${COMPILING} 'Disconnecting'=${DISCONNECTING} 'Backup'=${BACKUP} 'Restore'=${RESTORE} 'Other'=${OTHER} "
     else
-      QTY_FILTERED=$(printf '%s\n' "$CONNS" | awk '{print $1}' | sort | uniq -c)
-      if [[ $VERBOSE -ge 3 ]] ; then
-        echo "RESULT FILTER:'$QTY_FILTERED'"
+      QTY_FILTERED=$(printf '%s\n' "${CONNS}" | awk '{print $1}' | sort | uniq -c)
+      if [[ ${VERBOSE} -ge 3 ]] ; then
+        echo "RESULT FILTER:'${QTY_FILTERED}'"
       fi
       AGREGATE=0
       while IFS= read LINE ; do
-        USERNAME=$(echo $LINE | awk '{print $2}')
-        QTY_USER=$(echo $LINE | awk '{print $1}')
-        AGREGATE=$(($AGREGATE + $QTY_USER))
-        LONG_OUTPUT="${LONG_PERFORMANCE} ${USERNAME} has ${QTY_USER},"
-        LONG_PERFORMANCE="$LONG_PERFORMANCE '$USERNAME'=$AGREGATE"
-      done < <( printf '%s\n' "$QTY_FILTERED" )
+        USERNAME=$(echo ${LINE} | awk '{print $2}')
+        QTY_USER=$(echo ${LINE} | awk '{print $1}')
+        AGREGATE=$((${AGREGATE} + ${QTY_USER}))
+        LONG_OUTPUT="${LONG_OUTPUT} ${USERNAME} has ${QTY_USER},"
+        LONG_PERFORMANCE="${LONG_PERFORMANCE} '${USERNAME}'=${AGREGATE}"
+      done < <( printf '%s\n' "${QTY_FILTERED}" )
     fi
-    if [[ $VERBOSE -ge 3 ]] ; then
-      echo "RESULT:'$QTY'"
+    if [[ ${VERBOSE} -ge 3 ]] ; then
+      echo "RESULT:'${QTY}'"
     fi
 
-    if [[ $IGNORE_THRES == false ]] ; then
-      if [[ $QTY -lt $WARNING_THRES ]] ; then
-         OUTPUT="OK. Normal quantity of connections ($QTY)."
-         RETURN=$OK
-      elif [[ $QTY -lt $CRITICAL_THRES ]] ; then
-         OUTPUT="Quantity of connections is increasing, currently $QTY."
-         RETURN=$WARNING
+    if [[ ${IGNORE_THRES} == false ]] ; then
+      if [[ ${QTY} -lt ${WARNING_THRES} ]] ; then
+         OUTPUT="OK. Normal quantity of connections (${QTY})."
+         RETURN=${OK}
+      elif [[ ${QTY} -lt ${CRITICAL_THRES} ]] ; then
+         OUTPUT="Quantity of connections is increasing, currently ${QTY}."
+         RETURN=${WARNING}
       else
-         OUTPUT="Quantity of connections is critical, currently $QTY."
-         RETURN=$CRITICAL
+         OUTPUT="Quantity of connections is critical, currently ${QTY}."
+         RETURN=${CRITICAL}
       fi
-      PERFORMANCE="'Connections'=$QTY;$WARNING_THRES;$CRITICAL_THRES "
+      PERFORMANCE="'Connections'=${QTY};${WARNING_THRES};${CRITICAL_THRES} "
     else
       OUTPUT="OK. Threshold ignored."
-      RETURN=$OK
-      PERFORMANCE="'Connections'=$QTY "
+      RETURN=${OK}
+      PERFORMANCE="'Connections'=${QTY} "
     fi
   else
     OUTPUT="Problem retreiving the applications list"
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
   fi
 fi
 
 # Prints the output.
-if [[ $OUTPUT == "" ]] ; then
+if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "$OUTPUT|$PERFORMANCE
-$LONG_OUTPUT|$LONG_PERFORMANCE"
+echo "${OUTPUT}|${PERFORMANCE}
+${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 # Returns the error code.
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo "Return code: $RETURN"
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo "Return code: ${RETURN}"
 fi
-if [[ $TRACE == true ]] ; then
-  echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
-  date >> $LOG
-  echo -e "<<<<<\n" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo -e "OUTPUT:${OUTPUT}\nPERF:${PERFORMANCE}\nLONG_OUT:${LONG_OUTPUT}\nLONGPERF:${LONG_PERFORMANCE}\nRET_CODE:${RETURN}" >> ${LOG}
+  date >> ${LOG}
+  echo -e "<<<<<\n" >> ${LOG}
 fi
-exit $RETURN
+exit ${RETURN}
+
+
