@@ -21,6 +21,9 @@
 # This script checks the log usage to prevent log full conditions when there
 # are long transactions.
 #
+# The user used to execute this script should has access to the directory where
+# the log files are found.
+#
 # TODO: Accept percentage for warn and crit
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
@@ -41,13 +44,15 @@
 # }
 #
 # Parameters:
-# -c | --critical : Critical threshold in quantity of files
+# -c | --critical : Critical threshold in quantity of files.
 # -d | --database : Database name.
+# -f | --files : Counts the quantity of files.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1
-# -V | --version : Show the current version of this script.
+#   /home/db2inst1.
+# -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
+# -V | --version : Show the current version of this script.
 # -w | --warning : Warning threshold in quantity of files.
 #
 # The exit codes are the standard for Nagios.
@@ -81,25 +86,34 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName [-c][-w] # -h # -V } 
-[ -v ]"
+  /bin/cat <<__EOT
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-f][-w] | -h | -V }
+[-T][-v]
+__EOT
 }
 
 function print_help {
   print_revision
-  print_usage $1
+  print_usage ${1}
   # Max 80 chars width.
   /bin/cat <<__EOT
+-------------------------------------------------------------------------------
 This script checks for long lock waits in the database.
 -c | --critical INTEGER
    Quantity or percentage of secundary log files to consider as critical.
-   Default 50%
+   Default 50%.
 -d | --database STRING
    Database name.
+-f | --files
+   Counts the quantity of allocated files for the logs. This is the basic
+   calculation based on the quantity of primary and secondary files, but it
+   does not take into account how much of primary files are being used.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
-   Instance home directory. It is usually /home/db2inst1
+   Instance home directory. It is usually /home/db2inst1.
+-T | --trace
+   Trace mode: writes date and output in /tmp.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -119,7 +133,7 @@ WARNING=1
 CRITICAL=2
 UNKNOWN=3
 # This is the returned code.
-RETURN=$UNKNOWN
+RETURN=${UNKNOWN}
 
 # Nagios Output
 # Text output 80 chars | Optional Perf Data Line 1
@@ -133,224 +147,294 @@ LONG_PERFORMANCE=
 
 APPL_NAME=$(basename ${0})
 
-if [[ $# -eq 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${#} -eq 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
 # The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+# http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o hVvi:d:c:w: --long help,version,verbose,instance:,database:,critical:,warning: \
-             -n $APPL_NAME -- "$@")
+TEMP=$(getopt -o c:d:fhi:TvVw: --long critical:,database:,files,help,instance:,trace,verbose,version,warning: \
+             -n ${APPL_NAME} -- "${@}")
 
-if [[ $? -ne 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${?} -ne 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  # Note the quotes around $TEMP: they are essential!
-  eval set -- "$TEMP"
+if [[ ${CONTINUE} == true ]] ; then
+  # Note the quotes around ${TEMP}: they are essential!
+  eval set -- "${TEMP}"
 
   HELP=false
   VERSION=false
   # Verbosity level
   VERBOSE=0
+  # Trace activated
+  TRACE=false
+  LOG=/tmp/${APPL_NAME}.log
+  FILES=false
   INSTANCE_HOME=
   DATABASE_NAME=
   UPDATE_MON=false
   WARNING_THRES=1
   CRITICAL_THRES=50
   while true; do
-    case "$1" in
-      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      --update ) UPDATE_MON=true; shift ;;
+    case "${1}" in
+      -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -f | --files ) FILES=true ; shift ;;
+      -h | --help ) HELP=true ; shift ;;
+      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -T | --trace ) TRACE=true ; shift ;;
+      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+      -V | --version ) VERSION=true ; shift ;;
+      -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      --update ) UPDATE_MON=true ; shift ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
   done
 fi
 
-if [[ $VERBOSE -ge 2 ]] ; then
-  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-  ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-  ECHO=$ECHO"update:$UPDATE_MON, warning:$WARNING_THRES, "
-  ECHO=$ECHO"critical:$CRITICAL_THRES"
-  echo $ECHO
+if [[ ${TRACE} == true ]] ; then
+  echo ">>>>>" >> ${LOG}
+  date >> ${LOG}
+  echo "Instance at ${INSTANCE_HOME}"
+  echo "PID ${$}" >> ${LOG}
 fi
 
-if [[ $CONTINUE == true && $HELP == true ]] ; then
-  print_help $APPL_NAME
-  RETURN=$UNKNOWN
+ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
+ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
+ECHO="${ECHO}, update:${UPDATE_MON}, files:${FILES}"
+
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo ${ECHO}
+fi
+
+if [[ ${TRACE} == true ]] ; then
+  echo "PARAMS:${ECHO}" >> ${LOG}
+fi
+
+if [[ ${CONTINUE} == true && ${HELP} == true ]] ; then
+  print_help ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $VERSION == true ]] ; then
-  print_revision $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
+  print_revision ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
-    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
-    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
-    || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
-  print_usage $APPL_NAME
+if [[ ${CONTINUE} == true
+    && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
+    || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
+    || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
+    || ${WARNING_THRES} -ge ${CRITICAL_THRES} ) ]] ; then
+  print_usage ${APPL_NAME}
   echo "Warning threshold should be less than critical threshold."
   echo "Threshold should be greater than 0."
-  RETURN=$UNKNOWN
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    . ${INSTANCE_HOME}/sqllib/db2profile
   else
     OUTPUT="Instance directory is invalid."
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_DATABASE="db2 list db directory"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_DATABASE"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_DATABASE}"
   fi
-  DATABASE=$($COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$DATABASE'"
+  DATABASE=$(${COMMAND_DATABASE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${DATABASE}'" >> ${LOG}
+  fi
+  DATABASE=$(printf '%s\n' "${DATABASE}" | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${DATABASE}'"
   fi
 
-  if [[ $DATABASE == "" ]] ; then
-    OUTPUT="The database $DATABASE_NAME is not cataloged."
-    RETURN=$UNKNOWN
+  if [[ ${DATABASE} == "" ]] ; then
+    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  COMMAND_DB_CFG="db2 get db cfg for $DATABASE_NAME"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_DB_CFG"
+if [[ ${CONTINUE} == true ]] ; then
+  COMMAND_DB_CFG="db2 get db cfg for ${DATABASE_NAME}"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_DB_CFG}"
   fi
-  COMMAND_OUTPUT=$($COMMAND_DB_CFG) 
+  COMMAND_OUTPUT=$(${COMMAND_DB_CFG}) 
   while IFS= read -r LINE ; do
-    LOG_PRI_GREP=$(echo $LINE | grep LOGPRIMARY)
-    if [[ $LOG_PRI == "" || $LOG_PRI_GREP != "" ]] ; then
-      LOG_PRI=$(echo $LOG_PRI_GREP | awk -F"= " '{print $2}' | tail -1)
+    LOG_PRI_GREP=$(echo ${LINE} | grep LOGPRIMARY)
+    if [[ ${LOG_PRI} == "" || ${LOG_PRI_GREP} != "" ]] ; then
+      LOG_PRI=$(echo ${LOG_PRI_GREP} | awk -F"= " '{print $2}' | tail -1)
     fi
-    LOG_SEC_GREP=$(echo $LINE | grep LOGSECOND)
-    if [[ $LOG_SEC == "" || $LOG_SEC_GREP != "" ]] ; then
-      LOG_SEC=$(echo $LOG_SEC_GREP | awk -F"= " '{print $2}' | tail -1)
+    LOG_SEC_GREP=$(echo ${LINE} | grep LOGSECOND)
+    if [[ ${LOG_SEC} == "" || ${LOG_SEC_GREP} != "" ]] ; then
+      LOG_SEC=$(echo ${LOG_SEC_GREP} | awk -F"= " '{print $2}' | tail -1)
     fi
-    LOG_PATH_GREP=$(echo $LINE | grep "Path to log files")
-    if [[ $LOG_PATH == "" || $LOG_PATH_GREP != "" ]] ; then
-      LOG_PATH=$(echo $LOG_PATH_GREP | awk -F"= " '{print $2}' | tail -1)
+    LOG_SIZ_GREP=$(echo ${LINE} | grep LOGFILSIZ)
+    if [[ ${LOG_SIZ} == "" || ${LOG_SIZ_GREP} != "" ]] ; then
+      LOG_SIZ=$(echo ${LOG_SIZ_GREP} | awk -F"= " '{print $2}' | tail -1)
     fi
-  done < <( printf '%s\n' "$COMMAND_OUTPUT" | grep -i log )
-  LOG_TOTAL=$(echo "$LOG_PRI+$LOG_SEC" | bc)
+    LOG_PATH_GREP=$(echo ${LINE} | grep "Path to log files")
+    if [[ ${LOG_PATH} == "" || ${LOG_PATH_GREP} != "" ]] ; then
+      LOG_PATH=$(echo ${LOG_PATH_GREP} | awk -F"= " '{print $2}' | tail -1)
+    fi
+  done < <( printf '%s\n' "${COMMAND_OUTPUT}" | grep -i log )
+  LOG_TOTAL=$(echo "${LOG_PRI}+${LOG_SEC}" | bc)
+  SIZ_PRI=$((${LOG_SIZ}*${LOG_PRI}))
+  SIZ_SEC=$((${LOG_SIZ}*${LOG_SEC}))
+  SIZ_TOT=$((${LOG_SIZ}*${LOG_TOTAL}))
 
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT LOG_PRI:'$LOG_PRI'"
-    echo "RESULT LOG_SEC:'$LOG_SEC'"
-    echo "RESULT LOG_PATH:'$LOG_TOTAL'"
-    echo "RESULT LOG_PATH:'$LOG_PATH'"
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT LOG_PRI:'${LOG_PRI}'"
+    echo "RESULT LOG_SEC:'${LOG_SEC}'"
+    echo "RESULT LOG_SIZ:'${LOG_SIZ}'"
+    echo "RESULT LOG_TOTAL:'${LOG_TOTAL}'"
+    echo "RESULT LOG_PATH:'${LOG_PATH}'"
+    echo "RESULT SIZ_PRI:'${SIZ_PRI}'"
+    echo "RESULT SIZ_SEC:'${SIZ_SEC}'"
+    echo "RESULT SIZ_TOT:'${SIZ_TOT}'"
   fi
 
-  LOG_USED=$(ls -l $LOG_PATH*LOG | wc -l)
-  LOG_WARN=$(echo "$LOG_PRI+$WARNING_THRES" | bc)
-  LOG_CRIT=$(echo "$LOG_PRI+$CRITICAL_THRES" | bc)
+  LOG_USED=$(ls -l ${LOG_PATH}*LOG 2> /dev/null | wc -l)
+  LOG_WARN=$(echo "${LOG_PRI}+${WARNING_THRES}" | bc)
+  LOG_CRIT=$(echo "${LOG_PRI}+${CRITICAL_THRES}" | bc)
 
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT LOG_USED:'$LOG_USED'"
-    echo "RESULT LOG_WARN:'$LOG_WARN'"
-    echo "RESULT LOG_CRIT:'$LOG_CRIT'"
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT LOG_USED:'${LOG_USED}'"
+    echo "RESULT LOG_WARN:'${LOG_WARN}'"
+    echo "RESULT LOG_CRIT:'${LOG_CRIT}'"
   fi
 
-  COMMAND_HADR="db2pd -db $DATABASE_NAME -hadr"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_HADR"
+  COMMAND_HADR="db2pd -db ${DATABASE_NAME} -hadr"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_HADR}"
   fi
   # Check that the command is not executed in the Standby server.
-  RESULT_HARD=$($COMMAND_HADR | awk '/Standby/ && !/Active/ {print $1}')
+  RESULT_HARD=$(${COMMAND_HADR} | awk '/Standby/ && !/Active/ {print $1}')
 
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT HADR:'$RESULT_HARD'"
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT HADR:'${RESULT_HARD}'"
   fi
 
-  if [[ $RESULT_HARD == "Standby" ]] ; then
+  if [[ ${RESULT_HARD} == "Standby" ]] ; then
     HADR=true
+  else
+    COMMAND_KBYTES="db2 -x select TOTAL_LOG_USED_KB, TOTAL_LOG_AVAILABLE_KB, TOTAL_LOG_USED_TOP_KB from SYSIBMADM.LOG_UTILIZATION "
+    if [[ ${VERBOSE} -ge 2 ]] ; then
+      echo "COMMAND: ${COMMAND_KBYTES}"
+    fi
+    KBYTES=$(db2 connect to ${DATABASE_NAME} > /dev/null ; ${COMMAND_KBYTES} ; db2 connect reset > /dev/null)
+      if [[ ${VERBOSE} -ge 3 ]] ; then
+        echo "RESULT:'${KBYTES}'"
+      fi
+    USED=$(echo ${KBYTES} | awk '{print $1}')
+    AVAILABLE=$(echo ${KBYTES} | awk '{print $2}')
+    TOP=$(echo ${KBYTES} | awk '{print $3}')
   fi
 
-  if [[ $HADR == true ]] ; then
+  if [[ ${HADR} == true ]] ; then
     OUTPUT="HADR is using the whole space for logs."
-    RETURN=$OK
+    RETURN=${OK}
   else
-    if [[ $LOG_USED -le $LOG_WARN ]] ; then
-      OUTPUT="The transaction log utilization is OK."
-      RETURN=$OK
-    elif [[ $LOG_USED -gt $LOG_WARN && $LOG_USED -lt $LOG_CRIT ]] ; then
-      OUTPUT="Please check database transaction workload ($LOG_USED files)."
-      RETURN=$WARNING
-    else
-      COMMAND_LOG_ID="db2diag -readfile -gi msg:=ADM1823E"
-      # The AppID has two dots in the db2diag.log file, thus they are removed
-      # (i.e. It appears 2380.. and it becomes 2380)
-      LOG_ID=$($COMMAND_LOG_ID | grep "\"." | sort | uniq | awk -F\" '{print $2}' | sed 's/\.\.//')
-      LOG_COUNT=$(printf '%s\n' "$LOG_ID" | wc -l)
-
-      if [[ $VERBOSE -ge 2 ]] ; then
-        echo "COMMAND: $COMMAND_LOG_ID"
-      fi
-      if [[ $VERBOSE -ge 3 ]] ; then
-        echo "RESULT LOG_ID:'$LOG_ID'"
-        echo "RESULT LOG_COUNT:'$LOG_COUNT'"
-      fi
-
-      if [[ $LOG_COUNT -ne 0 ]] ; then
-        OUTPUT="There was occurrence of transaction log full due to application handle: $LOG_ID"
+    if [[ ${FILES} == true ]] ; then
+      if [[ ${LOG_USED} -eq 0 ]] ; then
+        OUTPUT="Error calculating the quantity of logs."
+        RETURN=${UNKNOWN}
+      elif [[ ${LOG_USED} -le ${LOG_WARN} ]] ; then
+        OUTPUT="The transaction log utilization is OK."
+        RETURN=${OK}
+      elif [[ ${LOG_USED} -gt ${LOG_WARN} && ${LOG_USED} -lt ${LOG_CRIT} ]] ; then
+        OUTPUT="Please check database transaction workload (${LOG_USED} files)."
+        RETURN=${WARNING}
       else
-        OUTPUT="Workload is reaching the limit ($LOG_USED files)."
-      fi
-      RETURN=$CRITICAL
-    fi
+        COMMAND_LOG_ID="db2diag -readfile -gi msg:=ADM1823E"
+        # The AppID has two dots in the db2diag.log file, thus they are removed
+        # (i.e. It appears 2380.. and it becomes 2380)
+        LOG_ID=$(${COMMAND_LOG_ID} | grep "\"." | sort | uniq | awk -F\" '{print $2}' | sed 's/\.\.//')
+        LOG_COUNT=$(printf '%s\n' "${LOG_ID}" | wc -l)
 
-    PERFORMANCE="'Log used'=$LOG_USED;$LOG_WARN;$LOG_CRIT;;$LOG_TOTAL"
+        if [[ ${VERBOSE} -ge 2 ]] ; then
+          echo "COMMAND: ${COMMAND_LOG_ID}"
+        fi
+        if [[ ${VERBOSE} -ge 3 ]] ; then
+          echo "RESULT LOG_ID:'${LOG_ID}'"
+          echo "RESULT LOG_COUNT:'${LOG_COUNT}'"
+        fi
+
+        if [[ ${LOG_COUNT} -ne 0 ]] ; then
+          OUTPUT="There was occurrence of transaction log full due to application handle: ${LOG_ID}"
+        else
+          OUTPUT="Workload is reaching the limit (${LOG_USED} files)."
+        fi
+        RETURN=${CRITICAL}
+      fi
+      PERFORMANCE="'Log files used'=${LOG_USED};${LOG_WARN};${LOG_CRIT};;${LOG_TOTAL}"
+    else
+      if [[ ${USED} -le ${SIZ_PRI} ]] ; then
+        OUTPUT="The transaction log utilization is OK."
+        RETURN=${OK}
+      elif [[ ${USED} -le $((${SIZ_PRI}+${SIZ_SEC}/2)) ]] ; then
+        OUTPUT="Please check database transaction workload (${LOG_USED} files)."
+        RETURN=${WARNING}
+      else
+        OUTPUT="Workload is reaching the limit (${USED})."
+        RETURN=${CRITICAL}
+      fi
+      PERFORMANCE="'Log used'=${USED};${SIZ_PRI};$((${SIZ_PRI}+${SIZ_SEC}/2));;${SIZ_TOT}"
+      LONG_PERFORMANCE="'top'=${TOP}"
+    fi
   fi
 fi
 
 # Prints the output.
-if [[ $OUTPUT == "" ]] ; then
+if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "$OUTPUT|$PERFORMANCE
-$LONG_OUTPUT|$LONG_PERFORMANCE"
+echo "${OUTPUT}|${PERFORMANCE}
+${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 # Returns the error code.
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo "Return code: $RETURN"
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo "Return code: ${RETURN}"
 fi
-exit $RETURN
+if [[ ${TRACE} == true ]] ; then
+  echo -e "OUTPUT:${OUTPUT}\nPERF:${PERFORMANCE}\nLONG_OUT:${LONG_OUTPUT}\nLONGPERF:${LONG_PERFORMANCE}\nRET_CODE:${RETURN}" >> ${LOG}
+  date >> ${LOG}
+  echo -e "<<<<<\n" >> ${LOG}
+fi
+exit ${RETURN}
+
+
