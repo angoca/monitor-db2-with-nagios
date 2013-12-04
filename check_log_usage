@@ -357,12 +357,18 @@ if [[ ${CONTINUE} == true ]] ; then
       echo "COMMAND: ${COMMAND_KBYTES}"
     fi
     KBYTES=$(db2 connect to ${DATABASE_NAME} > /dev/null ; ${COMMAND_KBYTES} ; db2 connect reset > /dev/null)
-      if [[ ${VERBOSE} -ge 3 ]] ; then
-        echo "RESULT:'${KBYTES}'"
-      fi
-    USED=$(echo ${KBYTES} | awk '{print $1}')
-    AVAILABLE=$(echo ${KBYTES} | awk '{print $2}')
-    TOP=$(echo ${KBYTES} | awk '{print $3}')
+    if [[ ${VERBOSE} -ge 3 ]] ; then
+      echo "RESULT:'${KBYTES}'"
+    fi
+    ERROR_SELECT=$(echo ${KBYTES} | grep SQL0551N)
+    if [[ ${ERROR_SELECT} == "" ]] ; then
+      USED=$(echo ${KBYTES} | awk '{print $1}')
+      AVAILABLE=$(echo ${KBYTES} | awk '{print $2}')
+      TOP=$(echo ${KBYTES} | awk '{print $3}')
+    else
+      OUTPUT="Error in select."
+      USED=0
+    fi
   fi
 
   if [[ ${HADR} == true ]] ; then
@@ -403,7 +409,9 @@ if [[ ${CONTINUE} == true ]] ; then
       fi
       PERFORMANCE="'Log files used'=${LOG_USED};${LOG_WARN};${LOG_CRIT};;${LOG_TOTAL}"
     else
-      if [[ ${USED} -le ${SIZ_PRI} ]] ; then
+      if [[ ${OUTPUT} != "" ]] ; then
+        RETURN=${UNKNOWN}
+      elif [[ ${USED} -le ${SIZ_PRI} ]] ; then
         OUTPUT="The transaction log utilization is OK."
         RETURN=${OK}
       elif [[ ${USED} -le $((${SIZ_PRI}+${SIZ_SEC}/2)) ]] ; then
