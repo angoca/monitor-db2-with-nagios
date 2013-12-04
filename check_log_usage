@@ -409,20 +409,21 @@ if [[ ${CONTINUE} == true ]] ; then
       fi
       PERFORMANCE="'Log files used'=${LOG_USED};${LOG_WARN};${LOG_CRIT};;${LOG_TOTAL}"
     else
+      WARN_VAL=$((${SIZ_PRI}+${SIZ_SEC}/2))
       if [[ ${OUTPUT} != "" ]] ; then
         RETURN=${UNKNOWN}
       elif [[ ${USED} -le ${SIZ_PRI} ]] ; then
         OUTPUT="The transaction log utilization is OK."
         RETURN=${OK}
-      elif [[ ${USED} -le $((${SIZ_PRI}+${SIZ_SEC}/2)) ]] ; then
+      elif [[ ${USED} -le ${WARN_VAL} ]] ; then
         OUTPUT="Please check database transaction workload (${LOG_USED} files)."
         RETURN=${WARNING}
       else
         OUTPUT="Workload is reaching the limit (${USED})."
         RETURN=${CRITICAL}
       fi
-      PERFORMANCE="'Log used'=${USED};${SIZ_PRI};$((${SIZ_PRI}+${SIZ_SEC}/2));;${SIZ_TOT}"
-      LONG_PERFORMANCE="'top'=${TOP}"
+      PERFORMANCE="'Log qty used'=${USED};${SIZ_PRI};${WARN_VAL};;${SIZ_TOT}"
+      LONG_PERFORMANCE="'Top used'=${TOP}"
     fi
   fi
 fi
