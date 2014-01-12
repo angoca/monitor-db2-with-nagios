@@ -58,9 +58,10 @@
 # -c | --critical : Quantity of utilities is critical.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1
-# -V | --version : Show the current version of this script.
+#   /home/db2inst1.
+# -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
+# -V | --version : Show the current version of this script.
 # -w | --warning : quantity of utilities is big.
 #
 # The exit codes are the standard for Nagios.
@@ -94,14 +95,17 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory [-c][-w] # -h # -V } [ -v ]"
+  /bin/cat <<__EOT
+Usage: ${1} { -i instanceHomeDirectory [-c][-w] | -h | -V }[-T][-v]
+__EOT
 }
 
 function print_help {
   print_revision
-  print_usage $1
+  print_usage ${1}
   # Max 80 chars width.
   /bin/cat <<__EOT
+-------------------------------------------------------------------------------
 Checks the quantity of utilities currently running in the instance.
 -c | --critical INTEGER
    Quantity of utilities running is critical.
@@ -109,7 +113,9 @@ Checks the quantity of utilities currently running in the instance.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
-   Instance home directory. It is usually /home/db2inst1
+   Instance home directory. It is usually /home/db2inst1.
+-T | --trace
+   Trace mode: writes date and output in /tmp.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -129,7 +135,7 @@ WARNING=1
 CRITICAL=2
 UNKNOWN=3
 # This is the returned code.
-RETURN=$UNKNOWN
+RETURN=${UNKNOWN}
 
 # Nagios Output
 # Text output 80 chars | Optional Perf Data Line 1
@@ -143,165 +149,189 @@ LONG_PERFORMANCE=
 
 APPL_NAME=$(basename ${0})
 
-if [[ $# -eq 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${#} -eq 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
 # The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+# http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o hVvi:c:w: --long help,version,verbose,instance:,critical:,warning: \
-             -n $APPL_NAME -- "$@")
+TEMP=$(getopt -o c:hi:vVw: --long critical:,help,instance:,verbose,version,warning: \
+             -n ${APPL_NAME} -- "${@}")
 
-if [[ $? -ne 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${?} -ne 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  # Note the quotes around $TEMP: they are essential!
-  eval set -- "$TEMP"
+if [[ ${CONTINUE} == true ]] ; then
+  # Note the quotes around ${TEMP}: they are essential!
+  eval set -- "${TEMP}"
 
   HELP=false
   VERSION=false
   # Verbosity level
   VERBOSE=0
+  # Trace activated
+  TRACE=false
+  LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
   WARNING_THRES=5
   CRITICAL_THRES=10
   while true; do
-    case "$1" in
-      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+    case "${1}" in
+      -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -h | --help ) HELP=true ; shift ;;
+      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -T | --trace ) TRACE=true ; shift ;;
+      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+      -V | --version ) VERSION=true ; shift ;;
+      -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
   done
 fi
 
-if [[ $VERBOSE -ge 2 ]] ; then
-  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-  ECHO=$ECHO"directory:$INSTANCE_HOME "
-  ECHO=$ECHO"warning:$WARNING_THRES, critical:$CRITICAL_THRES"
-  echo $ECHO
+if [[ ${TRACE} == true ]] ; then
+  echo ">>>>>" >> ${LOG}
+  date >> ${LOG}
+  echo "Instance at ${INSTANCE_HOME}"
+  echo "PID ${$}" >> ${LOG}
 fi
 
-if [[ $CONTINUE == true && $HELP == true ]] ; then
-  print_help $APPL_NAME
-  RETURN=$UNKNOWN
+ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}"
+ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
+
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo ${ECHO}
+fi
+
+if [[ ${TRACE} == true ]] ; then
+  echo "PARAMS:${ECHO}" >> ${LOG}
+fi
+
+if [[ ${CONTINUE} == true && ${HELP} == true ]] ; then
+  print_help ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $VERSION == true ]] ; then
-  print_revision $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
+  print_revision ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
-    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
-    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
-    || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
-  print_usage $APPL_NAME
+if [[ ${CONTINUE} == true
+    && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
+    || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
+    || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
+    || ${WARNING_THRES} -ge ${CRITICAL_THRES} ) ]] ; then
+  print_usage ${APPL_NAME}
   echo "Warning threshold should be less than critical threshold."
   echo "Threshold should be greater than 0."
-  RETURN=$UNKNOWN
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    . ${INSTANCE_HOME}/sqllib/db2profile
   else
     OUTPUT="Instance directory is invalid."
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_UTILITIES="db2 list utilities"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_UTILITIES"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_UTILITIES}"
   fi
-  OUTPUT_UTILITIES=$($COMMAND_UTILITIES)
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "OUTPUT: $OUTPUT_UTILITIES"
+  OUTPUT_UTILITIES=$(${COMMAND_UTILITIES})
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "OUTPUT: ${OUTPUT_UTILITIES}"
   fi
-  ERROR=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep SQL1092)
-  if [[ $ERROR != "" ]] ; then
-    OUTPUT="The current user cannot execute this script: $OUTPUT_UTILITIES"
-    RETURN=$UNKNOWN
+  ERROR=$(printf '%s\n' "${OUTPUT_UTILITIES}" | grep SQL1092)
+  if [[ ${ERROR} != "" ]] ; then
+    OUTPUT="The current user cannot execute this script: ${OUTPUT_UTILITIES}"
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
-if [[ $CONTINUE == true ]] ; then
-  RESTORE_QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep RESTORE | wc -l)
+if [[ ${CONTINUE} == true ]] ; then
+  RESTORE_QTY=$(printf '%s\n' "${OUTPUT_UTILITIES}" | grep RESTORE | wc -l)
   # A Restore or a Backup is synonime of a warning.
-  if [[ $RESTORE_QTY -ge 1 ]] ; then
-    OUTPUT="Performing $RESTORE_QTY restore(s). "
-    RETURN=$WARNING
+  if [[ ${RESTORE_QTY} -ge 1 ]] ; then
+    OUTPUT="Performing ${RESTORE_QTY} restore(s). "
+    RETURN=${WARNING}
   fi
-  BACKUP_QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep BACKUP | wc -l)
-  if [[ $BACKUP_QTY -ge 1 ]] ; then
-    OUTPUT="${OUTPUT}Performing $BACKUP_QTY backup(s). "
-    RETURN=$WARNING
+  BACKUP_QTY=$(printf '%s\n' "${OUTPUT_UTILITIES}" | grep BACKUP | wc -l)
+  if [[ ${BACKUP_QTY} -ge 1 ]] ; then
+    OUTPUT="${OUTPUT}Performing ${BACKUP_QTY} backup(s). "
+    RETURN=${WARNING}
   fi
 
-  RUNSTATS_QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep RUNSTATS | wc -l)
-  if [[ $RUNSTATS_QTY -ge 1 ]] ; then
-    OUTPUT="${OUTPUT}Performing $RUNSTATS_QTY runstats(s). "
+  RUNSTATS_QTY=$(printf '%s\n' "${OUTPUT_UTILITIES}" | grep RUNSTATS | wc -l)
+  if [[ ${RUNSTATS_QTY} -ge 1 ]] ; then
+    OUTPUT="${OUTPUT}Performing ${RUNSTATS_QTY} runstats(s). "
   fi
-  REORGS_QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep REORG | wc -l)
-  if [[ $REORGS_QTY -ge 1 ]] ; then
-    OUTPUT="${OUTPUT}Performing $REORGS_QTY reorg(s). "
+  REORGS_QTY=$(printf '%s\n' "${OUTPUT_UTILITIES}" | grep REORG | wc -l)
+  if [[ ${REORGS_QTY} -ge 1 ]] ; then
+    OUTPUT="${OUTPUT}Performing ${REORGS_QTY} reorg(s). "
   fi
-  OTHERS=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | grep -v "ROLLFORWARD RECOVERY" | awk -F= '{print $2}')
-  OTHERS_QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | wc -l)
-  if [[ $OTHERS != "" ]] ; then
-    OUTPUT="${OUTPUT}Other utilities are running: $OTHERS"
-    RETURN=$WARNING
+  OTHERS=$(printf '%s\n' "${OUTPUT_UTILITIES}" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | grep -v "ROLLFORWARD RECOVERY" | awk -F= '{print $2}')
+  OTHERS_QTY=$(printf '%s\n' "${OUTPUT_UTILITIES}" | grep "^Type" | grep -v RESTORE | grep -v BACKUP | grep -v RUNSTATS | grep -v REORG | wc -l)
+  if [[ ${OTHERS} != "" ]] ; then
+    OUTPUT="${OUTPUT}Other utilities are running: ${OTHERS}"
+    RETURN=${WARNING}
   fi
-  QTY=$(printf '%s\n' "$OUTPUT_UTILITIES" | grep "^Type" | wc -l)
-  if [[ $QTY -ge $CRITICAL_THRES ]] ; then
-    RETURN=$CRITICAL
-    OUTPUT="Quantity  of utilities currently running is critical: $QTY. ${OUTPUT}"
-  elif [[ $QTY -ge $WARNING_THRES ]] ; then
-    RETURN=$WARNING
-    OUTPUT="Quantity of utilities currently running is: $QTY. ${OUTPUT}"
+  QTY=$(printf '%s\n' "${OUTPUT_UTILITIES}" | grep "^Type" | wc -l)
+  if [[ ${QTY} -ge ${CRITICAL_THRES} ]] ; then
+    RETURN=${CRITICAL}
+    OUTPUT="Quantity  of utilities currently running is critical: ${QTY}. ${OUTPUT}"
+  elif [[ ${QTY} -ge ${WARNING_THRES} ]] ; then
+    RETURN=${WARNING}
+    OUTPUT="Quantity of utilities currently running is: ${QTY}. ${OUTPUT}"
   else
-    if [[ $RETURN == $UNKNOWN ]] ; then
-      RETURN=$OK
+    if [[ ${RETURN} == ${UNKNOWN} ]] ; then
+      RETURN=${OK}
     fi
-    OUTPUT="Quantity of utilities is normal: $QTY."
+    OUTPUT="Quantity of utilities is normal: ${QTY}."
   fi
-  PERFORMANCE="Utilities=$QTY;$WARNING_THRES;$CRITICAL_THRES "
-  LONG_PERFORMANCE="Restore=$RESTORE_QTY Backup=$BACKUP_QTY Runstats=$RUNSTATS_QTY Reorgs=$REORGS_QTY Others=$OTHERS_QTY "
+  PERFORMANCE="Utilities=${QTY};${WARNING_THRES};${CRITICAL_THRES} "
+  LONG_PERFORMANCE="Restore=${RESTORE_QTY} Backup=${BACKUP_QTY} Runstats=${RUNSTATS_QTY} Reorgs=${REORGS_QTY} Others=${OTHERS_QTY} "
 fi
 
 # Prints the output.
-if [[ $OUTPUT == "" ]] ; then
+if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "$OUTPUT|$PERFORMANCE
-$LONG_OUTPUT|$LONG_PERFORMANCE"
+echo "${OUTPUT}|${PERFORMANCE}
+${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 # Returns the error code.
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo "Return code: $RETURN"
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo "Return code: ${RETURN}"
 fi
-exit $RETURN
+if [[ ${TRACE} == true ]] ; then
+  echo -e "OUTPUT:${OUTPUT}\nPERF:${PERFORMANCE}\nLONG_OUT:${LONG_OUTPUT}\nLONGPERF:${LONG_PERFORMANCE}\nRET_CODE:${RETURN}" >> ${LOG}
+  date >> ${LOG}
+  echo -e "<<<<<\n" >> ${LOG}
+fi
+exit ${RETURN}
+
+
