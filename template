@@ -28,15 +28,15 @@
 # TODO Nagios with NRPE.
 #
 # Parameters:
-# -c | --critical : TODO What is critical
+# -c | --critical : TODO What is critical.
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1
-# -T | --trace : Trace mode. Writes output in /tmp
+#   /home/db2inst1.
+# -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
-# -w | --warning : TODO What is critical
+# -w | --warning : TODO What is warning.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -70,8 +70,10 @@ function print_revision {
 # Function to show the help
 function print_usage {
   # TODO Add arguments.
-  echo "Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w] ! -h ! -V } \
-[ -T ]\n [ -v ]"
+  /bin/cat <<__EOT
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w] | -h | -V }
+[-T][-v]
+__EOT
 }
 
 function print_help {
@@ -79,24 +81,27 @@ function print_help {
   print_usage ${1}
   # Max 80 chars width.
   /bin/cat <<__EOT
+-------------------------------------------------------------------------------
 TODO Add a global description.
 TODO Add arguments in detail.
 -c | --critical INTEGER
-   TODO What is critical
+   TODO What is critical.
+   TODO Default 2.
 -d | --database STRING
    Database name.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
-   Instance home directory. It is usually /home/db2inst1
+   Instance home directory. It is usually /home/db2inst1.
 -T | --trace
-   Trace mode: writes date and output in /tmp
+   Trace mode: writes date and output in /tmp.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
    Shows the current version of this script.
 -w | --warning INTEGER
-   TODO What is warning
+   TODO What is warning.
+   TODO Default 1.
 __EOT
 }
 
@@ -130,10 +135,10 @@ if [[ ${#} -eq 0 ]] ; then
 fi
 
 # The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+# http://stackoverflow.com/questions/402377
 
 # TODO Add the arguments here. One char in -o, multiple char in -long.
-TEMP=$(getopt -o c:d:hi:TvVw: --long critical:,database:,instance:,help,trace,verbose,version,warning: \
+TEMP=$(getopt -o c:d:hi:TvVw: --long critical:,database:,help,instance:,trace,verbose,version,warning: \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -161,11 +166,11 @@ if [[ ${CONTINUE} == true ]] ; then
     case "${1}" in
       -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true; shift ;;
+      -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -T | --trace ) TRACE=true ; shift ;;
-      -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )); shift ;;
+      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+      -V | --version ) VERSION=true ; shift ;;
       -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       # TODO Validate any new argument.
       -- ) shift; break ;;
@@ -177,16 +182,18 @@ fi
 if [[ ${TRACE} == true ]] ; then
   echo ">>>>>" >> ${LOG}
   date >> ${LOG}
+  echo "Instance at ${INSTANCE_HOME}"
   echo "PID ${$}" >> ${LOG}
 fi
 
-ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}, "
-ECHO=${ECHO}"directory:${INSTANCE_HOME}, database:${DATABASE_NAME}, "
-ECHO=${ECHO}"warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
+ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
+ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo ${ECHO}
 fi
+
 if [[ ${TRACE} == true ]] ; then
   echo "PARAMS:${ECHO}" >> ${LOG}
 fi
@@ -215,7 +222,8 @@ if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
   CONTINUE=false
 fi
 
-if [[ ${CONTINUE} == true && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
+if [[ ${CONTINUE} == true
+    && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
     || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
     || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
     || ${WARNING_THRES} -ge ${CRITICAL_THRES} ) ]] ; then
@@ -242,7 +250,11 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ ${VERBOSE} -ge 2 ]] ; then
     echo "COMMAND: ${COMMAND_DATABASE}"
   fi
-  DATABASE=$(${COMMAND_DATABASE} | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
+  DATABASE=$(${COMMAND_DATABASE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${DATABASE}'" >> ${LOG}
+  fi
+  DATABASE=$(printf '%s\n' "${DATABASE}" | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
   if [[ ${VERBOSE} -ge 3 ]] ; then
     echo "RESULT:'${DATABASE}'"
   fi
