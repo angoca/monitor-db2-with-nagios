@@ -422,8 +422,9 @@ if [[ ${CONTINUE} == true ]] ; then
         OUTPUT="Workload is reaching the limit (${USED})."
         RETURN=${CRITICAL}
       fi
-      PERFORMANCE="'Log qty used'=${USED};${SIZ_PRI};${WARN_VAL};;${SIZ_TOT}"
-      LONG_PERFORMANCE="'Top used'=${TOP}"
+      PERFORMANCE="'Log qty used'=${USED}"
+      LONG_OUTPUT="The top for the moment has been ${TOP}."
+      LONG_PERFORMANCE="'Top'=${TOP}"
     fi
   fi
 fi
