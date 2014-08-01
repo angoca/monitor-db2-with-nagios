@@ -355,6 +355,7 @@ if [[ ${CONTINUE} == true ]] ; then
       CONNECTED=0
       DISCONNECTING=0
       LOCK_WAIT=0
+      RECOMPILING=0
       RESTORE=0
       ROLLBACK=0
       ROLLBACK_TO_SAVEPOINT=0
@@ -386,6 +387,8 @@ if [[ ${CONTINUE} == true ]] ; then
           DISCONNECTING=$((${DISCONNECTING} + 1))
         elif [[ ${STATE} == "Performing a Backup           " ]] ; then
           BACKUP=$((${BACKUP} + 1))
+        elif [[ ${STATE} == "Recompiling                   " ]] ; then
+          RECOMPILING=$((${RECOMPILING} + 1))
         elif [[ ${STATE} == "Restoring Database            " ]] ; then
           RESTORE=$((${RESTORE} + 1))
         else
@@ -395,7 +398,7 @@ if [[ ${CONTINUE} == true ]] ; then
           echo "'${STATE}'" >> /tmp/db2_nagios_connections_unknown_state.log
         fi
       done < <( printf '%s\n' "${CONNS}" )
-      LONG_PERFORMANCE="'Connect Completed'=${CONNECTED} 'UOW Executing'=${UOW_EXECUTING} 'UOW Waiting'=${UOW_WAITING} 'Lock Wait'=${LOCK_WAIT} 'Commit Active'=${COMMIT} 'Rollback'=${ROLLBACK} 'Rollback to savepoint'=${ROLLBACK_TO_SAVEPOINT} 'Compiling'=${COMPILING} 'Disconnecting'=${DISCONNECTING} 'Backup'=${BACKUP} 'Restore'=${RESTORE} 'Other'=${OTHER} "
+      LONG_PERFORMANCE="'Connect Completed'=${CONNECTED} 'UOW Executing'=${UOW_EXECUTING} 'UOW Waiting'=${UOW_WAITING} 'Lock Wait'=${LOCK_WAIT} 'Commit Active'=${COMMIT} 'Rollback'=${ROLLBACK} 'Rollback to savepoint'=${ROLLBACK_TO_SAVEPOINT} 'Compiling'=${COMPILING} 'Disconnecting'=${DISCONNECTING} 'Backup'=${BACKUP} 'Restore'=${RESTORE} 'Recompiling'=${RECOMPILING} 'Other'=${OTHER} "
     else
       QTY_FILTERED=$(printf '%s\n' "${CONNS}" | awk '{print $1}' | sort | uniq -c)
       if [[ ${VERBOSE} -ge 3 ]] ; then
