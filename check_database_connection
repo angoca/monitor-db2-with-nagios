@@ -61,8 +61,8 @@
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1
-# -T | --trace : Trace mode. Writes output in /tmp
+#   /home/db2inst1.
+# -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
 #
@@ -97,24 +97,27 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName ! -h ! -V } \
-[ -T ]\n [ -v ]"
+  /bin/cat <<__EOT
+Usage: ${1} { -i instanceHomeDirectory -d databaseName
+| -h | -V } [-T][-v]
+__EOT
 }
 
 function print_help {
   print_revision
-  print_usage $1
+  print_usage ${1}
   # Max 80 chars width.
   /bin/cat <<__EOT
-This script check the conectivity of a database.
+-------------------------------------------------------------------------------
+This script checks the connectivity to a database.
 -d | --database STRING
    Database name.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
-   Instance home directory. It is usually /home/db2inst1
+   Instance home directory. It is usually /home/db2inst1.
 -T | --trace
-   Trace mode: writes date and output in /tmp
+   Trace mode: writes date and output in /tmp.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -131,7 +134,7 @@ WARNING=1
 CRITICAL=2
 UNKNOWN=3
 # This is the returned code.
-RETURN=$UNKNOWN
+RETURN=${UNKNOWN}
 
 # Nagios Output
 # Text output 80 chars | Optional Perf Data Line 1
@@ -145,27 +148,27 @@ LONG_PERFORMANCE=
 
 APPL_NAME=$(basename ${0})
 
-if [[ $# -eq 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${#} -eq 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
 # The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+# http://stackoverflow.com/questions/402377
 
 TEMP=$(getopt -o d:hi:TvV --long database:,help,instance:,trace,verbose,version \
-             -n $APPL_NAME -- "$@")
+             -n ${APPL_NAME} -- "${@}")
 
-if [[ $? -ne 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${?} -ne 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  # Note the quotes around $TEMP: they are essential!
-  eval set -- "$TEMP"
+if [[ ${CONTINUE} == true ]] ; then
+  # Note the quotes around ${TEMP}: they are essential!
+  eval set -- "${TEMP}"
 
   HELP=false
   VERSION=false
@@ -177,170 +180,172 @@ if [[ $CONTINUE == true ]] ; then
   INSTANCE_HOME=
   DATABASE_NAME=
   while true; do
-    case "$1" in
-      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+    case "${1}" in
+      -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -h | --help ) HELP=true ; shift ;;
+      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -T | --trace ) TRACE=true ; shift ;;
-      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -V | --version ) VERSION=true; shift ;;
+      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+      -V | --version ) VERSION=true ; shift ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
   done
 fi
 
-if [[ $TRACE == true ]] ; then
-  echo ">>>>>" >> $LOG
-  date >> $LOG
-  echo "PID $$" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo ">>>>>" >> ${LOG}
+  date >> ${LOG}
+  echo "Instance at ${INSTANCE_HOME}"
+  echo "PID ${$}" >> ${LOG}
 fi
 
-ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
+ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo $ECHO
-fi
-if [[ $TRACE == true ]] ; then
-  echo "PARAMS:$ECHO" >> $LOG
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo ${ECHO}
 fi
 
-if [[ $CONTINUE == true && $HELP == true ]] ; then
-  print_help $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${TRACE} == true ]] ; then
+  echo "PARAMS:${ECHO}" >> ${LOG}
+fi
+
+if [[ ${CONTINUE} == true && ${HELP} == true ]] ; then
+  print_help ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $VERSION == true ]] ; then
-  print_revision $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
+  print_revision ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    . ${INSTANCE_HOME}/sqllib/db2profile
   else
     OUTPUT="Instance directory is invalid."
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_DATABASE="db2 list db directory"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_DATABASE"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_DATABASE}"
   fi
-  DATABASE=$($COMMAND_DATABASE)
-  if [[ $TRACE == true ]] ; then
-    echo "RESULT:'$DATABASE'" >> $LOG
+  DATABASE=$(${COMMAND_DATABASE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${DATABASE}'" >> ${LOG}
   fi
-  DATABASE=$(printf '%s\n' "$DATABASE" | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$DATABASE'"
+  DATABASE=$(printf '%s\n' "${DATABASE}" | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${DATABASE}'"
   fi
 
-  if [[ $DATABASE == "" ]] ; then
-    OUTPUT="The database $DATABASE_NAME is not cataloged."
-    RETURN=$UNKNOWN
+  if [[ ${DATABASE} == "" ]] ; then
+    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_ACTIVE="db2 list active databases"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_ACTIVE"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_ACTIVE}"
   fi
-  ACTIVE=$($COMMAND_ACTIVE)
-  if [[ $TRACE == true ]] ; then
-    echo "RESULT:'$ACTIVE'" >> $LOG
+  ACTIVE=$(${COMMAND_ACTIVE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${ACTIVE}'" >> ${LOG}
   fi
-  ACTIVE=$(printf '%s\n' "$ACTIVE" | awk '/Database name/ {print $4}' |  grep -iw $DATABASE_NAME)
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$ACTIVE'"
+  ACTIVE=$(printf '%s\n' "${ACTIVE}" | awk '/Database name/ {print $4}' |  grep -iw ${DATABASE_NAME})
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${ACTIVE}'"
   fi
   
-  if [[ $ACTIVE == "" ]] ; then
+  if [[ ${ACTIVE} == "" ]] ; then
     OUTPUT_ACTIVE="The database is not active. "
-    LONG_OUTPUT="$OUTPUT_ACTIVE"
+    LONG_OUTPUT="${OUTPUT_ACTIVE}"
     LONG_PERFORMANCE="'Database Active'=0.2;0.5;;0.1;1 "
   else
     OUTPUT_ACTIVE="The database is active. "
-    LONG_OUTPUT="$OUTPUT_ACTIVE"
+    LONG_OUTPUT="${OUTPUT_ACTIVE}"
     LONG_PERFORMANCE="'Database Active'=0.8;0.5;;0.1;1 "
   fi
 
-  COMMAND_CONNECTABLE="db2 -a connect to $DATABASE_NAME"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_CONNECTABLE"
+  COMMAND_CONNECTABLE="db2 -a connect to ${DATABASE_NAME}"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_CONNECTABLE}"
   fi
-  CONNECTABLE=$($COMMAND_CONNECTABLE)
-  if [[ $TRACE == true ]] ; then
-    echo "RESULT:'$CONNECTABLE'" >> $LOG
+  CONNECTABLE=$(${COMMAND_CONNECTABLE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${CONNECTABLE}'" >> ${LOG}
   fi
-  CONNECTABLE=$(printf '%s\n' "$CONNECTABLE" | awk '/sqlcode/ {print $7}')
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$CONNECTABLE'"
+  CONNECTABLE=$(printf '%s\n' "${CONNECTABLE}" | awk '/sqlcode/ {print $7}')
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${CONNECTABLE}'"
   fi
 
-  if [[ $CONNECTABLE -eq 0 ]] ; then
-    OUTPUT="OK Connection to database $DATABASE_NAME. "$OUTPUT_ACTIVE
-    RETURN=$OK
+  if [[ ${CONNECTABLE} -eq 0 ]] ; then
+    OUTPUT="OK Connection to database ${DATABASE_NAME}. "${OUTPUT_ACTIVE}
+    RETURN=${OK}
     PERFORMANCE="'Connectable Database'=1.8;1.6;1.3;1.1;2 "
-  elif [[ $CONNECTABLE -eq -20157 ]] ; then
-    OUTPUT="The database is in quiesce mode. "$OUTPUT_ACTIVE
-    RETURN=$WARNING
+  elif [[ ${CONNECTABLE} -eq -20157 ]] ; then
+    OUTPUT="The database is in quiesce mode. "${OUTPUT_ACTIVE}
+    RETURN=${WARNING}
     PERFORMANCE="'Connectable Database'=1.5;1.6;1.3;1.1;2 "
   else
-    OUTPUT="A connection to database $DATABASE_NAME was not succesful. "$OUTPUT_ACTIVE
+    OUTPUT="A connection to database ${DATABASE_NAME} was not succesful. "${OUTPUT_ACTIVE}
     LONG_OUTPUT="${LONG_OUTPUT} ${CONNECTABLE}"
-    RETURN=$CRITICAL
+    RETURN=${CRITICAL}
     PERFORMANCE="'Connectable Database'=1.2;1.6;1.3;1.1;2 "
   fi
 
   # Check for HADR Window replay
-  COMMAND_ROLE="db2 get db cfg for $DATABASE_NAME"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_ROLE"
+  COMMAND_ROLE="db2 get db cfg for ${DATABASE_NAME}"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_ROLE}"
   fi
-  ROLE=$($COMMAND_ROLE)
-  if [[ $TRACE == true ]] ; then
-    echo "RESULT:'$ROLE'" >> $LOG
+  ROLE=$(${COMMAND_ROLE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${ROLE}'" >> ${LOG}
   fi
-  ROLE=$(printf '%s\n' "$ROLE" | awk '/HADR database role/ {print $5}')
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$ROLE'"
+  ROLE=$(printf '%s\n' "${ROLE}" | awk '/HADR database role/ {print $5}')
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${ROLE}'"
   fi
-  if [[ $ROLE == "STANDBY" ]] ; then
+  if [[ ${ROLE} == "STANDBY" ]] ; then
     COMMAND_REPLAY="db2pd -db wfscpd -hadr"
-    if [[ $VERBOSE -ge 2 ]] ; then
-      echo "COMMAND: $COMMAND_REPLAY"
+    if [[ ${VERBOSE} -ge 2 ]] ; then
+      echo "COMMAND: ${COMMAND_REPLAY}"
     fi
-    REPLAY=$($COMMAND_REPLAY)
-    if [[ $TRACE == true ]] ; then
-      echo "RESULT:'$REPLAY'" >> $LOG
+    REPLAY=$(${COMMAND_REPLAY})
+    if [[ ${TRACE} == true ]] ; then
+      echo "RESULT:'${REPLAY}'" >> ${LOG}
     fi
-    REPLAY=$(printf '%s\n' "$REPLAY" | awk '/^Active/ {print "active"}')
-    if [[ $VERBOSE -ge 3 ]] ; then
-      echo "RESULT:'$REPLAY'"
+    REPLAY=$(printf '%s\n' "${REPLAY}" | awk '/^Active/ {print "active"}')
+    if [[ ${VERBOSE} -ge 3 ]] ; then
+      echo "RESULT:'${REPLAY}'"
     fi
-    if [[ $REPLAY == "active" ]] ; then
+    if [[ ${REPLAY} == "active" ]] ; then
       LONG_PERFORMANCE="${LONG_PERFORMANCE}HADR-replay=2.4;2.6;;2.2;3 "
     else
       LONG_PERFORMANCE="${LONG_PERFORMANCE}HADR-replay=2.8;2.6;;2.2;3 "
@@ -349,19 +354,19 @@ if [[ $CONTINUE == true ]] ; then
 fi
 
 # Prints the output.
-if [[ $OUTPUT == "" ]] ; then
+if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "$OUTPUT|$PERFORMANCE
-$LONG_OUTPUT|$LONG_PERFORMANCE"
+echo "${OUTPUT}|${PERFORMANCE}
+${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 # Returns the error code.
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo "Return code: $RETURN"
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo "Return code: ${RETURN}"
 fi
-if [[ $TRACE == true ]] ; then
-  echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
-  date >> $LOG
-  echo -e "<<<<<\n" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo -e "OUTPUT:${OUTPUT}\nPERF:${PERFORMANCE}\nLONG_OUT:${LONG_OUTPUT}\nLONGPERF:${LONG_PERFORMANCE}\nRET_CODE:${RETURN}" >> ${LOG}
+  date >> ${LOG}
+  echo -e "<<<<<\n" >> ${LOG}
 fi
-exit $RETURN
+exit ${RETURN}
