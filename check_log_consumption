@@ -44,9 +44,10 @@
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1
-# -V | --version : Show the current version of this script.
+#   /home/db2inst1.
+# -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
+# -V | --version : Show the current version of this script.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -79,20 +80,26 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName # -h # -V } [ -v ]"
+  /bin/cat <<__EOT
+Usage: ${1} { -i instanceHomeDirectory -d databaseName | -h
+| -V }[-T][-v]
+__EOT
 }
 
 function print_help {
   print_revision
-  print_usage $1
+  print_usage ${1}
   # Max 80 chars width.
   /bin/cat <<__EOT
+-------------------------------------------------------------------------------
 This script retrieves the size of the archive log in the day.
 This is only for performance data.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
-   Instance home directory. It is usually /home/db2inst1
+   Instance home directory. It is usually /home/db2inst1.
+-T | --trace
+   Trace mode: writes date and output in /tmp.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -109,7 +116,7 @@ WARNING=1
 CRITICAL=2
 UNKNOWN=3
 # This is the returned code.
-RETURN=$UNKNOWN
+RETURN=${UNKNOWN}
 
 # Nagios Output
 # Text output 80 chars | Optional Perf Data Line 1
@@ -123,157 +130,176 @@ LONG_PERFORMANCE=
 
 APPL_NAME=$(basename ${0})
 
-if [[ $# -eq 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${#} -eq 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
 # The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+# http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o hVvi:d: --long help,version,verbose,instance:,database: \
-             -n $APPL_NAME -- "$@")
+TEMP=$(getopt -o d:hi:TvV --long database:,help,instance:,trace,verbose,version \
+             -n ${APPL_NAME} -- "${@}")
 
-if [[ $? -ne 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${?} -ne 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  # Note the quotes around $TEMP: they are essential!
-  eval set -- "$TEMP"
+if [[ ${CONTINUE} == true ]] ; then
+  # Note the quotes around ${TEMP}: they are essential!
+  eval set -- "${TEMP}"
 
   HELP=false
   VERSION=false
   # Verbosity level
   VERBOSE=0
+  # Trace activated
+  TRACE=false
+  LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
   DATABASE_NAME=
   UPDATE_MON=false
   while true; do
-    case "$1" in
-      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      --update ) UPDATE_MON=true; shift ;;
+    case "${1}" in
+      -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -h | --help ) HELP=true ; shift ;;
+      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -T | --trace ) TRACE=true ; shift ;;
+      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+      -V | --version ) VERSION=true ; shift ;;
+      --update ) UPDATE_MON=true ; shift ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
   done
 fi
 
-if [[ $VERBOSE -ge 2 ]] ; then
-  ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-  ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME, "
-  ECHO=$ECHO"update:$UPDATE_MON"
-  echo $ECHO
+if [[ ${TRACE} == true ]] ; then
+  echo ">>>>>" >> ${LOG}
+  date >> ${LOG}
+  echo "Instance at ${INSTANCE_HOME}"
+  echo "PID ${$}" >> ${LOG}
+fi
+ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
+ECHO="${ECHO} ,update:${UPDATE_MON}"
+
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo ${ECHO}
 fi
 
-if [[ $CONTINUE == true && $HELP == true ]] ; then
-  print_help $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${TRACE} == true ]] ; then
+  echo "PARAMS:${ECHO}" >> ${LOG}
+fi
+
+if [[ ${CONTINUE} == true && ${HELP} == true ]] ; then
+  print_help ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $VERSION == true ]] ; then
-  print_revision $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
+  print_revision ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    . ${INSTANCE_HOME}/sqllib/db2profile
   else
     OUTPUT="Instance directory is invalid."
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_DATABASE="db2 list db directory"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_DATABASE"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_DATABASE}"
   fi
-  DATABASE=$($COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$DATABASE'"
+  DATABASE=$(${COMMAND_DATABASE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${DATABASE}'" >> ${LOG}
+  fi
+  DATABASE=$(printf '%s\n' "${DATABASE}" | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${DATABASE}'"
   fi
 
-  if [[ $DATABASE == "" ]] ; then
-    OUTPUT="The database $DATABASE_NAME is not cataloged."
-    RETURN=$UNKNOWN
+  if [[ ${DATABASE} == "" ]] ; then
+    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  COMMAND_HADR="db2pd -db $DATABASE_NAME -hadr"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_HADR"
+if [[ ${CONTINUE} == true ]] ; then
+  COMMAND_HADR="db2pd -db ${DATABASE_NAME} -hadr"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_HADR}"
   fi
-  RESULT_HARD=$($COMMAND_HADR | awk '/Standby/ && !/Active/ {print $1}')
+  RESULT_HARD=$(${COMMAND_HADR} | awk '/Standby/ && !/Active/ {print $1}')
 
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT HADR:'$RESULT_HARD'"
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT HADR:'${RESULT_HARD}'"
   fi
 
-  if [[ $RESULT_HARD == "Standby" ]] ; then
+  if [[ ${RESULT_HARD} == "Standby" ]] ; then
     HADR=true
   fi
 
-  if [[ $HADR == true ]] ; then
+  if [[ ${HADR} == true ]] ; then
     OUTPUT="HADR does not perform archiving"
-    RETURN=$OK
+    RETURN=${OK}
   else
     OUTPUT="Archive logs counted"
-    RETURN=$OK
+    RETURN=${OK}
 
-    COMMAND_DB_CFG="db2 get db cfg for $DATABASE_NAME"
-    if [[ $VERBOSE -ge 2 ]] ; then
-      echo "COMMAND: $COMMAND_DB_CFG"
+    COMMAND_DB_CFG="db2 get db cfg for ${DATABASE_NAME}"
+    if [[ ${VERBOSE} -ge 2 ]] ; then
+      echo "COMMAND: ${COMMAND_DB_CFG}"
     fi
-    ARCHIVE=$($COMMAND_DB_CFG | awk '/LOGARCHMETH1/ {print $7}' | cut -d: -f2)
+    ARCHIVE=$(${COMMAND_DB_CFG} | awk '/LOGARCHMETH1/ {print $7}' | cut -d: -f2)
     MONTH=$(date | awk '{print $2}')
     DAY=$(date | awk '{print $3}')
-    ARCHIVE_SIZE=$(ls -lR $ARCHIVE | grep "$MONTH\s*$DAY" | awk '{sum +=$5}END{print sum/1024/1024}' | cut -d. -f1)
-    if [[ $VERBOSE -ge 3 ]] ; then
-      echo "RESULT ARCHIVE:'$ARCHIVE'"
-      echo "RESULT MONTH:'$MONTH'"
-      echo "RESULT DAY:'$DAY'"
-      echo "RESULT ARCHIVE_SIZE:'$ARCHIVE_SIZE'"
+    ARCHIVE_SIZE=$(ls -lR ${ARCHIVE} | grep "${MONTH}\s*${DAY}" | awk '{sum +=$5}END{print sum/1024/1024}' | cut -d. -f1)
+    if [[ ${VERBOSE} -ge 3 ]] ; then
+      echo "RESULT ARCHIVE:'${ARCHIVE}'"
+      echo "RESULT MONTH:'${MONTH}'"
+      echo "RESULT DAY:'${DAY}'"
+      echo "RESULT ARCHIVE_SIZE:'${ARCHIVE_SIZE}'"
     fi
-    PERFORMANCE="'Size archive logs'=$ARCHIVE_SIZE "
+    PERFORMANCE="'Size archive logs'=${ARCHIVE_SIZE} "
   fi
 fi
 
 # Prints the output.
-if [[ $OUTPUT == "" ]] ; then
+if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "$OUTPUT|$PERFORMANCE
-$LONG_OUTPUT|$LONG_PERFORMANCE"
+echo "${OUTPUT}|${PERFORMANCE}
+${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 # Returns the error code.
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo "Return code: $RETURN"
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo "Return code: ${RETURN}"
 fi
-exit $RETURN
+exit ${RETURN}
