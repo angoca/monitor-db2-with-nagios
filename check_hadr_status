@@ -56,8 +56,8 @@
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1
-# -T | --trace : Trace mode. Writes output in /tmp
+#   /home/db2inst1.
+# -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
 #
@@ -92,24 +92,27 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName ! -h ! -V } \
-[ -T ]\n [ -v ]"
+  /bin/cat <<__EOT
+Usage: ${1} { -i instanceHomeDirectory -d databaseName | -h | -V }
+[-T][-v]
+__EOT
 }
 
 function print_help {
   print_revision
-  print_usage $1
+  print_usage ${1}
   # Max 80 chars width.
   /bin/cat <<__EOT
+-------------------------------------------------------------------------------
 Checks the HADR status of the database.
 -d | --database STRING
    Database name.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
-   Instance home directory. It is usually /home/db2inst1
+   Instance home directory. It is usually /home/db2inst1.
 -T | --trace
-   Trace mode: writes date and output in /tmp
+   Trace mode: writes date and output in /tmp.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -126,7 +129,7 @@ WARNING=1
 CRITICAL=2
 UNKNOWN=3
 # This is the returned code.
-RETURN=$UNKNOWN
+RETURN=${UNKNOWN}
 
 # Nagios Output
 # Text output 80 chars | Optional Perf Data Line 1
@@ -140,27 +143,27 @@ LONG_PERFORMANCE=
 
 APPL_NAME=$(basename ${0})
 
-if [[ $# -eq 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${#} -eq 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
 # The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+# http://stackoverflow.com/questions/402377
 
 TEMP=$(getopt -o d:hi:TvV --long database:,help,instance:,trace,verbose,version \
-             -n $APPL_NAME -- "$@")
+             -n ${APPL_NAME} -- "${@}")
 
-if [[ $? -ne 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${?} -ne 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  # Note the quotes around $TEMP: they are essential!
-  eval set -- "$TEMP"
+if [[ ${CONTINUE} == true ]] ; then
+  # Note the quotes around ${TEMP}: they are essential!
+  eval set -- "${TEMP}"
 
   HELP=false
   VERSION=false
@@ -172,161 +175,167 @@ if [[ $CONTINUE == true ]] ; then
   INSTANCE_HOME=
   DATABASE_NAME=
   while true; do
-    case "$1" in
-      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+    case "${1}" in
+      -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -h | --help ) HELP=true ; shift ;;
+      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -T | --trace ) TRACE=true ; shift ;;
-      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -V | --version ) VERSION=true; shift ;;
+      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+      -V | --version ) VERSION=true ; shift ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
   done
 fi
 
-if [[ $TRACE == true ]] ; then
-  echo ">>>>>" >> $LOG
-  date >> $LOG
-  echo "PID $$" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo ">>>>>" >> ${LOG}
+  date >> ${LOG}
+  echo "Instance at ${INSTANCE_HOME}"
+  echo "PID ${$}" >> ${LOG}
 fi
 
-ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE, "
-ECHO=$ECHO"directory:$INSTANCE_HOME, database:$DATABASE_NAME "
+ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo $ECHO
-fi
-if [[ $TRACE == true ]] ; then
-  echo "PARAMS:$ECHO" >> $LOG
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo ${ECHO}
 fi
 
-if [[ $CONTINUE == true && $HELP == true ]] ; then
-  print_help $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${TRACE} == true ]] ; then
+  echo "PARAMS:${ECHO}" >> ${LOG}
+fi
+
+if [[ ${CONTINUE} == true && ${HELP} == true ]] ; then
+  print_help ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $VERSION == true ]] ; then
-  print_revision $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
+  print_revision ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    . ${INSTANCE_HOME}/sqllib/db2profile
   else
     OUTPUT="Instance directory is invalid."
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_DATABASE="db2 list db directory"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_DATABASE"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_DATABASE}"
   fi
-  DATABASE=$($COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$DATABASE'"
+  DATABASE=$(${COMMAND_DATABASE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${DATABASE}'" >> ${LOG}
+  fi
+  DATABASE=$(printf '%s\n' "${DATABASE}" | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${DATABASE}'"
   fi
 
-  if [[ $DATABASE == "" ]] ; then
-    OUTPUT="The database $DATABASE_NAME is not cataloged."
-    RETURN=$UNKNOWN
+  if [[ ${DATABASE} == "" ]] ; then
+    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  COMMAND_ROLE="db2 get db cfg for $DATABASE_NAME"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_ROLE"
+if [[ ${CONTINUE} == true ]] ; then
+  COMMAND_ROLE="db2 get db cfg for ${DATABASE_NAME}"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_ROLE}"
   fi
-  ROLE=$($COMMAND_ROLE)
-  if [[ $TRACE == true ]] ; then
-    echo "RESULT:'$ROLE'" >> $LOG
+  ROLE=$(${COMMAND_ROLE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${ROLE}'" >> ${LOG}
   fi
-  ROLE=$(printf '%s\n' "$ROLE" | awk '/HADR database role/ {print $5}')
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$ROLE'"
+  ROLE=$(printf '%s\n' "${ROLE}" | awk '/HADR database role/ {print $5}')
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${ROLE}'"
   fi
-  if [[ $ROLE == "STANDARD" ]] ; then
+  if [[ ${ROLE} == "STANDARD" ]] ; then
     OUTPUT="Database is not in HADR"
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
   else
     COMMAND_HADR="db2pd -db wfscpd -hadr"
-    if [[ $VERBOSE -ge 2 ]] ; then
-      echo "COMMAND: $COMMAND_HADR"
+    if [[ ${VERBOSE} -ge 2 ]] ; then
+      echo "COMMAND: ${COMMAND_HADR}"
     fi
-    OUTPUT_HADR=$($COMMAND_HADR)
-    if [[ $TRACE == true ]] ; then
-      echo "RESULT:'$OUTPUT_HADR'" >> $LOG
+    OUTPUT_HADR=$(${COMMAND_HADR})
+    if [[ ${TRACE} == true ]] ; then
+      echo "RESULT:'${OUTPUT_HADR}'" >> ${LOG}
     fi
-    CONNECTED=$(printf '%s\n' "$OUTPUT_HADR" | awk '/onnected/ {print $1}' | tail -1)
-    if [[ $ROLE == "PRIMARY" ]] ; then
-      HADR_STATUS=$(printf '%s\n' "$OUTPUT_HADR" | awk '/^Primary / {print $2}')
-      if [[ $VERBOSE -ge 3 ]] ; then
-        echo "RESULT:'$CONNECTED'"
-        echo "RESULT:'$HADR_STATUS'"
+    CONNECTED=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/onnected/ {print $1}' | tail -1)
+    if [[ ${ROLE} == "PRIMARY" ]] ; then
+      HADR_STATUS=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/^Primary / {print $2}')
+      if [[ ${VERBOSE} -ge 3 ]] ; then
+        echo "RESULT:'${CONNECTED}'"
+        echo "RESULT:'${HADR_STATUS}'"
       fi
-      if [[ $HADR_STATUS == "Peer" ]] ; then
+      if [[ ${HADR_STATUS} == "Peer" ]] ; then
         OUTPUT="OK. Database is primary and peer"
-        RETURN=$OK
-      elif [[ $HADR_STATUS == "Disconnected" ]] ; then
-        OUTPUT="Standby database is not reachable ($CONNECTED)."
-        RETURN=$CRITICAL
+        RETURN=${OK}
+      elif [[ ${HADR_STATUS} == "Disconnected" ]] ; then
+        OUTPUT="Standby database is not reachable (${CONNECTED})."
+        RETURN=${CRITICAL}
       else
-        OUTPUT="Database is primary and not peer. $HADR_STATUS $CONNECTED"
-        RETURN=$UNKNOWN
+        OUTPUT="Database is primary and not peer. ${HADR_STATUS} ${CONNECTED}"
+        RETURN=${UNKNOWN}
       fi
-    elif [[ $ROLE == "STANDBY" ]] ; then
-      HADR_STATUS=$(printf '%s\n' "$OUTPUT_HADR" | awk '/^Standby/ {print $2}')
-      if [[ $VERBOSE -ge 3 ]] ; then
-        echo "RESULT:'$CONNECTED'"
-        echo "RESULT:'$HADR_STATUS'"
+    elif [[ ${ROLE} == "STANDBY" ]] ; then
+      HADR_STATUS=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/^Standby/ {print $2}')
+      if [[ ${VERBOSE} -ge 3 ]] ; then
+        echo "RESULT:'${CONNECTED}'"
+        echo "RESULT:'${HADR_STATUS}'"
       fi
-      if [[ $HADR_STATUS == "Peer" ]] ; then
+      if [[ ${HADR_STATUS} == "Peer" ]] ; then
         OUTPUT="OK. Database is standby and peer"
-        RETURN=$OK
-      elif [[ $HADR_STATUS == "DisconnectedPeer" ]] ; then
-        OUTPUT="Pimary database is not reachable ($CONNECTED)."
-        RETURN=$CRITICAL
-      elif [[ $HADR_STATUS == "RemoteCatchupPending" ]] ; then
-        OUTPUT="StandBy in remote catchup pending. Make sure database primary is reachable ($CONNECTED)."
-        RETRUN=$WARNING
+        RETURN=${OK}
+      elif [[ ${HADR_STATUS} == "DisconnectedPeer" ]] ; then
+        OUTPUT="Pimary database is not reachable (${CONNECTED})."
+        RETURN=${CRITICAL}
+      elif [[ ${HADR_STATUS} == "RemoteCatchupPending" ]] ; then
+        OUTPUT="StandBy in remote catchup pending. Make sure database primary is reachable (${CONNECTED})."
+        RETRUN=${WARNING}
       else
-        OUTPUT="Database is standby and not peer. $HADR_STATUS $CONNECTED"
-        RETURN=$UNKNOWN
+        OUTPUT="Database is standby and not peer. ${HADR_STATUS} ${CONNECTED}"
+        RETURN=${UNKNOWN}
       fi
     else
-      OUTPUT="Database role is unknown ($ROLE)"
-      RETURN=$UNKNOWN
+      OUTPUT="Database role is unknown (${ROLE})"
+      RETURN=${UNKNOWN}
       CONTINUE=false
     fi
   fi
 fi
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   # Divided by 1000 (3E8)
-  HEX_DIFF=$(printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $3}' | cut -dx -f2 | sed 'N;s/\n/-/' | awk '{print "ibase=16;("$1")/3E8"}' | bc)
+  HEX_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $3}' | cut -dx -f2 | sed 'N;s/\n/-/' | awk '{print "ibase=16;("$1")/3E8"}' | bc)
   PERFORMANCE="HexDiff=${HEX_DIFF} " 
-  PAGE_DIFF=$(printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $2}' | sed 'N;s/\n/-/' | bc)
-  LOG_DIFF=$(printf '%s\n' "$OUTPUT_HADR" | awk '/LOG/ {print $1}' | cut -d. -f1 | sed 's/^.//' | sed 'N;s/\n/-/' | bc)
+  PAGE_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $2}' | sed 'N;s/\n/-/' | bc)
+  LOG_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $1}' | cut -d. -f1 | sed 's/^.//' | sed 'N;s/\n/-/' | bc)
   if [[ ${PAGE_DIFF} -lt 0 ]] ; then
     # The 2000 value is based on observation, but not sure.
     PAGE_DIFF=$((${PAGE_DIFF}+2000))
@@ -334,19 +343,19 @@ if [[ $CONTINUE == true ]] ; then
   LONG_PERFORMANCE="PageDiff=${PAGE_DIFF} LogDiff=${LOG_DIFF} " 
 fi
 # Prints the output.
-if [[ $OUTPUT == "" ]] ; then
+if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "$OUTPUT|$PERFORMANCE
-$LONG_OUTPUT|$LONG_PERFORMANCE"
+echo "${OUTPUT}|${PERFORMANCE}
+${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 # Returns the error code.
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo "Return code: $RETURN"
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo "Return code: ${RETURN}"
 fi
-if [[ $TRACE == true ]] ; then
-  echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
-  date >> $LOG
-  echo -e "<<<<<\n" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo -e "OUTPUT:${OUTPUT}\nPERF:${PERFORMANCE}\nLONG_OUT:${LONG_OUTPUT}\nLONGPERF:${LONG_PERFORMANCE}\nRET_CODE:${RETURN}" >> ${LOG}
+  date >> ${LOG}
+  echo -e "<<<<<\n" >> ${LOG}
 fi
-exit $RETURN
+exit ${RETURN}
