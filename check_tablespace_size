@@ -42,13 +42,13 @@
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1
-# -n | --name : Tablespace name
-# -T | --trace : Trace mode. Writes output in /tmp
-# -V | --version : Show the current version of this script.
+#   /home/db2inst1.
+# -n | --name : Tablespace name.
+# -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
+# -V | --version : Show the current version of this script.
 # -w | --warning : Warning threshold in milliseconds.
-# --id : Tablespace ID (instead of name)
+# --id : Tablespace ID (instead of name).
 #
 # The exit codes are the standard for Nagios.
 #
@@ -81,15 +81,18 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory -d databaseName
-[-n tablespaceName # --id tablespaceId] [-c][-w] ! -h ! -V } [ -v ]"
+  /bin/cat <<__EOT
+Usage: ${1} { -i instanceHomeDirectory -d databaseName
+[-n tablespaceName | --id tablespaceId] [-c][-w] | -h | -V } [-T][-v]
+__EOT
 }
 
 function print_help {
   print_revision
-  print_usage $1
+  print_usage ${1}
   # Max 80 chars width.
   /bin/cat <<__EOT
+-------------------------------------------------------------------------------
 This script check the usage of a tablespace.
 -c | --critical INTEGER
    Critical percentage of usage.
@@ -99,11 +102,11 @@ This script check the usage of a tablespace.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
-   Instance home directory. It is usually /home/db2inst1
+   Instance home directory. It is usually /home/db2inst1.
 -n | --name STRING
    Tablespace name to check.
 -T | --trace
-   Trace mode: writes date and output in /tmp
+   Trace mode: writes date and output in /tmp.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
@@ -125,7 +128,7 @@ WARNING=1
 CRITICAL=2
 UNKNOWN=3
 # This is the returned code.
-RETURN=$UNKNOWN
+RETURN=${UNKNOWN}
 
 # Nagios Output
 # Text output 80 chars | Optional Perf Data Line 1
@@ -139,27 +142,27 @@ LONG_PERFORMANCE=
 
 APPL_NAME=$(basename ${0})
 
-if [[ $# -eq 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${#} -eq 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
 # The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+# http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o c:d:hi:n:TvVw: --long critical:,database:,help,id:,instance:,name:,trace,version,verbose,warning: \
-             -n $APPL_NAME -- "$@")
+TEMP=$(getopt -o c:d:hi:n:TvVw: --long critical:,database:,help,id:,instance:,name:,trace,verbose,version,warning: \
+             -n ${APPL_NAME} -- "${@}")
 
-if [[ $? -ne 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${?} -ne 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  # Note the quotes around $TEMP: they are essential!
-  eval set -- "$TEMP"
+if [[ ${CONTINUE} == true ]] ; then
+  # Note the quotes around ${TEMP}: they are essential!
+  eval set -- "${TEMP}"
 
   HELP=false
   VERSION=false
@@ -167,6 +170,7 @@ if [[ $CONTINUE == true ]] ; then
   VERBOSE=0
   # Trace activated
   TRACE=false
+  LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
   DATABASE_NAME=
   WARNING_THRES=80
@@ -174,299 +178,306 @@ if [[ $CONTINUE == true ]] ; then
   TABLESPACE_NAME=
   TABLESPACE_ID=
   while true; do
-    case "$1" in
-      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -n | --name ) TABLESPACE_NAME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+    case "${1}" in
+      -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -h | --help ) HELP=true ; shift ;;
+      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -n | --name ) TABLESPACE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -T | --trace ) TRACE=true ; shift ;;
-      -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      --id ) TABLESPACE_ID=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+      -V | --version ) VERSION=true ; shift ;;
+      -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      --id ) TABLESPACE_ID=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
   done
 fi
 
-if [[ $TRACE == true ]] ; then
-  echo ">>>>>" >> $LOG
-  date >> $LOG
-  echo "PID $$" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo ">>>>>" >> ${LOG}
+  date >> ${LOG}
+  echo "Instance at ${INSTANCE_HOME}"
+  echo "PID ${$}" >> ${LOG}
 fi
 
-ECHO="help:$HELP, version:$VERSION, verbose:$VERBOSE"
-ECHO=$ECHO", directory:$INSTANCE_HOME, database:$DATABASE_NAME"
-ECHO=$ECHO", warning:$WARNING_THRES, critical:$CRITICAL_THRES"
-ECHO=$ECHO", ts_name:$TABLESPACE_NAME, ts_id:$TABLESPACE_ID"
+ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
+ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
+ECHO="${ECHO}, ts_name:${TABLESPACE_NAME}, ts_id:${TABLESPACE_ID}"
 
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo $ECHO
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo ${ECHO}
 fi
 
-if [[ $TRACE == true ]] ; then
-  echo "PARAMS:$ECHO" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo "PARAMS:${ECHO}" >> ${LOG}
 fi
 
-if [[ $CONTINUE == true && $HELP == true ]] ; then
-  print_help $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${HELP} == true ]] ; then
+  print_help ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $VERSION == true ]] ; then
-  print_revision $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
+  print_revision ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $DATABASE_NAME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $WARNING_THRES == "" || $CRITICAL_THRES == ""
-    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
-    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
-    || $WARNING_THRES -gt 100 || $CRITICAL_THRES -gt 100
-    || $WARNING_THRES -ge $CRITICAL_THRES ]] ; then
-  print_usage $APPL_NAME
+if [[ ${CONTINUE} == true
+    && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
+    || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
+    || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
+    || ${WARNING_THRES} -gt 100 || ${CRITICAL_THRES} -gt 100
+    || ${WARNING_THRES} -ge ${CRITICAL_THRES} ) ]] ; then
+  print_usage ${APPL_NAME}
   echo "Warning threshold should be less than critical threshold."
   echo "Threshold should be greater than 0 and less than 100."
-  RETURN=$UNKNOWN
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $TABLESPACE_NAME == "" && $TABLESPACE_ID == "" ]] ; then
-  print_usage $APPL_NAME
+if [[ ${CONTINUE} == true && ${TABLESPACE_NAME} == ""
+    && ${TABLESPACE_ID} == "" ]] ; then
+  print_usage ${APPL_NAME}
   echo "Tablespace name or id should be provided."
-  RETURN=$UNKNOWN
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    . ${INSTANCE_HOME}/sqllib/db2profile
   else
     OUTPUT="Instance directory is invalid."
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_DATABASE="db2 list db directory"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_DATABASE"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_DATABASE}"
   fi
-  DATABASE=$($COMMAND_DATABASE | awk '/Database alias/ {print $4}' | grep -iw $DATABASE_NAME)
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$DATABASE'"
+  DATABASE=$(${COMMAND_DATABASE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${DATABASE}'" >> ${LOG}
+  fi
+  DATABASE=$(printf '%s\n' "${DATABASE}" | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${DATABASE}'"
   fi
 
-  if [[ $DATABASE == "" ]] ; then
-    OUTPUT="The database $DATABASE_NAME is not cataloged."
-    RETURN=$UNKNOWN
+  if [[ ${DATABASE} == "" ]] ; then
+    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 # Checks if the tablespace exist.
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_EXIST="db2 list tablespaces"
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_EXIST"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_EXIST}"
   fi
-  if [[ $TABLESPACE_NAME != "" ]] ; then
-    EXIST=$(db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep Name | grep -w $TABLESPACE_NAME | awk '{print $3}' ; db2 connect reset > /dev/null)
+  if [[ ${TABLESPACE_NAME} != "" ]] ; then
+    EXIST=$(db2 connect to ${DATABASE_NAME} > /dev/null ; if [[ ${?} -ne 0 ]] ; then echo "error" ; fi ; ${COMMAND_EXIST} | grep Name | grep -w ${TABLESPACE_NAME} | awk '{print $3}' ; db2 connect reset > /dev/null)
   else
-    EXIST=$(db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_EXIST | grep ID | grep -w $TABLESPACE_ID | awk '{print $4}' ; db2 connect reset > /dev/null)
+    EXIST=$(db2 connect to ${DATABASE_NAME} > /dev/null ; if [[ ${?} -ne 0 ]] ; then echo "error" ; fi ; ${COMMAND_EXIST} | grep ID | grep -w ${TABLESPACE_ID} | awk '{print $4}' ; db2 connect reset > /dev/null)
   fi
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$EXIST'"
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${EXIST}'"
   fi
 
   # Substring para ver si hubo un error
-  EXIST_ERROR=$(echo $EXIST | cut -c 1-5)
-  if [[ $EXIST_ERROR == "error" ]] ; then
+  EXIST_ERROR=$(echo ${EXIST} | cut -c 1-5)
+  if [[ ${EXIST_ERROR} == "error" ]] ; then
     OUTPUT="Connection problem"
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
     CONTINUE=false
-  elif [[ ( $TABLESPACE_ID == "" && $EXIST != $TABLESPACE_NAME ) || ( $TABLESPACE_NAME == "" && $EXIST != $TABLESPACE_ID ) ]] ; then
-    OUTPUT="Tablespace $TABLESPACE_NAME$TABLESPACE_ID does not exist."
-    RETURN=$UNKNOWN
+  elif [[ ( ${TABLESPACE_ID} == "" && ${EXIST} != ${TABLESPACE_NAME} ) || ( ${TABLESPACE_NAME} == "" && ${EXIST} != ${TABLESPACE_ID} ) ]] ; then
+    OUTPUT="Tablespace ${TABLESPACE_NAME}${TABLESPACE_ID} does not exist."
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_TS="db2 -x select integer(TBSP_UTILIZATION_PERCENT), TBSP_TYPE, TBSP_CONTENT_TYPE, TBSP_USING_AUTO_STORAGE, TBSP_AUTO_RESIZE_ENABLED, TBSP_STATE, TBSP_TOTAL_SIZE_KB / 1024, TBSP_USED_SIZE_KB / 1024, TBSP_PAGE_TOP * TBSP_PAGE_SIZE / 1024 / 1024 from sysibmadm.TBSP_UTILIZATION "
-  if [[ $TABLESPACE_NAME != "" ]] ; then
-    COMMAND_TS="$COMMAND_TS where TBSP_NAME = '$TABLESPACE_NAME'"
+  if [[ ${TABLESPACE_NAME} != "" ]] ; then
+    COMMAND_TS="${COMMAND_TS} where TBSP_NAME = '${TABLESPACE_NAME}'"
   else
-    COMMAND_TS="$COMMAND_TS where TBSP_ID = $TABLESPACE_ID"
+    COMMAND_TS="${COMMAND_TS} where TBSP_ID = ${TABLESPACE_ID}"
   fi
-  if [[ $VERBOSE -ge 2 ]] ; then
-    echo "COMMAND: $COMMAND_TS"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_TS}"
   fi
   set -f
-  TS=$(db2 connect to $DATABASE_NAME > /dev/null ; if [[ $? -ne 0 ]] ; then echo "error" ; fi ; $COMMAND_TS ; db2 connect reset > /dev/null)
+  TS=$(db2 connect to ${DATABASE_NAME} > /dev/null ; if [[ ${?} -ne 0 ]] ; then echo "error" ; fi ; ${COMMAND_TS} ; db2 connect reset > /dev/null)
   set +f
-  TS_ERROR=$(echo $TS | cut -c 1-5)
-  if [[ $TS_ERROR == "error" ]] ; then
+  TS_ERROR=$(echo ${TS} | cut -c 1-5)
+  if [[ ${TS_ERROR} == "error" ]] ; then
     OUTPUT="Connection problem"
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
     CONTINUE=false
   fi
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$TS'"
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${TS}'"
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  SIZE=$(printf '%s\n' "$TS" | awk '{print $1}')
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$SIZE'"
+if [[ ${CONTINUE} == true ]] ; then
+  SIZE=$(printf '%s\n' "${TS}" | awk '{print $1}')
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${SIZE}'"
   fi
 
-  TYPE=$(printf '%s\n' "$TS" | awk '{print $2}')
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$TYPE'"
+  TYPE=$(printf '%s\n' "${TS}" | awk '{print $2}')
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${TYPE}'"
   fi
 
-  if [[ $TYPE == "SMS" ]] ; then
-    if [[ $SIZE -lt $WARNING_THRES ]] ; then
+  if [[ ${TYPE} == "SMS" ]] ; then
+    if [[ ${SIZE} -lt ${WARNING_THRES} ]] ; then
       OUTPUT="OK tablespace size (SMS)."
-      RETURN=$OK
+      RETURN=${OK}
     else
-      CONTENT=$(printf '%s\n' "$TS" | awk '{print $3}')
-      if [[ $VERBOSE -ge 3 ]] ; then
-        echo "RESULT:'$CONTENT'"
+      CONTENT=$(printf '%s\n' "${TS}" | awk '{print $3}')
+      if [[ ${VERBOSE} -ge 3 ]] ; then
+        echo "RESULT:'${CONTENT}'"
       fi
-      if [[ $CONTENT == "SYSTEMP" || $CONTENT == "USRTEMP" ]] ; then
-        OUTPUT="Temporary tablespace is being used. - $SIZE"
-        RETURN=$OK
+      if [[ ${CONTENT} == "SYSTEMP" || ${CONTENT} == "USRTEMP" ]] ; then
+        OUTPUT="Temporary tablespace is being used. - ${SIZE}"
+        RETURN=${OK}
       else
-        OUTPUT="Script error for SMS tablespace. - $SIZE"
-        RETURN=$CRITICAL
+        OUTPUT="Script error for SMS tablespace. - ${SIZE}"
+        RETURN=${CRITICAL}
       fi
     fi
-  elif [[ $TYPE == "DMS" ]] ; then
+  elif [[ ${TYPE} == "DMS" ]] ; then
     # Tablespace should be DMS
-    AUTO=$(printf '%s\n' "$TS" | awk '{print $4}')
-    if [[ $VERBOSE -ge 3 ]] ; then
-      echo "RESULT:'$AUTO'"
+    AUTO=$(printf '%s\n' "${TS}" | awk '{print $4}')
+    if [[ ${VERBOSE} -ge 3 ]] ; then
+      echo "RESULT:'${AUTO}'"
     fi
 
-    RESIZE=$(printf '%s\n' "$TS" | awk '{print $5}')
-    if [[ $VERBOSE -ge 3 ]] ; then
-      echo "RESULT:'$RESIZE'"
+    RESIZE=$(printf '%s\n' "${TS}" | awk '{print $5}')
+    if [[ ${VERBOSE} -ge 3 ]] ; then
+      echo "RESULT:'${RESIZE}'"
     fi
 
-    if [[ ! $AUTO =~ ^[0-9]+$ || ! $RESIZE =~ ^[0-9]+$ ]] ; then
+    if [[ ! ${AUTO} =~ ^[0-9]+$ || ! ${RESIZE} =~ ^[0-9]+$ ]] ; then
       OUTPUT="Problem determining if auto or resize"
-      RETURN=$UNKNOWN
-    elif [[ $AUTO -eq "1" || $RESIZE -eq "1" ]] ; then
-      if [[ $SIZE -lt $WARNING_THRES ]] ; then
-        OUTPUT="OK tablespace size ($SIZE% - Auto resize)."
-        RETURN=$OK
-      elif [[ $SIZE -lt $CRITICAL_THRES ]] ; then
-        OUTPUT="Tablespace size is getting bigger ($SIZE% - Auto resize)."
-        RETURN=$OK
+      RETURN=${UNKNOWN}
+    elif [[ ${AUTO} -eq "1" || ${RESIZE} -eq "1" ]] ; then
+      if [[ ${SIZE} -lt ${WARNING_THRES} ]] ; then
+        OUTPUT="OK tablespace size (${SIZE}% - Auto resize)."
+        RETURN=${OK}
+      elif [[ ${SIZE} -lt ${CRITICAL_THRES} ]] ; then
+        OUTPUT="Tablespace size is getting bigger (${SIZE}% - Auto resize)."
+        RETURN=${OK}
       else
-        OUTPUT="Tablespace size is critical. It should be resized automatically ($SIZE% - Auto reisze)."
-        RETURN=$OK
+        OUTPUT="Tablespace size is critical. It should be resized automatically (${SIZE}% - Auto resize)."
+        RETURN=${OK}
       fi
     else
-      if [[ $SIZE -lt $WARNING_THRES ]] ; then
-        OUTPUT="OK tablespace size ($SIZE%)."
-        RETURN=$OK
-      elif [[ $SIZE -lt $CRITICAL_THRES ]] ; then
-        OUTPUT="Tablespace size is getting bigger ($SIZE%)."
-        RETURN=$WARNING
+      if [[ ${SIZE} -lt ${WARNING_THRES} ]] ; then
+        OUTPUT="OK tablespace size (${SIZE}%)."
+        RETURN=${OK}
+      elif [[ ${SIZE} -lt ${CRITICAL_THRES} ]] ; then
+        OUTPUT="Tablespace size is getting bigger (${SIZE}%)."
+        RETURN=${WARNING}
       else
-        OUTPUT="Tablespace size is critical ($SIZE%)."
-        RETURN=$CRITICAL
+        OUTPUT="Tablespace size is critical (${SIZE}%)."
+        RETURN=${CRITICAL}
       fi
     fi
   else
     OUTPUT="Problem retrieving the type"
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
   fi
   
   #Availability
-  STATUS=$(printf '%s\n' "$TS" | awk '{print $6}')
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$STATUS'"
+  STATUS=$(printf '%s\n' "${TS}" | awk '{print $6}')
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${STATUS}'"
   fi
 
   # Substring para ver si hubo un error
-  STATUS_ERROR=$(echo $STATUS | cut -c 1-5)
-  if [[ $STATUS_ERROR == "error" ]] ; then
+  STATUS_ERROR=$(echo ${STATUS} | cut -c 1-5)
+  if [[ ${STATUS_ERROR} == "error" ]] ; then
     OUTPUT="Connection problem"
-    RETURN=$UNKNOWN
+    RETURN=${UNKNOWN}
     CONTINUE=false
-  elif [[ $STATUS == "BACKUP_IN_PROGRESS" ]] ; then
-    OUTPUT="Backup in progress. $OUTPUT"
-  elif [[ $STATUS != "NORMAL" ]] ; then
-    OUTPUT="State not normal ($STATUS). $OUTPUT"
-    if [[ $RETURN == $OK ]] ; then
-      RETURN=$WARNING
+  elif [[ ${STATUS} == "BACKUP_IN_PROGRESS" ]] ; then
+    OUTPUT="Backup in progress. ${OUTPUT}"
+  elif [[ ${STATUS} != "NORMAL" ]] ; then
+    OUTPUT="State not normal (${STATUS}). ${OUTPUT}"
+    if [[ ${RETURN} == ${OK} ]] ; then
+      RETURN=${WARNING}
     fi
   fi
 fi
 
-if [[ $CONTINUE == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   # Performance data
   ## Allocated size
-  TB_ALLOCATED=$(printf '%s\n' "$TS" | awk '{print $7}')
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$TB_ALLOCATED'"
+  TB_ALLOCATED=$(printf '%s\n' "${TS}" | awk '{print $7}')
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${TB_ALLOCATED}'"
   fi
-  LONG_OUTPUT="Tablespace $TABLESPACE_NAME$TABLESPACE_ID has allocated $TB_ALLOCATED MB"
+  LONG_OUTPUT="Tablespace ${TABLESPACE_NAME}${TABLESPACE_ID} has allocated ${TB_ALLOCATED} MB"
   LONG_PERFORMANCE="Allocated=${TB_ALLOCATED}"
 
   ## Used size
-  TB_SIZE=$(printf '%s\n' "$TS" | awk '{print $8}')
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$TB_SIZE'"
+  TB_SIZE=$(printf '%s\n' "${TS}" | awk '{print $8}')
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${TB_SIZE}'"
   fi
   PERFORMANCE="Tablespace=${TB_SIZE} "
 
   ## High water mark
-  TB_HWM=$(printf '%s\n' "$TS" | awk '{print $9}')
-  if [[ $VERBOSE -ge 3 ]] ; then
-    echo "RESULT:'$TB_HWM'"
+  TB_HWM=$(printf '%s\n' "${TS}" | awk '{print $9}')
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${TB_HWM}'"
   fi
-  LONG_OUTPUT="$LONG_OUTPUT and its watermark is at $TB_HWM"
+  LONG_OUTPUT="${LONG_OUTPUT} and its watermark is at ${TB_HWM}"
   LONG_PERFORMANCE="${LONG_PERFORMANCE} Watermark=${TB_HWM}"
   # TODO As part of the performance, display the status (backup pending, restore pending, etc.
 fi
 
 # Prints the output.
-if [[ $OUTPUT == "" ]] ; then
+if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "$OUTPUT|$PERFORMANCE
-$LONG_OUTPUT|$LONG_PERFORMANCE"
+echo "${OUTPUT}|${PERFORMANCE}
+${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 # Returns the error code.
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo "Return code: $RETURN"
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo "Return code: ${RETURN}"
 fi
-if [[ $TRACE == true ]] ; then
-  echo -e "OUTPUT:$OUTPUT\nPERF:$PERFORMANCE\nLONG_OUT:$LONG_OUTPUT\nLONGPERF:$LONG_PERFORMANCE\nRET_CODE:$RETURN" >> $LOG
-  date >> $LOG
-  echo -e "<<<<<\n" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo -e "OUTPUT:${OUTPUT}\nPERF:${PERFORMANCE}\nLONG_OUT:${LONG_OUTPUT}\nLONGPERF:${LONG_PERFORMANCE}\nRET_CODE:${RETURN}" >> ${LOG}
+  date >> ${LOG}
+  echo -e "<<<<<\n" >> ${LOG}
 fi
-exit $RETURN
+exit ${RETURN}
 
 
