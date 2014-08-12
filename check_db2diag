@@ -63,10 +63,10 @@
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1
+#   /home/db2inst1.
 # -R | --noreplace : Do not replace the last written date. This allows you to
 #   execute the script without altering the date.
-# -T | --trace : Trace mode. Writes output in /tmp
+# -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
 # -w | --warning : Quantity of messages written in the db2diag.log file to be
@@ -104,34 +104,38 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  echo "Usage: $1 { -i instanceHomeDirectory [-c][-w] ! -h ! -V } [ -R ] [ -T ]
-  [ -v ] [ -x ]"
+  /bin/cat <<__EOT
+Usage: ${1} { -i instanceHomeDirectory [-c][-w][-R][-x] | -h | -V }
+[-T][-v]
+__EOT
 }
 
 function print_help {
   print_revision
-  print_usage $1
+  print_usage ${1}
   # Max 80 chars width.
   /bin/cat <<__EOT
-Checks the quantity of messages written in the db2diag.log since the last check.
+-------------------------------------------------------------------------------
+Checks the quantity of messages written in the db2diag.log since the last
+check.
 -c | --critical INTEGER
    Quantity of messages to be considered as critical. Default 40 between calls.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
-   Instance home directory. It is usually /home/db2inst1
+   Instance home directory. It is usually /home/db2inst1.
 -R | --noreplace
    Do not replace the last check time of the plugin. This allows to execute the
    script without altering oher executions.
 -T | --trace
-   Trace mode: writes date and output in /tmp
+   Trace mode: writes date and output in /tmp.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
    Shows the current version of this script.
 -w | --warning INTEGER
    Quantity of messages to be considered as warning. Default 20 between calls.
--x | --extra INTEGER
+-x | --extra
    Shows extra information for the performance values.
 __EOT
 }
@@ -145,7 +149,7 @@ WARNING=1
 CRITICAL=2
 UNKNOWN=3
 # This is the returned code.
-RETURN=$UNKNOWN
+RETURN=${UNKNOWN}
 
 # Nagios Output
 # Text output 80 chars | Optional Perf Data Line 1
@@ -159,27 +163,27 @@ LONG_PERFORMANCE=
 
 APPL_NAME=$(basename ${0})
 
-if [[ $# -eq 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${#} -eq 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
 # The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
+# http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o c:hi:RTvVw:x --long critical:,extra,instance:,help,noreplace,trace,verbose,version,warning: \
-             -n $APPL_NAME -- "$@")
+TEMP=$(getopt -o c:hi:RTvVw:x --long critical:,extra,help,instance:,noreplace,trace,verbose,version,warning: \
+             -n ${APPL_NAME} -- "${@}")
 
-if [[ $? -ne 0 ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${?} -ne 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  # Note the quotes around $TEMP: they are essential!
-  eval set -- "$TEMP"
+if [[ ${CONTINUE} == true ]] ; then
+  # Note the quotes around ${TEMP}: they are essential!
+  eval set -- "${TEMP}"
 
   HELP=false
   VERSION=false
@@ -195,15 +199,15 @@ if [[ $CONTINUE == true ]] ; then
   WARNING_THRES=20
   CRITICAL_THRES=40
   while true; do
-    case "$1" in
-      -c | --critical ) CRITICAL_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+    case "${1}" in
+      -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -h | --help ) HELP=true ; shift ;;
+      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -R | --noreplace ) REPLACE=false ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
-      -V | --version ) VERSION=true; shift ;;
-      -v | --verbose ) VERBOSE=$(( $VERBOSE + 1 )); shift ;;
-      -w | --warning ) WARNING_THRES=$(echo $2 | cut -d' ' -f1) ; shift 2 ;;
+      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+      -V | --version ) VERSION=true ; shift ;;
+      -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -x | --extra ) EXTRA=true ; shift ;;
       -- ) shift; break ;;
       * ) break ;;
@@ -211,10 +215,11 @@ if [[ $CONTINUE == true ]] ; then
   done
 fi
 
-if [[ $TRACE == true ]] ; then
-  echo ">>>>>" >> $LOG
-  date >> $LOG
-  echo "PID $$" >> $LOG
+if [[ ${TRACE} == true ]] ; then
+  echo ">>>>>" >> ${LOG}
+  date >> ${LOG}
+  echo "Instance at ${INSTANCE_HOME}"
+  echo "PID ${$}" >> ${LOG}
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
@@ -222,46 +227,48 @@ ECHO="${ECHO}, directory:${INSTANCE_HOME}, extra: ${EXTRA}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 ECHO="${ECHO}, replace:${REPLACE}"
 
-if [[ $VERBOSE -ge 2 ]] ; then
-  echo $ECHO
-fi
-if [[ $TRACE == true ]] ; then
-  echo "PARAMS:$ECHO" >> $LOG
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo ${ECHO}
 fi
 
-if [[ $CONTINUE == true && $HELP == true ]] ; then
-  print_help $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${TRACE} == true ]] ; then
+  echo "PARAMS:${ECHO}" >> ${LOG}
+fi
+
+if [[ ${CONTINUE} == true && ${HELP} == true ]] ; then
+  print_help ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $VERSION == true ]] ; then
-  print_revision $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
+  print_revision ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && $INSTANCE_HOME == "" ]] ; then
-  print_usage $APPL_NAME
-  RETURN=$UNKNOWN
+if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true && ( $WARNING_THRES == "" || $CRITICAL_THRES == ""
-    || ! $WARNING_THRES =~ ^[0-9]+$ || ! $CRITICAL_THRES =~ ^[0-9]+$
-    || $WARNING_THRES -le 0 || $CRITICAL_THRES -le 0
-    || $WARNING_THRES -ge $CRITICAL_THRES ) ]] ; then
-  print_usage $APPL_NAME
+if [[ ${CONTINUE} == true
+    && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
+    || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
+    || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
+    || ${WARNING_THRES} -ge ${CRITICAL_THRES} ) ]] ; then
+  print_usage ${APPL_NAME}
   echo "Warning threshold should be less than critical threshold."
   echo "Threshold should be greater than 0."
-  RETURN=$UNKNOWN
+  RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-if [[ $CONTINUE == true ]] ; then
-  if [[ -d $INSTANCE_HOME && -e $INSTANCE_HOME/sqllib/db2profile ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
-    . $INSTANCE_HOME/sqllib/db2profile
+    . ${INSTANCE_HOME}/sqllib/db2profile
   else
     OUTPUT="Instance directory is invalid."
     RETURN=${UNKNOWN}
@@ -392,3 +399,4 @@ if [[ ${TRACE} == true ]] ; then
   echo -e "<<<<<\n" >> ${LOG}
 fi
 exit ${RETURN}
+
