@@ -20,7 +20,7 @@
 
 # Checks the memory usage by an instance. It does not take into account the
 # bufferpools, or other memory dumps, it just takes the result of the query.
-# The query is executed agaist the first connectable database of an instance.
+# The query is executed against the first connectable database of an instance.
 # The user used to execute the script should have a special privileges in at
 # least one of the database of the instance analyzed; the privilege are:
 #  db2 grant execute on package NULLID.SQLC2H21 to user nagios
