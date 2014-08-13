@@ -30,10 +30,10 @@
 #
 # In order to be used in Nagios, you have to configure the following.
 #
-# # 'check_connection_qty' command definition
+# # 'check_instance_memory' command definition
 # define command {
 #         command_name    check_instance_memory
-#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "script s/check_instance_memory -i '$ARG1$'"
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_instance_memory -i '$ARG1$'"
 # }
 # define service{
 #         host_name               db2server
