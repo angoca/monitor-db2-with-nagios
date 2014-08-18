@@ -20,22 +20,46 @@
 
 # Checks the quantity of open files by a given instance.
 #
-# Here comes the documentation
+# This file execute the command lsof as root with the sudo command. In this
+# case you need to give the necessary right to execute this command as root.
+# Normally, you can do that just by adding a line in the sudoers file. The best
+# is to edit this file with the command: 'visudo'
 #
-# TODO Nagios usage.
+#   nagios  ALL=(root) lsof
 #
-# TODO Nagios with NRPE.
+# User nagios, can execute from ALL terminals, acting as root the command lsof.
+#
+# In order to be used in Nagios, you have to configure the following.
+#
+# # 'check_open_files' command definition
+# define command {
+#         command_name    check_open_files
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_open_files -i '$ARG1$'"
+# }
+# define service{
+#         host_name               db2server
+#         service_description     Quantity of open files
+#         check_command           check_open_files!/home/db2inst1
+#         use                     generic-service
+# }
+#
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_open_files]=/home/nagios/scripts/check_open_files -i /home/db2inst1
 #
 # Parameters:
-# -c | --critical : TODO What is critical.
-# -d | --database : Database name.
+# -c | --critical : Percentage of the soft limit. This value should be bigger
+#   than warning value.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
-# -w | --warning : TODO What is warning.
+# -w | --warning : Percentage of the soft limit. This value should be smaller
+#   than the critical value.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -53,7 +77,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.0 2013-05-26
+# Version: v1.0 2014-08-13
 
 # Flag for debugging.
 #set -xv
@@ -64,14 +88,12 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-05-26
+  echo v1.0 2014-08-13
 }
 # Function to show the help
 function print_usage {
-  # TODO Add arguments.
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w] | -h | -V }
-[-T][-v]
+Usage: ${1} { -i instanceHomeDirectory [-c][-w] | -h | -V } [-T][-v]
 __EOT
 }
 
@@ -81,13 +103,11 @@ function print_help {
   # Max 80 chars width.
   /bin/cat <<__EOT
 -------------------------------------------------------------------------------
-TODO Add a global description.
-TODO Add arguments in detail.
+Checks the quantity of open files an compares this value with the soft max.
 -c | --critical INTEGER
-   TODO What is critical.
-   TODO Default 2.
--d | --database STRING
-   Database name.
+   Percentage of the soft limit to be consider as critical. This value should
+   be bigger than warning.
+   Default 95.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
@@ -99,8 +119,9 @@ TODO Add arguments in detail.
 -V | --version
    Shows the current version of this script.
 -w | --warning INTEGER
-   TODO What is warning.
-   TODO Default 1.
+   Percentage of the soft limit to be consider as warning. This value should
+   be smaller than warning.
+   Default 90.
 __EOT
 }
 
@@ -136,8 +157,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-# TODO Add the arguments here. One char in -o, multiple char in -long.
-TEMP=$(getopt -o c:d:hi:TvVw: --long critical:,database:,help,instance:,trace,verbose,version,warning: \
+TEMP=$(getopt -o c:hi:TvVw: --long critical:,help,instance:,trace,verbose,version,warning: \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -158,20 +178,17 @@ if [[ ${CONTINUE} == true ]] ; then
   TRACE=false
   LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
-  DATABASE_NAME=
-  WARNING_THRES=1
-  CRITICAL_THRES=2
+  WARNING_THRES=90
+  CRITICAL_THRES=95
   while true; do
     case "${1}" in
       -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
       -V | --version ) VERSION=true ; shift ;;
       -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      # TODO Validate any new argument.
       -- ) shift; break ;;
       * ) break ;;
     esac
@@ -186,7 +203,7 @@ if [[ ${TRACE} == true ]] ; then
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
-ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
@@ -210,12 +227,6 @@ if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
 fi
 
 if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
-  print_usage ${APPL_NAME}
-  RETURN=${UNKNOWN}
-  CONTINUE=false
-fi
-
-if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
   print_usage ${APPL_NAME}
   RETURN=${UNKNOWN}
   CONTINUE=false
@@ -245,29 +256,67 @@ if [[ ${CONTINUE} == true ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  COMMAND_DATABASE="db2 list db directory"
+  COMMAND_PID="db2pd -edus"
   if [[ ${VERBOSE} -ge 2 ]] ; then
-    echo "COMMAND: ${COMMAND_DATABASE}"
+    echo "COMMAND: ${COMMAND_PID}"
   fi
-  DATABASE=$(${COMMAND_DATABASE})
-  if [[ ${TRACE} == true ]] ; then
-    echo "RESULT:'${DATABASE}'" >> ${LOG}
-  fi
-  DATABASE=$(printf '%s\n' "${DATABASE}" | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
+  OUTPUT_PID=$(${COMMAND_PID} | grep 'db2sysc PID' | cut -d' ' -f3)
   if [[ ${VERBOSE} -ge 3 ]] ; then
-    echo "RESULT:'${DATABASE}'"
+    echo "Result: ${OUTPUT_PID}"
   fi
-
-  if [[ ${DATABASE} == "" ]] ; then
-    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+  if [[ ${OUTPUT_PID} == "" ]] ; then
+    OUTPUT="Impossible to get the process ID."
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  # TODO add the logic
-  echo "Logic goes here!"
+  COMMAND_LSOF="sudo lsof -p ${OUTPUT_PID}"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_LSOF}"
+  fi
+  OUTPUT_LSOF=$(${COMMAND_LSOF} | tail -n +3 | wc -l)
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "Result: ${OUTPUT_LSOF}"
+  fi
+
+  COMMAND_HARD_LIMIT="ulimit -Hn"
+  COMMAND_SOFT_LIMIT="ulimit -Sn"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_HARD_LIMIT}"
+    echo "COMMAND: ${COMMAND_SOFT_LIMIT}"
+  fi
+  OUTPUT_HARD_LIMIT=$(${COMMAND_HARD_LIMIT})
+  OUTPUT_SOFT_LIMIT=$(${COMMAND_SOFT_LIMIT})
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "Result: ${OUTPUT_HARD_LIMIT}"
+    echo "Result: ${OUTPUT_SOFT_LIMIT}"
+  fi
+
+  WARN_VALUE=$((${OUTPUT_SOFT_LIMIT} * ${WARNING_THRES} / 100))
+  CRIT_VALUE=$((${OUTPUT_SOFT_LIMIT} * ${CRITICAL_THRES} / 100))
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "Thresholds: ${WARN_VALUE} and ${CRIT_VALUE}"
+  fi
+
+  if [[ ${DB2INSTANCE} == "" ]] ; then
+    OUTPUT="Invalid instance name"
+    RETURN=${UNKNOWN}
+  else
+    if [[ ${OUTPUT_LSOF} -lt ${WARN_VALUE} ]] ; then
+      OUTPUT="OK. List of open files for instance ${DB2INSTANCE} is ${OUTPUT_LSOF}"
+      RETURN=${OK}
+    elif [[ ${OUTPUT_LSOF} -lt ${CRIT_VALUE} ]] ; then
+      OUTPUT="List of open files for instance ${DB2INSTANCE} is ${OUTPUT_LSOF} is getting bigger"
+      RETURN=${WARNING}
+    else
+      OUTPUT="List of open files for instance ${DB2INSTANCE} is ${OUTPUT_LSOF} is critical"
+      RETURN=${CRITICAL}
+    fi
+    PERFORMANCE="'Open files'=${OUTPUT_LSOF};;;;${OUTPUT_SOFT_LIMIT}"
+    LONG_PERFORMANCE="'Hard limit'=${OUTPUT_HARD_LIMIT}"
+  fi
 fi
 
 # Prints the output.
@@ -287,5 +336,6 @@ if [[ ${TRACE} == true ]] ; then
   echo -e "<<<<<\n" >> ${LOG}
 fi
 exit ${RETURN}
+
 
 
