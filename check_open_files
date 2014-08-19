@@ -25,7 +25,7 @@
 # Normally, you can do that just by adding a line in the sudoers file. The best
 # is to edit this file with the command: 'visudo'
 #
-#   nagios  ALL=(root) lsof
+#   nagios  ALL= NOPASSWD:/usr/bin/lsof
 #
 # User nagios, can execute from ALL terminals, acting as root the command lsof.
 #
