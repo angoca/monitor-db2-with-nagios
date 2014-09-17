@@ -459,7 +459,7 @@ if [[ ${CONTINUE} == true ]] ; then
       LONG_PERFORMANCE="'Incremental backup'=${DIFF_INCR};${WARN_INCR};${CRIT_INCR} ${LONG_PERFORMANCE}"
     fi
   else
-    OUTPUT="There are problems retreiving the data."
+    OUTPUT="There are problems retrieving the data."
     RETURN=${UNKNOWN}
   fi
 fi
