@@ -81,8 +81,8 @@ function print_revision {
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][a] | -h | -V }
-[-T][-v]
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][-a][-S] | -h
+| -V } [-T][-v]
 __EOT
 }
 
@@ -246,24 +246,29 @@ if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
   CONTINUE=false
 fi
 
-if [[ ${CONTINUE} == true
-    && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
-    || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
-    || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0 ]] ; then
-  if [[ ${ASYNC} == true
-      && ${WARNING_THRES} -ge ${CRITICAL_THRES} ) ]] ; then
-    print_usage ${APPL_NAME}
-    echo "Warning threshold should be less than critical threshold."
-    echo "Threshold should be greater than 0."
-    RETURN=${UNKNOWN}
-    CONTINUE=false
-  elif [[ ${ASYNC} == false
-        && ${WARNING_THRES} -le ${CRITICAL_THRES} ) ]] ; then
-    print_usage ${APPL_NAME}
-    echo "Warning threshold should be greater than critical threshold."
-    echo "Threshold should be greater than 0."
-    RETURN=${UNKNOWN}
-    CONTINUE=false
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ ${ASYNC} == true ]] ; then
+    if [[ ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
+        || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
+        || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
+        || ${WARNING_THRES} -le ${CRITICAL_THRES} ]] ; then
+      print_usage ${APPL_NAME}
+      echo "Warning threshold should be less than critical threshold."
+      echo "Threshold should be greater than 0."
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+  else
+    if [[ ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
+        || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
+        || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
+        || ${WARNING_THRES} -ge ${CRITICAL_THRES} ]] ; then
+      print_usage ${APPL_NAME}
+      echo "Warning threshold should be greater than critical threshold."
+      echo "Threshold should be greater than 0."
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
   fi
 fi
 
@@ -301,25 +306,28 @@ fi
 
 if [[ ${CONTINUE} == true ]] ; then
   TMP_FILE=/tmp/snap
-  COMMAND_SNAPSHOT="db2 get snapshot for database on ${DATABASE} > ${TMP_FILE}"
+  COMMAND_SNAPSHOT="db2 get snapshot for database on ${DATABASE}"
   if [[ ${VERBOSE} -ge 2 ]] ; then
     echo "COMMAND: ${COMMAND_SNAPSHOT}"
   fi
-  ${COMMAND_SNAPSHOT}
+  ${COMMAND_SNAPSHOT} > ${TMP_FILE}
 
   if [[ ${ASYNC} == false ]] ; then
     LNS_GAP_C_T=$(awk '/LSN Gap cleaner triggers/ {print $6}' ${TMP_FILE})
     DIRTY_PAGE_STEAL_C_T=$(awk '/Dirty page steal cleaner triggers/ {print $7}' ${TMP_FILE})
     DIRTY_PAGE_THRESHOLD_C_T=$(awk '/Dirty page threshold cleaner triggers/ {print $7}' ${TMP_FILE})
     TOTAL=$(( ${LNS_GAP_C_T} + ${DIRTY_PAGE_STEAL_C_T} + ${DIRTY_PAGE_THRESHOLD_C_T} ))
+    PBPCT=$(( ${DIRTY_PAGE_STEAL_C_T} * 100 / ${TOTAL} ))
+    LNS_GAP_PER=$(( ${LNS_GAP_C_T} * 100 / ${TOTAL} ))
+    DIRTY_PAGE_THRESHOLD_PER=$(( ${DIRTY_PAGE_THRESHOLD_C_T} * 100 / ${TOTAL} ))
     if [[ ${VERBOSE} -ge 3 ]] ; then
       echo "LNS Gap:'${LNS_GAP_C_T}'"
       echo "Dirty page steal:'${DIRTY_PAGE_STEAL_C_T}'"
       echo "Dirty page threshold:'${DIRTY_PAGE_THRESHOLD_C_T}'"
+      echo "PBPCT%=${PBPCT}"
+      echo "LNS Gap%=${LNS_GAP_PER}"
+      echo "Threshold%=${DIRTY_PAGE_THRESHOLD_PER}"
     fi
-    PBPCT=$(( ( ${DIRTY_PAGE_STEAL_C_T} / ${TOTAL} ) * 100 ))
-    LNS_GAP_PER=$(( ( ${LNS_GAP_C_T} / ${TOTAL} ) * 100 ))
-    DIRTY_PAGE_THRESHOLD_PER=$(( ( ${DIRTY_PAGE_THRESHOLD_C_T} / ${TOTAL} ) * 100 ))
 
     # Checks the value of PBPCT
     if [[ ${PBPCT} -lt ${WARNING_THRES} ]] ; then
@@ -333,18 +341,22 @@ if [[ ${CONTINUE} == true ]] ; then
       OUTPUT="Bad page cleaner trigger is impacting the performance"
     fi
     PERFORMANCE="'PBPCT'=${PBPCT}%;${WARNING_THRES};${CRITICAL_THRES};0;100 "
-    if [[ ${SINGLE} == true ]] ; then
-      LONG_PERFORMANCE="'LNS Gap'=${LNS_GAP_PER}% 'Page cleaner threshold'=${DIRTY_PAGE_THRESHOLD_PER} "
-    else
-      PERFORMANCE="${PERFORMANCE} 'LNS Gap'=${LNS_GAP_PER}% 'Page cleaner threshold'=${DIRTY_PAGE_THRESHOLD_PER} "
-    fi
+    LONG_PERFORMANCE="'LNS Gap'=${LNS_GAP_PER}% 'Page cleaner threshold'=${DIRTY_PAGE_THRESHOLD_PER}% "
   else
     BP_DATA_WRITES=$(awk '/Buffer pool data writes/ {print $6}' ${TMP_FILE})
     BP_ASYNC_DATA_WRITES=$(awk '/Asynchronous pool data page writes/ {print $7}' ${TMP_FILE})
     BP_INDEX_WRITES=$(awk '/Buffer pool index writes/ {print $6}' ${TMP_FILE})
     BP_ASYNC_INDEX_WRITES=$(awk '/Asynchronous pool index page writes/ {print $7}' ${TMP_FILE})
-    ASYNC_DATA_WRITES_PER=$(( ( ${BP_ASYNC_DATA_WRITES} / ${BP_DATA_WRITES} ) * 100 ))
-    ASYNC_INDEX_WRITES_PER=$(( ( ${BP_ASYNC_INDEX_WRITES} / ${BP_INDEX_WRITES} ) * 100 ))
+    ASYNC_DATA_WRITES_PER=$(( ${BP_ASYNC_DATA_WRITES} * 100 / ${BP_DATA_WRITES} ))
+    ASYNC_INDEX_WRITES_PER=$(( ${BP_ASYNC_INDEX_WRITES} * 100 / ${BP_INDEX_WRITES} ))
+    if [[ ${VERBOSE} -ge 3 ]] ; then
+      echo "Data writes:'${BP_DATA_WRITES}'"
+      echo "Data async writes:'${BP_ASYNC_DATA_WRITES}'"
+      echo "Index writes:'${BP_INDEX_WRITES}'"
+      echo "Index async writes:'${BP_ASYNC_INDEX_WRITES}'"
+      echo "Data async%=${ASYNC_DATA_WRITES_PER}"
+      echo "Index async%=${ASYNC_INDEX_WRITES_PER}"
+    fi
 
     # Checks the asynchronous writes.
     if [[ ${ASYNC_DATA_WRITES_PER} -gt ${WARNING_THRES} ]] ; then
@@ -378,8 +390,12 @@ if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "${OUTPUT}|${PERFORMANCE}
+if [[ ${SINGLE} == true ]] ; then
+  echo "${OUTPUT}|${PERFORMANCE}${LONG_PERFORMANCE}"
+else
+  echo "${OUTPUT}|${PERFORMANCE}
 ${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+fi
 # Returns the error code.
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo "Return code: ${RETURN}"
