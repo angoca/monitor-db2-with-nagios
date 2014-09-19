@@ -43,6 +43,7 @@
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
+# -S | --single : Performance data in single line.
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
@@ -107,6 +108,8 @@ proportion between Sync and Async writes.
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1.
+-S | --single
+   Writes all the performance output in one line.
 -T | --trace
    Trace mode: writes date and output in /tmp.
 -v | --verbose
@@ -153,7 +156,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o ac:d:hi:TvVw: --long async,critical:,database:,help,instance:,trace,verbose,version,warning: \
+TEMP=$(getopt -o ac:d:hi:STvVw: --long async,critical:,database:,help,instance:,simple,trace,verbose,version,warning: \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -172,6 +175,8 @@ if [[ ${CONTINUE} == true ]] ; then
   ASYNC=false
   # Verbosity level
   VERBOSE=0
+  # Single line
+  SINGLE=false
   # Trace activated
   TRACE=false
   LOG=/tmp/${APPL_NAME}.log
@@ -186,6 +191,7 @@ if [[ ${CONTINUE} == true ]] ; then
       -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -S | --single ) SINGLE=true ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
       -V | --version ) VERSION=true ; shift ;;
@@ -204,6 +210,7 @@ if [[ ${TRACE} == true ]] ; then
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}, async:${ASYNC}"
+ECHO="${ECHO}, single:${SINGLE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 
@@ -326,7 +333,11 @@ if [[ ${CONTINUE} == true ]] ; then
       OUTPUT="Bad page cleaner trigger is impacting the performance"
     fi
     PERFORMANCE="'PBPCT'=${PBPCT}%;${WARNING_THRES};${CRITICAL_THRES};0;100 "
-    LONG_PERFORMANCE="'LNS Gap'=${LNS_GAP_PER}% 'Page cleaner threshold'=${DIRTY_PAGE_THRESHOLD_PER} "
+    if [[ ${SINGLE} == true ]] ; then
+      LONG_PERFORMANCE="'LNS Gap'=${LNS_GAP_PER}% 'Page cleaner threshold'=${DIRTY_PAGE_THRESHOLD_PER} "
+    else
+      PERFORMANCE="${PERFORMANCE} 'LNS Gap'=${LNS_GAP_PER}% 'Page cleaner threshold'=${DIRTY_PAGE_THRESHOLD_PER} "
+    fi
   else
     BP_DATA_WRITES=$(awk '/Buffer pool data writes/ {print $6}' ${TMP_FILE})
     BP_ASYNC_DATA_WRITES=$(awk '/Asynchronous pool data page writes/ {print $7}' ${TMP_FILE})
