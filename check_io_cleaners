@@ -21,18 +21,46 @@
 # Checks the performance of the IO cleaners (Page cleaners) by calculating the
 # percentage between Sync and Async writes, and the percentage between the
 # page cleaner triggers (LSN Gap cleaner trigger, dirty page steal clean
-# trigger and Diry page threshold cleaner.
+# trigger and Dirty page threshold cleaner.
 #
 # These formulas were taken from different sites:
 # * http://books.google.fr/books?id=KdBLn-LQ0n4C&pg=PA110&lpg=PA110&dq=pbpct+percentage+of+bad+page+cleaner+trigger&source=bl&ots=WZNE0msIaO&sig=6Kk4VWXK0Yw1EusO82U8w4FhTGs&hl=en&sa=X&ei=F-cbVMbuLMXnOf_ygbAO&ved=0CCMQ6AEwAA#v=onepage&q=pbpct%20percentage%20of%20bad%20page%20cleaner%20trigger&f=false
 # * http://www.ebenner.com/db2dba_blog/
 # * http://www.dbisoftware.com/blog/db2_performance.php?id=117
 #
-# Here comes the documentation
+# In order to be used in Nagios, you have to configure the following.
 #
-# TODO Nagios usage.
+# # 'check_io_cleaners' command definition
+# define command {
+#         command_name    check_io_cleaners
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_io_cleaners -i '$ARG1$' -d '$ARG2$'"
+# }
+# define service{
+#         host_name               db2server
+#         service_description     IO cleaners
+#         check_command           check_io_cleaners!/home/db2inst1
+#         use                     generic-service
+# }
 #
-# TODO Nagios with NRPE.
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_io_cleaners]=/home/nagios/scripts/check_io_cleaners -i /home/db2inst1 -d sample
+#
+# Then modify the path according to your script location and instance home dir.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     IO cleaners
+#         check_command           check_nrpe_1arg!check_io_cleaners
+#         use                     generic-service
+# }
+#
+# It is necessary to execute this script with a user with at least SYSMON authority, in
+# order to execute db2pd.
 #
 # Parameters:
 # -a | --async : Changes the behavoiur of the script to check the percentage
@@ -43,6 +71,7 @@
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
+# -K | --mk : Change the output for Check_MK.
 # -S | --single : Performance data in single line.
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
@@ -81,7 +110,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][-a][-S] | -h
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][-a][-S][-K] | -h
 | -V } [-T][-v]
 __EOT
 }
@@ -108,6 +137,8 @@ proportion between Sync and Async writes.
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1.
+-K | --mk
+   Changes the output to be compatible with Check_MK.
 -S | --single
    Writes all the performance output in one line.
 -T | --trace
@@ -144,6 +175,7 @@ OUTPUT=
 PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
+PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
@@ -156,7 +188,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o ac:d:hi:STvVw: --long async,critical:,database:,help,instance:,simple,trace,verbose,version,warning: \
+TEMP=$(getopt -o ac:d:hi:KSTvVw: --long async,critical:,database:,help,instance:,mk,simple,trace,verbose,version,warning: \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -171,6 +203,7 @@ if [[ ${CONTINUE} == true ]] ; then
 
   HELP=false
   VERSION=false
+  CHECK_MK=false
   # Behaviour of the script
   ASYNC=false
   # Verbosity level
@@ -191,6 +224,7 @@ if [[ ${CONTINUE} == true ]] ; then
       -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -K | --mk ) CHECK_MK=true ; shift ;;
       -S | --single ) SINGLE=true ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
@@ -205,12 +239,12 @@ fi
 if [[ ${TRACE} == true ]] ; then
   echo ">>>>>" >> ${LOG}
   date >> ${LOG}
-  echo "Instance at ${INSTANCE_HOME}"
+  echo "Instance at ${INSTANCE_HOME}" >> ${LOG}
   echo "PID ${$}" >> ${LOG}
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}, async:${ASYNC}"
-ECHO="${ECHO}, single:${SINGLE}"
+ECHO="${ECHO}, single:${SINGLE}, check_mk:${CHECK_MK}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 
@@ -276,6 +310,7 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . ${INSTANCE_HOME}/sqllib/db2profile
+    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
   else
     OUTPUT="Instance directory is invalid."
     RETURN=${UNKNOWN}
@@ -313,13 +348,20 @@ if [[ ${CONTINUE} == true ]] ; then
   ${COMMAND_SNAPSHOT} > ${TMP_FILE}
 
   if [[ ${ASYNC} == false ]] ; then
+    TYPE="PBPCT"
     LNS_GAP_C_T=$(awk '/LSN Gap cleaner triggers/ {print $6}' ${TMP_FILE})
     DIRTY_PAGE_STEAL_C_T=$(awk '/Dirty page steal cleaner triggers/ {print $7}' ${TMP_FILE})
     DIRTY_PAGE_THRESHOLD_C_T=$(awk '/Dirty page threshold cleaner triggers/ {print $7}' ${TMP_FILE})
     TOTAL=$(( ${LNS_GAP_C_T} + ${DIRTY_PAGE_STEAL_C_T} + ${DIRTY_PAGE_THRESHOLD_C_T} ))
-    PBPCT=$(( ${DIRTY_PAGE_STEAL_C_T} * 100 / ${TOTAL} ))
-    LNS_GAP_PER=$(( ${LNS_GAP_C_T} * 100 / ${TOTAL} ))
-    DIRTY_PAGE_THRESHOLD_PER=$(( ${DIRTY_PAGE_THRESHOLD_C_T} * 100 / ${TOTAL} ))
+    if [[ ${TOTAL} -eq 0 ]] ; then
+      PBPCT=0
+      LNS_GAP_PER=0
+      DIRTY_PAGE_THRESHOLD_PER=0
+    else
+      PBPCT=$(( ${DIRTY_PAGE_STEAL_C_T} * 100 / ${TOTAL} ))
+      LNS_GAP_PER=$(( ${LNS_GAP_C_T} * 100 / ${TOTAL} ))
+      DIRTY_PAGE_THRESHOLD_PER=$(( ${DIRTY_PAGE_THRESHOLD_C_T} * 100 / ${TOTAL} ))
+    fi
     if [[ ${VERBOSE} -ge 3 ]] ; then
       echo "LNS Gap:'${LNS_GAP_C_T}'"
       echo "Dirty page steal:'${DIRTY_PAGE_STEAL_C_T}'"
@@ -340,15 +382,27 @@ if [[ ${CONTINUE} == true ]] ; then
       RETURN=${CRITICAL}
       OUTPUT="Bad page cleaner trigger is impacting the performance"
     fi
-    PERFORMANCE="'PBPCT'=${PBPCT}%;${WARNING_THRES};${CRITICAL_THRES};0;100 "
-    LONG_PERFORMANCE="'LNS Gap'=${LNS_GAP_PER}% 'Page cleaner threshold'=${DIRTY_PAGE_THRESHOLD_PER}% "
+    PERFORMANCE="'PBPCT'=${PBPCT}%;${WARNING_THRES};${CRITICAL_THRES};0;100"
+    LNS_PERF="'LNS_Gap'=${LNS_GAP_PER}%"
+    THRES_PERF="'Page_cleaner_threshold'=${DIRTY_PAGE_THRESHOLD_PER}%"
+    LONG_PERFORMANCE="${LNS_PERF}\n${THRES_PERF}"
+    PERF_MK="${PERFORMANCE}|${LNS_PERF}|${THRES_PERF}"
   else
+    TYPE="Ratio"
     BP_DATA_WRITES=$(awk '/Buffer pool data writes/ {print $6}' ${TMP_FILE})
     BP_ASYNC_DATA_WRITES=$(awk '/Asynchronous pool data page writes/ {print $7}' ${TMP_FILE})
     BP_INDEX_WRITES=$(awk '/Buffer pool index writes/ {print $6}' ${TMP_FILE})
     BP_ASYNC_INDEX_WRITES=$(awk '/Asynchronous pool index page writes/ {print $7}' ${TMP_FILE})
-    ASYNC_DATA_WRITES_PER=$(( ${BP_ASYNC_DATA_WRITES} * 100 / ${BP_DATA_WRITES} ))
-    ASYNC_INDEX_WRITES_PER=$(( ${BP_ASYNC_INDEX_WRITES} * 100 / ${BP_INDEX_WRITES} ))
+    if [[ ${BP_DATA_WRITES} -eq 0 ]] ; then
+      ASYNC_DATA_WRITES_PER=100
+    else
+      ASYNC_DATA_WRITES_PER=$(( ${BP_ASYNC_DATA_WRITES} * 100 / ${BP_DATA_WRITES} ))
+    fi
+    if [[ ${BP_INDEX_WRITES} -eq 0 ]] ; then
+      ASYNC_INDEX_WRITES_PER=100
+    else
+      ASYNC_INDEX_WRITES_PER=$(( ${BP_ASYNC_INDEX_WRITES} * 100 / ${BP_INDEX_WRITES} ))
+    fi
     if [[ ${VERBOSE} -ge 3 ]] ; then
       echo "Data writes:'${BP_DATA_WRITES}'"
       echo "Data async writes:'${BP_ASYNC_DATA_WRITES}'"
@@ -381,7 +435,10 @@ if [[ ${CONTINUE} == true ]] ; then
       RETURN=${CRITICAL}
       OUTPUT="Quantity of asynchronous writes is bad and it is impacting the performance"
     fi
-    PERFORMANCE="'Async data writes'=${ASYNC_DATA_WRITES_PER}%;${WARNING_THRES};${CRITICAL_THRES};0;100 'Async index writes'=${ASYNC_INDEX_WRITES_PER}%;${WARNING_THRES};${CRITICAL_THRES};0;100 "
+    ASYNC_DATA_PERF="'Async_data_writes'=${ASYNC_DATA_WRITES_PER}%;${WARNING_THRES};${CRITICAL_THRES};0;100"
+    ASYNC_INDEX_PERF="'Async_index_writes'=${ASYNC_INDEX_WRITES_PER}%;${WARNING_THRES};${CRITICAL_THRES};0;100"
+    PERFORMANCE="${ASYNC_DATA_PERF} ${ASYNC_INDEX_PERF}"
+    PERF_MK="${ASYNC_DATA_PERF}|${ASYNC_INDEX_PERF}"
   fi
 fi
 
@@ -390,11 +447,14 @@ if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-if [[ ${SINGLE} == true ]] ; then
-  echo "${OUTPUT}|${PERFORMANCE}${LONG_PERFORMANCE}"
+if [[ ${CHECK_MK} == true ]] ; then
+  echo "${RETURN} ioCleaners${TYPE}-${INSTANCE_NAME} ${PERF_MK} ${OUTPUT}"
 else
-  echo "${OUTPUT}|${PERFORMANCE}
-${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+  if [[ ${SINGLE} == true ]] ; then
+    echo "${OUTPUT}|${PERFORMANCE}${LONG_PERFORMANCE}"
+  else
+    echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+  fi
 fi
 # Returns the error code.
 if [[ ${VERBOSE} -ge 2 ]] ; then
