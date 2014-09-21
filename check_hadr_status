@@ -57,6 +57,7 @@
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
+# -K | --mk : Change the output for Check_MK.
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
@@ -93,7 +94,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory -d databaseName | -h | -V }
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-K] | -h | -V }
 [-T][-v]
 __EOT
 }
@@ -111,6 +112,8 @@ Checks the HADR status of the database.
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1.
+-K | --mk
+   Changes the output to be compatible with Check_MK.
 -T | --trace
    Trace mode: writes date and output in /tmp.
 -v | --verbose
@@ -140,6 +143,7 @@ OUTPUT=
 PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
+PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
@@ -152,7 +156,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o d:hi:TvV --long database:,help,instance:,trace,verbose,version \
+TEMP=$(getopt -o d:hi:KTvV --long database:,help,instance:,mk,trace,verbose,version \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -167,6 +171,7 @@ if [[ ${CONTINUE} == true ]] ; then
 
   HELP=false
   VERSION=false
+  CHECK_MK=false
   # Verbosity level
   VERBOSE=0
   # Trace activated
@@ -179,6 +184,7 @@ if [[ ${CONTINUE} == true ]] ; then
       -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -K | --mk ) CHECK_MK=true ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
       -V | --version ) VERSION=true ; shift ;;
@@ -191,11 +197,12 @@ fi
 if [[ ${TRACE} == true ]] ; then
   echo ">>>>>" >> ${LOG}
   date >> ${LOG}
-  echo "Instance at ${INSTANCE_HOME}"
+  echo "Instance at ${INSTANCE_HOME}" >> ${LOG}
   echo "PID ${$}" >> ${LOG}
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, check_mk:${CHECK_MK}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
@@ -234,6 +241,7 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . ${INSTANCE_HOME}/sqllib/db2profile
+    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
   else
     OUTPUT="Instance directory is invalid."
     RETURN=${UNKNOWN}
@@ -323,6 +331,17 @@ if [[ ${CONTINUE} == true ]] ; then
         OUTPUT="Database is standby and not peer. ${HADR_STATUS} ${CONNECTED}"
         RETURN=${UNKNOWN}
       fi
+      # Divided by 1000 (3E8)
+      HEX_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $3}' | cut -dx -f2 | sed 'N;s/\n/-/' | awk '{print "ibase=16;("$1")/3E8"}' | bc)
+      PERFORMANCE="HexDiff_K=${HEX_DIFF}" 
+      PAGE_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $2}' | sed 'N;s/\n/-/' | bc)
+      LOG_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $1}' | cut -d. -f1 | sed 's/^.//' | sed 'N;s/\n/-/' | bc)
+      if [[ ${PAGE_DIFF} -lt 0 ]] ; then
+        # The 2000 value is based on observation, but not sure.
+        PAGE_DIFF=$((${PAGE_DIFF}+2000))
+      fi
+      LONG_PERFORMANCE="PageDiff=${PAGE_DIFF}\nLogDiff=${LOG_DIFF}" 
+      PERF_MK="${PERFORMANCE}|${PAGE_DIFF}|${LOG_DIFF}"
     else
       OUTPUT="Database role is unknown (${ROLE})"
       RETURN=${UNKNOWN}
@@ -330,25 +349,16 @@ if [[ ${CONTINUE} == true ]] ; then
     fi
   fi
 fi
-if [[ ${CONTINUE} == true ]] ; then
-  # Divided by 1000 (3E8)
-  HEX_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $3}' | cut -dx -f2 | sed 'N;s/\n/-/' | awk '{print "ibase=16;("$1")/3E8"}' | bc)
-  PERFORMANCE="HexDiff=${HEX_DIFF} " 
-  PAGE_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $2}' | sed 'N;s/\n/-/' | bc)
-  LOG_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $1}' | cut -d. -f1 | sed 's/^.//' | sed 'N;s/\n/-/' | bc)
-  if [[ ${PAGE_DIFF} -lt 0 ]] ; then
-    # The 2000 value is based on observation, but not sure.
-    PAGE_DIFF=$((${PAGE_DIFF}+2000))
-  fi
-  LONG_PERFORMANCE="PageDiff=${PAGE_DIFF} LogDiff=${LOG_DIFF} " 
-fi
 # Prints the output.
 if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "${OUTPUT}|${PERFORMANCE}
-${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+if [[ ${CHECK_MK} == true ]] ; then
+  echo "${RETURN} hadrStatus-${INSTANCE_NAME}-${DATABASE_NAME} ${PERF_MK} ${OUTPUT}"
+else
+  echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+fi
 # Returns the error code.
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo "Return code: ${RETURN}"
