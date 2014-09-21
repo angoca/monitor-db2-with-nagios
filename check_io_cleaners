@@ -352,6 +352,11 @@ if [[ ${CONTINUE} == true ]] ; then
     OUTPUT="Instance not started"
     RETURN=${UNKNOWN}
     CONTINUE=false
+    if [[ ${ASYNC} == false ]] ; then
+      TYPE="PBPCT"
+    else
+      TYPE="Ratio"
+    fi
   fi
 fi
 if [[ ${CONITNUE} == true ]] ; then
