@@ -347,6 +347,14 @@ if [[ ${CONTINUE} == true ]] ; then
   fi
   ${COMMAND_SNAPSHOT} > ${TMP_FILE}
 
+  ERROR_START=$(grep SQL1032N ${TMP_FILE})
+  if [[ ${ERROR_START} != "" ]] ; then
+    OUTPUT="Instance not started"
+    RETURN=${UNKNOWN}
+    CONTINUE=false
+  fi
+fi
+if [[ ${CONITNUE} == true ]] ; then
   if [[ ${ASYNC} == false ]] ; then
     TYPE="PBPCT"
     LNS_GAP_C_T=$(awk '/LSN Gap cleaner triggers/ {print $6}' ${TMP_FILE})
