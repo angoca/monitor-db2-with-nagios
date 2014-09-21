@@ -177,6 +177,7 @@ OUTPUT=
 PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
+PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
@@ -355,6 +356,7 @@ if [[ ${CONTINUE} == true ]] ; then
     fi
     QTY=$(printf '%s\n' "${CONNS}" | wc -l)
     if [[ ${STATE} == true ]] ; then
+      TYPE="PerStatus"
       BACKUP=0
       COMMIT=0
       COMPILING=0
@@ -420,6 +422,7 @@ if [[ ${CONTINUE} == true ]] ; then
       LONG_PERFORMANCE="${LONG_PERFORMANCE_1}\n${LONG_PERFORMANCE_2}\n${LONG_PERFORMANCE_3}\n${LONG_PERFORMANCE_4}\n${LONG_PERFORMANCE_5}\n${LONG_PERFORMANCE_6}\n${LONG_PERFORMANCE_7}\n${LONG_PERFORMANCE_8}\n${LONG_PERFORMANCE_9}\n${LONG_PERFORMANCE_10}\n${LONG_PERFORMANCE_11}\n${LONG_PERFORMANCE_12}\n${LONG_PERFORMANCE_13}"
       PERF_MK="${LONG_PERFORMANCE_1}|${LONG_PERFORMANCE_2}|${LONG_PERFORMANCE_3}|${LONG_PERFORMANCE_4}|${LONG_PERFORMANCE_5}|${LONG_PERFORMANCE_6}|${LONG_PERFORMANCE_7}|${LONG_PERFORMANCE_8}|${LONG_PERFORMANCE_9}|${LONG_PERFORMANCE_10}|${LONG_PERFORMANCE_11}|${LONG_PERFORMANCE_12}|${LONG_PERFORMANCE_13}"
     else
+      TYPE="PerUser"
       QTY_FILTERED=$(printf '%s\n' "${CONNS}" | awk '{print $1}' | sort | uniq -c)
       if [[ ${VERBOSE} -ge 3 ]] ; then
         echo "RESULT FILTER:'${QTY_FILTERED}'"
@@ -467,7 +470,7 @@ if [[ ${OUTPUT} == "" ]] ; then
 fi
 # Builds the output.
 if [[ ${CHECK_MK} == true ]] ; then
-  echo "${RETURN} databaseConnection-${INSTANCE_NAME}-${DATABASE_NAME} ${PERF_MK} ${OUTPUT}"
+  echo "${RETURN} connectionsQty${TYPE}-${INSTANCE_NAME}-${DATABASE_NAME} ${PERF_MK} ${OUTPUT}"
 else
   echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 fi
