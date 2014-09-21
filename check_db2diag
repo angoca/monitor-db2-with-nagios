@@ -19,7 +19,7 @@
 ###############################################################################
 
 # Check the quantity of messages written in the db2diag.log file. It allows to
-# detect an anormal behaviour in the instance, because most of the time, when
+# detect an abnormal behaviour in the instance, because most of the time, when
 # an recurrent error happens in the database/instance, it is described in the
 # diagnostic file.
 #
@@ -64,6 +64,7 @@
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
+# -K | --mk : Change the output for Check_MK.
 # -R | --noreplace : Do not replace the last written date. This allows you to
 #   execute the script without altering the date.
 # -T | --trace : Trace mode. Writes output in /tmp.
@@ -105,7 +106,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory [-c][-w][-R][-x] | -h | -V }
+Usage: ${1} { -i instanceHomeDirectory [-c][-w][-K][-R][-x] | -h | -V }
 [-T][-v]
 __EOT
 }
@@ -124,6 +125,8 @@ check.
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1.
+-K | --mk
+   Changes the output to be compatible with Check_MK.
 -R | --noreplace
    Do not replace the last check time of the plugin. This allows to execute the
    script without altering oher executions.
@@ -160,6 +163,7 @@ OUTPUT=
 PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
+PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
@@ -172,7 +176,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o c:hi:RTvVw:x --long critical:,extra,help,instance:,noreplace,trace,verbose,version,warning: \
+TEMP=$(getopt -o c:hi:iKRTvVw:x --long critical:,extra,help,instance:,mk,noreplace,trace,verbose,version,warning: \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -187,6 +191,7 @@ if [[ ${CONTINUE} == true ]] ; then
 
   HELP=false
   VERSION=false
+  CHECK_MK=false
   # Verbosity level
   VERBOSE=0
   # Trace activated
@@ -203,6 +208,7 @@ if [[ ${CONTINUE} == true ]] ; then
       -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -K | --mk ) CHECK_MK=true ; shift ;;
       -R | --noreplace ) REPLACE=false ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
@@ -218,14 +224,14 @@ fi
 if [[ ${TRACE} == true ]] ; then
   echo ">>>>>" >> ${LOG}
   date >> ${LOG}
-  echo "Instance at ${INSTANCE_HOME}"
+  echo "Instance at ${INSTANCE_HOME}" >> ${LOG}
   echo "PID ${$}" >> ${LOG}
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, extra: ${EXTRA}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
-ECHO="${ECHO}, replace:${REPLACE}"
+ECHO="${ECHO}, replace:${REPLACE}, check_mk:${CHECK_MK}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo ${ECHO}
@@ -269,6 +275,7 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . ${INSTANCE_HOME}/sqllib/db2profile
+    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
   else
     OUTPUT="Instance directory is invalid."
     RETURN=${UNKNOWN}
@@ -310,7 +317,7 @@ if [[ ${CONTINUE} == true ]] ; then
         RETURN=${CRITICAL}
       fi
       # Calculates the performance values (for each level)
-      PERFORMANCE="'logs'=${QTY};${WARNING_THRES};${CRITICAL_THRES} "
+      PERFORMANCE="'logs'=${QTY};${WARNING_THRES};${CRITICAL_THRES}"
       if [[ ${QTY} -lt $((3 * ${CRITICAL_THRES})) ]] ; then
         COMMAND_QTY_SEVERE="db2diag -readfile -time ${DATE_VALUE} -l Severe"
         COMMAND_QTY_CRITICAL="db2diag -readfile -time ${DATE_VALUE} -l Critical"
@@ -336,26 +343,29 @@ if [[ ${CONTINUE} == true ]] ; then
           QTY_LINES=$(${COMMAND_QTY} | wc -l)
           QTY_CHARS=$(${COMMAND_QTY} | wc -m)
         fi
-        SUM_INFO=$((${QTY_EVENT}+${QTY_INFO}))
-        SUM_WARNING=$((${SUM_INFO}+${QTY_WARNING}))
-        SUM_ERROR=$((${SUM_WARNING}+${QTY_ERROR}))
-        SUM_CRITICAL=$((${SUM_ERROR}+${QTY_CRITICAL}))
-        SUM_SEVERE=$((${SUM_CRITICAL}+${QTY_SEVERE}))
+        #SUM_INFO=$((${QTY_EVENT}+${QTY_INFO}))
+        #SUM_WARNING=$((${SUM_INFO}+${QTY_WARNING}))
+        #SUM_ERROR=$((${SUM_WARNING}+${QTY_ERROR}))
+        #SUM_CRITICAL=$((${SUM_ERROR}+${QTY_CRITICAL}))
+        #SUM_SEVERE=$((${SUM_CRITICAL}+${QTY_SEVERE}))
         if [[ ${VERBOSE} -ge 3 ]] ; then
-          echo "Result: ${QTY_SEVERE} - ${SUM_SEVERE}"
-          echo "Result: ${QTY_CRITICAL} - ${SUM_CRITICAL}"
-          echo "Result: ${QTY_ERROR} - ${SUM_ERROR}"
-          echo "Result: ${QTY_WARNING} - ${SUM_WARNING}"
-          echo "Result: ${QTY_INFO} - ${SUM_INFO}"
+          echo "Result: ${QTY_SEVERE}"
+          echo "Result: ${QTY_CRITICAL}"
+          echo "Result: ${QTY_ERROR}"
+          echo "Result: ${QTY_WARNING}"
+          echo "Result: ${QTY_INFO}"
           echo "Result: ${QTY_EVENT}"
           echo "Result: ${QTY_LINES}"
           echo "Result: ${QTY_CHARS}"
         fi
         LONG_OUTPUT="Messages by levels. Severe: ${QTY_SEVERE}, Critical: ${QTY_CRITICAL}, Error: ${QTY_ERROR}, Warning: ${QTY_WARNING}, Info: ${QTY_INFO}, Event: ${QTY_EVENT}"
-        LONG_PERFORMANCE="'Severe'=${SUM_SEVERE} 'Critical'=${SUM_CRITICAL} 'Error'=${SUM_ERROR} 'Warning'=${SUM_WARNING} 'Info'=${SUM_INFO} 'Event'=${QTY_EVENT}"
+        LONG_PERFORMANCE="'Severe'=${QTY_SEVERE}\n'Critical'=${QTY_CRITICAL}\n'Error'=${QTY_ERROR}\n'Warning'=${QTY_WARNING}\n'Info'=${QTY_INFO}\n'Event'=${QTY_EVENT}"
+        PERF_MK="${PERFORMANCE}|'Severe'=${QTY_SEVERE}|'Critical'=${QTY_CRITICAL}|'Error'=${QTY_ERROR}|'Warning'=${QTY_WARNING}|'Info'=${QTY_INFO}|'Event'=${QTY_EVENT}"
         if [[ ${EXTRA} == true ]] ; then
-          LONG_OUTPUT="${LONG_OUTPUT}, Lines: ${QTY_LINES}, Size: $((${QTY_CHARS}/1024))"
-          LONG_PERFORMANCE="${LONG_PERFORMANCE}, 'Lines'=${QTY_LINES}, 'Size'=$((${QTY_CHARS}/1024))"
+          QTY_CHAR_K=$((${QTY_CHARS}/1024))
+          LONG_OUTPUT="${LONG_OUTPUT}, Lines: ${QTY_LINES}, Size: ${QTY_CHAR_K}"
+          LONG_PERFORMANCE="${LONG_PERFORMANCE}\n'Lines'=${QTY_LINES}\n'Size'=${QTY_CHAR_K}"
+          PERF_MK="${PERF_MK}|'Lines'=${QTY_LINES}|'Size'=${QTY_CHAR_K}"
         fi
       fi
       # Writes the new date in the same file.
@@ -387,8 +397,11 @@ if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "${OUTPUT}|${PERFORMANCE}
-${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+if [[ ${CHECK_MK} == true ]] ; then
+  echo "${RETURN} db2diagMsgs-${INSTANCE_NAME} ${PERF_MK} ${OUTPUT}"
+else
+  echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+fi
 # Returns the error code.
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo "Return code: ${RETURN}"
