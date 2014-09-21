@@ -68,6 +68,7 @@
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
+# -K | --mk : Change the output for Check_MK.
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
@@ -104,7 +105,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory | -h | -V }[-T][-v]"
+Usage: ${1} { -i instanceHomeDirectory [-K]| -h | -V }[-T][-v]"
 __EOT
 }
 
@@ -119,6 +120,8 @@ This script checks if the instance is active by querying netstats.
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1.
+-K | --mk
+   Changes the output to be compatible with Check_MK.
 -T | --trace
    Trace mode: writes date and output in /tmp.
 -v | --verbose
@@ -148,6 +151,7 @@ OUTPUT=
 PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
+PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
@@ -160,7 +164,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o hi:TvV --long help,instance:,trace,verbose,version \
+TEMP=$(getopt -o hi:iKTvV --long help,instance:,mk,trace,verbose,version \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -175,6 +179,7 @@ if [[ ${CONTINUE} == true ]] ; then
 
   HELP=false
   VERSION=false
+  CHECK_MK=false
   # Verbosity level
   VERBOSE=0
   # Trace activated
@@ -185,6 +190,7 @@ if [[ ${CONTINUE} == true ]] ; then
     case "${1}" in
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -K | --mk ) CHECK_MK=true ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
       -V | --version ) VERSION=true ; shift ;;
@@ -197,11 +203,12 @@ fi
 if [[ ${TRACE} == true ]] ; then
   echo ">>>>>" >> ${LOG}
   date >> ${LOG}
-  echo "Instance at ${INSTANCE_HOME}"
+  echo "Instance at ${INSTANCE_HOME}" >> ${LOG}
   echo "PID ${$}" >> ${LOG}
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, check_mk:${CHECK_MK}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
@@ -237,6 +244,7 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . ${INSTANCE_HOME}/sqllib/db2profile
+    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
   else
     OUTPUT="Instance directory is invalid."
     RETURN=${UNKNOWN}
@@ -282,35 +290,35 @@ if [[ ${CONTINUE} == true ]] ; then
 
   if [[ ${OUTPUT_PID} == "" || ! ${OUTPUT_PID} =~ ^[0-9]+$ ]] ; then
     OUTPUT="Instance is not started (not listed in EDUs). "
-    PERFORMANCE="'Started Instance'=0.1;;0.4 "
+    PERFORMANCE="'Started_Instance'=0.1;;0.4"
     RETURN=${UNKNOWN}
   else
     OUTPUT="PID: ${OUTPUT_PID}. "
   fi
   if [[ ${SVCNAME} == "" ]] ; then
     OUTPUT="${OUTPUT}TCP port not defined or instance output is invalid."
-    PERFORMANCE="'Started Instance'=0.1;;0.4 "
+    PERFORMANCE="'Started_Instance'=0.1;;0.4"
     RETURN=${CRITICAL}
   elif [[ ${PORTNUM} == "" || ! ${PORTNUM} =~ ^[0-9]+$ ]] ; then
     OUTPUT="${OUTPUT}Problem retrieving port number."
-    PERFORMANCE="'Started Instance'=0.2;;0.4 "
+    PERFORMANCE="'Started_Instance'=0.2;;0.4"
     RETURN=${CRITICAL}
   elif [[ ! ${PROC} =~ ^[0-9]+$ ]] ; then
     OUTPUT="${OUTPUT}Weird situation."
-    PERFORMANCE="'Started Instance'=0.0;;0.4 "
+    PERFORMANCE="'Started_Instance'=0.0;;0.4"
     RETURN=${UNKNOWN}
   else
     if [[ ${PROC} -eq "0" ]] ; then
       OUTPUT="Instance at ${INSTANCE_HOME} is down."
-      PERFORMANCE="'Started Instance'=0.3;;0.4 "
+      PERFORMANCE="'Started_Instance'=0.3;;0.4"
       RETURN=${CRITICAL}
     elif [[ ! ${OUTPUT_PID} =~ ^[0-9]+$ ]] ; then
       OUTPUT="Instance at ${INSTANCE_HOME} is up but the PID is unknown"
-      PERFORMANCE="'Started Instance'=${MAX_DB};;0.4 "
+      PERFORMANCE="'Started_Instance'=${MAX_DB};;0.4"
       RETURN=${WARNING}
     else
       OUTPUT="Instance at ${INSTANCE_HOME} is up (PID ${OUTPUT_PID})."
-      PERFORMANCE="'Started Instance'=${MAX_DB};;0.4 "
+      PERFORMANCE="'Started_Instance'=${MAX_DB};;0.4"
       RETURN=${OK}
     fi
   fi
@@ -326,7 +334,8 @@ if [[ ${CONTINUE} == true ]] ; then
   fi
 
   LONG_OUTPUT="There are ${ACTIVE} active databases"
-  LONG_PERFORMANCE="'Active Databases'=${ACTIVE};;0.2 "
+  LONG_PERFORMANCE="'Active_Databases'=${ACTIVE}"
+  PERF_MK="${PERFORMANCE}|${LONG_PERFORMANCE}"
 fi
 
 # Prints the output.
@@ -334,8 +343,11 @@ if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "${OUTPUT}|${PERFORMANCE}
-${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+if [[ ${CHECK_MK} == true ]] ; then
+  echo "${RETURN} instanceUp-${INSTANCE_NAME} ${PERF_MK} ${OUTPUT}"
+else
+  echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+fi
 # Returns the error code.
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo "Return code: ${RETURN}"
