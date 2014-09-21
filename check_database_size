@@ -70,6 +70,7 @@
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
+# -K | --mk : Change the output for Check_MK.
 # -p | --percentage : Usage percentage (size : allocated).
 # -r | --refresh : Cache minutes before refresh (Stored procedure).
 # -T | --trace : Trace mode. Writes output in /tmp.
@@ -108,8 +109,8 @@ function print_revision {
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-p][-r] | -h | -V }
-[-T][-v]
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-p][-r][-K] | -h
+| -V } [-T][-v]
 __EOT
 }
 
@@ -131,6 +132,8 @@ that the provided percentage.
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1
+-K | --mk
+   Changes the output to be compatible with Check_MK.
 -p | --percentage INTEGER
    Usage percentage (size : allocated). Value between 1 and 99.
 -r | --refresh INTEGER
@@ -165,6 +168,7 @@ OUTPUT=
 PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
+PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
@@ -177,7 +181,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o c:d:hi:p:r:TvV --long critical:,database:,help,instance:,percentage:,refresh:,trace,verbose,version \
+TEMP=$(getopt -o c:d:hi:Kp:r:TvV --long critical:,database:,help,instance:,mk,percentage:,refresh:,trace,verbose,version \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -192,6 +196,7 @@ if [[ ${CONTINUE} == true ]] ; then
 
   HELP=false
   VERSION=false
+  CHECK_MK=false
   # Verbosity level
   VERBOSE=0
   # Trace activated
@@ -210,6 +215,7 @@ if [[ ${CONTINUE} == true ]] ; then
       -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -K | --mk ) CHECK_MK=true ; shift ;;
       -p | --percentage ) PERCENTAGE=$(echo ${2} | cut -d' ' -f1) ; PERCENTAGE_SET=true ; shift 2 ;;
       -r | --refresh ) REFRESH=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -T | --trace ) TRACE=true ; shift ;;
@@ -224,13 +230,14 @@ fi
 if [[ ${TRACE} == true ]] ; then
   echo ">>>>>" >> ${LOG}
   date >> ${LOG}
-  echo "Instance at ${INSTANCE_HOME}"
+  echo "Instance at ${INSTANCE_HOME}" >> ${LOG}
   echo "PID ${$}" >> ${LOG}
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 ECHO="${ECHO}, percentage:${PERCENTAGE}, percentage_set:${PERCENTAGE_SET}"
+ECHO="${ECHO}, check_mk:${CHECK_MK}"
 ECHO="${ECHO}, critical:${CRITICAL_THRES}, critical_set:${CRITICAL_SET}"
 ECHO="${ECHO}, refresh:${REFRESH} "
 
@@ -297,6 +304,7 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . ${INSTANCE_HOME}/sqllib/db2profile
+    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
   else
     OUTPUT="Instance directory is invalid."
     RETURN=${UNKNOWN}
@@ -355,7 +363,7 @@ if [[ ${CONTINUE} == true ]] ; then
     RETURN=${UNKNOWN}
     CONTINUE=false
   elif [[ ${BIND_ERROR} != "" ]] ; then
-    OUTPUT="User has to do a bind in the DB."
+    OUTPUT="User has to do a bind in the DB or not enough privileges."
     LONG_OUTPUT="${DBSIZE}"
     RETURN=${UNKNOWN}
     CONTINUE=false
@@ -403,8 +411,9 @@ if [[ ${CONTINUE} == true ]] ; then
     OUTPUT="${OUTPUT}Size is ${SIZE}B allocated in ${ALLOCATED}B" 
     
     # Performance data
-    PERFORMANCE="'Database size'=${SIZE}B "
-    LONG_PERFORMANCE="'Database allocation'=${ALLOCATED}B "
+    PERFORMANCE="'Database_size'=${SIZE}B"
+    LONG_PERFORMANCE="'Database_allocation'=${ALLOCATED}B"
+    PERF_MK="${PERFORMANCE}|${LONG_PERFORMANCE}"
   fi
 fi
 
@@ -413,8 +422,11 @@ if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "${OUTPUT}|${PERFORMANCE}
-${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+if [[ ${CHECK_MK} == true ]] ; then
+  echo "${RETURN} databaseSize-${INSTANCE_NAME}-${DATABASE_NAME} ${PERF_MK} ${OUTPUT}"
+else
+  echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+fi
 # Returns the error code.
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo "Return code: ${RETURN}"
