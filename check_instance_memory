@@ -66,6 +66,7 @@
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
+# -K | --mk : Change the output for Check_MK.
 # -l | --limit : Memory limit. If nothing, the script always returns OK.
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
@@ -104,7 +105,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory [-l][-c][-w] | -h 
+Usage: ${1} { -i instanceHomeDirectory [-l][-c][-w][-K] | -h 
 | -V }[-T][-v]
 __EOT
 }
@@ -123,6 +124,8 @@ Checks the memory usage at an instance (all nodes).
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1.
+-K | --mk
+   Changes the output to be compatible with Check_MK.
 -l | --limit
    Check the usage with a given limit (thresholds). If this option is not
    given, the script always returns OK.
@@ -158,6 +161,7 @@ OUTPUT=
 PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
+PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
@@ -170,7 +174,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o c:hi:lTvVw: --long critical:,help,instance:,limit,trace,verbose,version,warning: \
+TEMP=$(getopt -o c:hi:KlTvVw: --long critical:,help,instance:,mk,limit,trace,verbose,version,warning: \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -185,6 +189,7 @@ if [[ ${CONTINUE} == true ]] ; then
 
   HELP=false
   VERSION=false
+  CHECK_MK=false
   # Verbosity level
   VERBOSE=0
   # Trace activated
@@ -199,6 +204,7 @@ if [[ ${CONTINUE} == true ]] ; then
       -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -K | --mk ) CHECK_MK=true ; shift ;;
       -l | --limit ) LIMIT=true ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
@@ -213,12 +219,13 @@ fi
 if [[ ${TRACE} == true ]] ; then
   echo ">>>>>" >> ${LOG}
   date >> ${LOG}
-  echo "Instance at ${INSTANCE_HOME}"
+  echo "Instance at ${INSTANCE_HOME}" >> ${LOG}
   echo "PID ${$}" >> ${LOG}
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, limit:${LIMIT}"
+ECHO="${ECHO}, check_mk:${CHECK_MK}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
@@ -266,6 +273,7 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . ${INSTANCE_HOME}/sqllib/db2profile
+    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
   else
     OUTPUT="Instance directory is invalid."
     RETURN=${UNKNOWN}
@@ -362,8 +370,13 @@ FROM TABLE (SYSPROC.ADMIN_GET_DBP_MEM_USAGE()) AS T;"
         RETURN=${OK}
       fi
       LONG_OUTPUT="${LONG_OUTPUT} At node ${NODE} the max usage memory is ${MAX}MB and the current usage memory ${CURRENT}MB."
-      PERFORMANCE="${PERFORMANCE} 'Current memory at node ${NODE}'=${CURRENT}MB"
-      LONG_PERFORMANCE="${LONG_PERFORMANCE} 'Max memory at node ${NODE}'=${MAX}MB"
+      PERFORMANCE="${PERFORMANCE} 'Current_memory_at_node_${NODE}'=${CURRENT}MB"
+      LONG_PERFORMANCE="${LONG_PERFORMANCE} 'Max_memory_at_node_${NODE}'=${MAX}MB"
+      if [[ ${PERF_MK} == "-" ]] ; then
+        PERF_MK="'Current_memory_at_node_${NODE}'=${CURRENT}MB|'Max_memory_at_node_${NODE}'=${MAX}MB"
+      else
+        PERF_MK="'Current_memory_at_node_${NODE}'=${CURRENT}MB|${PERy_MK}|'Max_memory_at_node_${NODE}'=${MAX}MB"
+      fi 
     done < <(printf '%s\n' "${RESULT}" )
   fi
 fi
@@ -373,8 +386,11 @@ if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "${OUTPUT}|${PERFORMANCE}
-${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+if [[ ${CHECK_MK} == true ]] ; then
+  echo "${RETURN} instanceMemory-${INSTANCE_NAME} ${PERF_MK} ${OUTPUT}"
+else
+  echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+fi
 # Returns the error code.
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo "Return code: ${RETURN}"
