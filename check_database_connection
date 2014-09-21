@@ -202,7 +202,7 @@ fi
 if [[ ${TRACE} == true ]] ; then
   echo ">>>>>" >> ${LOG}
   date >> ${LOG}
-  echo "Instance at ${INSTANCE_HOME}"
+  echo "Instance at ${INSTANCE_HOME}" >> ${LOG}
   echo "PID ${$}" >> ${LOG}
 fi
 
