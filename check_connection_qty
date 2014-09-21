@@ -70,6 +70,7 @@
 #   /home/db2inst1.
 # -I | --ignore : Do not check threshold, only informative. It is useful
 #   when only graphs want to be created with the data from this script.
+# -K | --mk : Change the output for Check_MK.
 # -s | --state : Shows the connection state in the performance output.
 #   Normally it shows the distribution of connections by users.
 # -T | --trace : Trace mode. Writes output in /tmp.
@@ -111,7 +112,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w]
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][-K]
 [--filter][--inverted]][-I][-s] | -h | -V }[-T][-v]
 __EOT
 }
@@ -135,6 +136,8 @@ This script checks the quantity of established connections.
 -I | --ignore
    Ignore thresholds, show only informative information. Useful to create
    graphs descriving the activity.
+-K | --mk
+   Changes the output to be compatible with Check_MK.
 -s | --state
    Shows the connections states in the performance output. Normally, it shows
    the distribution of connections per user.
@@ -186,7 +189,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o c:d:hi:IsTvVw: --long critical:,database:,filter:,help,instance:,ignore,inverted,state,trace,verbose,version,warning: \
+TEMP=$(getopt -o c:d:hi:IKsTvVw: --long critical:,database:,filter:,help,instance:,ignore,inverted,mk,state,trace,verbose,version,warning: \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -201,6 +204,7 @@ if [[ ${CONTINUE} == true ]] ; then
 
   HELP=false
   VERSION=false
+  CHECK_MK=false
   # Verbosity level
   VERBOSE=0
   # Trace activated
@@ -221,6 +225,7 @@ if [[ ${CONTINUE} == true ]] ; then
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -I | --ignore ) IGNORE_THRES=true ; shift ;;
+      -K | --mk ) CHECK_MK=true ; shift ;;
       -s | --state ) STATE=true ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
@@ -245,7 +250,7 @@ ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 ECHO="${ECHO}, filter:${FILTER}, inverted:${FILTER_INVERTED}, state:${STATE}"
-ECHO="${ECHO}, ignore:${IGNORE_THRES}"
+ECHO="${ECHO}, ignore:${IGNORE_THRES}, check_mk:${CHECK_MK}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo ${ECHO}
@@ -295,6 +300,7 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . ${INSTANCE_HOME}/sqllib/db2profile
+    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
   else
     OUTPUT="Instance directory is invalid."
     RETURN=${UNKNOWN}
@@ -398,7 +404,21 @@ if [[ ${CONTINUE} == true ]] ; then
           echo "'${STATE}'" >> /tmp/db2_nagios_connections_unknown_state.log
         fi
       done < <( printf '%s\n' "${CONNS}" )
-      LONG_PERFORMANCE="'Connect Completed'=${CONNECTED} 'UOW Executing'=${UOW_EXECUTING} 'UOW Waiting'=${UOW_WAITING} 'Lock Wait'=${LOCK_WAIT} 'Commit Active'=${COMMIT} 'Rollback'=${ROLLBACK} 'Rollback to savepoint'=${ROLLBACK_TO_SAVEPOINT} 'Compiling'=${COMPILING} 'Disconnecting'=${DISCONNECTING} 'Backup'=${BACKUP} 'Restore'=${RESTORE} 'Recompiling'=${RECOMPILING} 'Other'=${OTHER} "
+      LONG_PERFORMANCE_1="'Connect_Completed'=${CONNECTED}"
+      LONG_PERFORMANCE_2="'UOW_Executing'=${UOW_EXECUTING}"
+      LONG_PERFORMANCE_3="'UOW_Waiting'=${UOW_WAITING}"
+      LONG_PERFORMANCE_4="'Lock_Wait'=${LOCK_WAIT}"
+      LONG_PERFORMANCE_5="'Commit_Active'=${COMMIT}"
+      LONG_PERFORMANCE_6="'Rollback'=${ROLLBACK}"
+      LONG_PERFORMANCE_7="'Rollback_to_savepoint'=${ROLLBACK_TO_SAVEPOINT}"
+      LONG_PERFORMANCE_8="'Compiling'=${COMPILING}"
+      LONG_PERFORMANCE_9="'Disconnecting'=${DISCONNECTING}"
+      LONG_PERFORMANCE_10="'Backup'=${BACKUP}"
+      LONG_PERFORMANCE_11="'Restore'=${RESTORE}"
+      LONG_PERFORMANCE_12="'Recompiling'=${RECOMPILING}"
+      LONG_PERFORMANCE_13="'Other'=${OTHER}"
+      LONG_PERFORMANCE="${LONG_PERFORMANCE_1}\n${LONG_PERFORMANCE_2}\n${LONG_PERFORMANCE_3}\n${LONG_PERFORMANCE_4}\n${LONG_PERFORMANCE_5}\n${LONG_PERFORMANCE_6}\n${LONG_PERFORMANCE_7}\n${LONG_PERFORMANCE_8}\n${LONG_PERFORMANCE_9}\n${LONG_PERFORMANCE_10}\n${LONG_PERFORMANCE_11}\n${LONG_PERFORMANCE_12}\n${LONG_PERFORMANCE_13}"
+      PERF_MK="${LONG_PERFORMANCE_1}|${LONG_PERFORMANCE_2}|${LONG_PERFORMANCE_3}|${LONG_PERFORMANCE_4}|${LONG_PERFORMANCE_5}|${LONG_PERFORMANCE_6}|${LONG_PERFORMANCE_7}|${LONG_PERFORMANCE_8}|${LONG_PERFORMANCE_9}|${LONG_PERFORMANCE_10}|${LONG_PERFORMANCE_11}|${LONG_PERFORMANCE_12}|${LONG_PERFORMANCE_13}"
     else
       QTY_FILTERED=$(printf '%s\n' "${CONNS}" | awk '{print $1}' | sort | uniq -c)
       if [[ ${VERBOSE} -ge 3 ]] ; then
@@ -409,8 +429,9 @@ if [[ ${CONTINUE} == true ]] ; then
         USERNAME=$(echo ${LINE} | awk '{print $2}')
         QTY_USER=$(echo ${LINE} | awk '{print $1}')
         AGREGATE=$((${AGREGATE} + ${QTY_USER}))
-        LONG_OUTPUT="${LONG_OUTPUT} ${USERNAME} has ${QTY_USER},"
-        LONG_PERFORMANCE="${LONG_PERFORMANCE} '${USERNAME}'=${AGREGATE}"
+        LONG_OUTPUT="${USERNAME} has ${QTY_USER},"
+        LONG_PERFORMANCE="'User_${USERNAME}'=${AGREGATE}"
+        PERF_MK=${LONG_PERFORMANCE}
       done < <( printf '%s\n' "${QTY_FILTERED}" )
     fi
     if [[ ${VERBOSE} -ge 3 ]] ; then
@@ -428,11 +449,11 @@ if [[ ${CONTINUE} == true ]] ; then
          OUTPUT="Quantity of connections is critical, currently ${QTY}."
          RETURN=${CRITICAL}
       fi
-      PERFORMANCE="'Connections'=${QTY};${WARNING_THRES};${CRITICAL_THRES} "
+      PERFORMANCE="'Connections'=${QTY};${WARNING_THRES};${CRITICAL_THRES}"
     else
       OUTPUT="OK. Threshold ignored."
       RETURN=${OK}
-      PERFORMANCE="'Connections'=${QTY} "
+      PERFORMANCE="'Connections'=${QTY}"
     fi
   else
     OUTPUT="Problem retreiving the applications list"
@@ -445,8 +466,11 @@ if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "${OUTPUT}|${PERFORMANCE}
-${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+if [[ ${CHECK_MK} == true ]] ; then
+  echo "${RETURN} databaseConnection-${INSTANCE_NAME}-${DATABASE_NAME} ${PERF_MK} ${OUTPUT}"
+else
+  echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+fi
 # Returns the error code.
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo "Return code: ${RETURN}"
