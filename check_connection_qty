@@ -431,9 +431,10 @@ if [[ ${CONTINUE} == true ]] ; then
       while IFS= read LINE ; do
         USERNAME=$(echo ${LINE} | awk '{print $2}')
         QTY_USER=$(echo ${LINE} | awk '{print $1}')
-        AGREGATE=$((${AGREGATE} + ${QTY_USER}))
+        #AGREGATE=$((${AGREGATE} + ${QTY_USER}))
         LONG_OUTPUT="${USERNAME} has ${QTY_USER},"
-        LONG_PERFORMANCE="'User_${USERNAME}'=${AGREGATE}"
+        #LONG_PERFORMANCE="'User_${USERNAME}'=${AGREGATE}"
+        LONG_PERFORMANCE="'User_${USERNAME}'=${QTY_USER}"
         PERF_MK=${LONG_PERFORMANCE}
       done < <( printf '%s\n' "${QTY_FILTERED}" )
     fi
