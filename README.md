@@ -1,7 +1,27 @@
 monitor-db2-with-nagios
 =======================
 
-Set of plugins / scripts to monitor DB2 from Nagios.
+Welcome to the monitor-db2-with-nagios project!
+
+Here you will find the sources, the wiki, and a bug tracker.
+
+This project aims to provide a set of open source tools to monitor DB2. The
+monitoring is limited to control that a value is between a range. The output of
+the scripts, allows you to create graphs and see the behavior of the monitored
+elements.
+
+Each script is autonomous, it means there are not dependencies between files,
+and any modification of the behaviour will be and affect the script.
+
+The template file is provided to create new scripts based on it. It was written
+in a way that you just need to fill the TODO with what you want to monitor.
+
+For more information about how to use these scripts, please visit the Wiki:
+  [https://github.com/angoca/monitor-db2-with-nagios/wiki]
+
+If you have seen a problem or you have any comments, please feel free to open
+an issue and tell us your issue:
+  [https://github.com/angoca/monitor-db2-with-nagios/issues]
 
 References:
 
@@ -9,13 +29,3 @@ References:
 * Nagios Plugin API. http://nagios.sourceforge.net/docs/3_0/pluginapi.html
 * Nagios Plugins. http://nagios.sourceforge.net/docs/3_0/plugins.html
 
-These plugins were developed for a DB2 output in English, and for this reason
-they could not work correctly for other languages. If you have this kind of
-issues, contact me in order to improve the plugins (an go ca at ya hoo dot com)
-
-For more information about how to use these scripts, please visit the Wiki:
-  [https://github.com/angoca/monitor-db2-with-nagios/wiki]
-
-If you have seen a problem or you have any comments, please feel free to open an issue and tell us
-your issue:
-  [https://github.com/angoca/monitor-db2-with-nagios/issues]
