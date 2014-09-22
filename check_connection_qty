@@ -462,6 +462,11 @@ if [[ ${CONTINUE} == true ]] ; then
   else
     OUTPUT="Problem retreiving the applications list"
     RETURN=${UNKNOWN}
+    if [[ ${STATE} == true ]] ; then
+      TYPE="PerStatus"
+    else
+      TYPE="PerUser"
+    fi
   fi
 fi
 
