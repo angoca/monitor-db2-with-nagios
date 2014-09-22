@@ -284,7 +284,7 @@ if [[ ${CONTINUE} == true ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  DATE_FILE=/tmp/last_date_check_db2diag_$(echo ${INSTANCE_HOME} | sed 's/\//_/g')
+  DATE_FILE=/tmp/last_date_check_db2diag_${INSTANCE_NAME}
   # Checks if the file can be read
   if [[ -r ${DATE_FILE} ]] ; then
     # Counts the blank lines base on the read date.
@@ -384,6 +384,7 @@ if [[ ${CONTINUE} == true ]] ; then
     OUTPUT="First execution, there is not a reference point."
     RETURN=${UNKNOWN}
     touch ${DATE_FILE}
+    chmod 666 ${DATE_FILE}
     if [[ -w ${DATE_FILE} ]] ; then
       date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
     else
