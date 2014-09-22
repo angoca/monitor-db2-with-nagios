@@ -213,6 +213,7 @@ if [[ ${CONTINUE} == true ]] ; then
   # Trace activated
   TRACE=false
   LOG=/tmp/${APPL_NAME}.log
+  TMP_FILE="/tmp/${APPL_NAME}_snap"
   INSTANCE_HOME=
   DATABASE_NAME=
   WARNING_THRES=20
@@ -340,7 +341,8 @@ if [[ ${CONTINUE} == true ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  TMP_FILE=/tmp/snap
+  touch ${TMP_FILE}
+  chmod 666 ${TMP_FILE}
   COMMAND_SNAPSHOT="db2 get snapshot for database on ${DATABASE}"
   if [[ ${VERBOSE} -ge 2 ]] ; then
     echo "COMMAND: ${COMMAND_SNAPSHOT}"
@@ -359,105 +361,123 @@ if [[ ${CONTINUE} == true ]] ; then
     fi
   fi
 fi
-if [[ ${CONITNUE} == true ]] ; then
+if [[ ${CONTINUE} == true ]] ; then
   if [[ ${ASYNC} == false ]] ; then
     TYPE="PBPCT"
     LNS_GAP_C_T=$(awk '/LSN Gap cleaner triggers/ {print $6}' ${TMP_FILE})
     DIRTY_PAGE_STEAL_C_T=$(awk '/Dirty page steal cleaner triggers/ {print $7}' ${TMP_FILE})
     DIRTY_PAGE_THRESHOLD_C_T=$(awk '/Dirty page threshold cleaner triggers/ {print $7}' ${TMP_FILE})
-    TOTAL=$(( ${LNS_GAP_C_T} + ${DIRTY_PAGE_STEAL_C_T} + ${DIRTY_PAGE_THRESHOLD_C_T} ))
-    if [[ ${TOTAL} -eq 0 ]] ; then
-      PBPCT=0
-      LNS_GAP_PER=0
-      DIRTY_PAGE_THRESHOLD_PER=0
+    if [[ ${LNS_GAP_C_T} == "Not" || ${DIRTY_PAGE_STEAL_C_T} == "Not"
+        || ${DIRTY_PAGE_THRESHOLD_C_T} == "Not" ]] ; then
+      OUTPUT="Performance data is not collected"
+      RETURN=${UNKNOWN}
     else
-      PBPCT=$(( ${DIRTY_PAGE_STEAL_C_T} * 100 / ${TOTAL} ))
-      LNS_GAP_PER=$(( ${LNS_GAP_C_T} * 100 / ${TOTAL} ))
-      DIRTY_PAGE_THRESHOLD_PER=$(( ${DIRTY_PAGE_THRESHOLD_C_T} * 100 / ${TOTAL} ))
-    fi
-    if [[ ${VERBOSE} -ge 3 ]] ; then
-      echo "LNS Gap:'${LNS_GAP_C_T}'"
-      echo "Dirty page steal:'${DIRTY_PAGE_STEAL_C_T}'"
-      echo "Dirty page threshold:'${DIRTY_PAGE_THRESHOLD_C_T}'"
-      echo "PBPCT%=${PBPCT}"
-      echo "LNS Gap%=${LNS_GAP_PER}"
-      echo "Threshold%=${DIRTY_PAGE_THRESHOLD_PER}"
-    fi
+      TOTAL=$(( ${LNS_GAP_C_T} + ${DIRTY_PAGE_STEAL_C_T} + ${DIRTY_PAGE_THRESHOLD_C_T} ))
+      if [[ ${TOTAL} -eq 0 ]] ; then
+        PBPCT=0
+        LNS_GAP_PER=0
+        DIRTY_PAGE_THRESHOLD_PER=0
+      else
+        PBPCT=$(( ${DIRTY_PAGE_STEAL_C_T} * 100 / ${TOTAL} ))
+        LNS_GAP_PER=$(( ${LNS_GAP_C_T} * 100 / ${TOTAL} ))
+        DIRTY_PAGE_THRESHOLD_PER=$(( ${DIRTY_PAGE_THRESHOLD_C_T} * 100 / ${TOTAL} ))
+      fi
+      if [[ ${VERBOSE} -ge 3 ]] ; then
+        echo "LNS Gap:'${LNS_GAP_C_T}'"
+        echo "Dirty page steal:'${DIRTY_PAGE_STEAL_C_T}'"
+        echo "Dirty page threshold:'${DIRTY_PAGE_THRESHOLD_C_T}'"
+        echo "PBPCT%=${PBPCT}"
+        echo "LNS Gap%=${LNS_GAP_PER}"
+        echo "Threshold%=${DIRTY_PAGE_THRESHOLD_PER}"
+      fi
 
-    # Checks the value of PBPCT
-    if [[ ${PBPCT} -lt ${WARNING_THRES} ]] ; then
-      RETURN=${OK}
-      OUTPUT="Percentage of Bad Page cleaner trigger is OK"
-    elif [[ ${PBPCT} -lt ${CRITICAL_THRES} ]] ; then
-      RETURN=${WARNING}
-      OUTPUT="Bad page cleaner tirgger is increasing, check writes"
-    else
-      RETURN=${CRITICAL}
-      OUTPUT="Bad page cleaner trigger is impacting the performance"
-    fi
-    PERFORMANCE="'PBPCT'=${PBPCT}%;${WARNING_THRES};${CRITICAL_THRES};0;100"
-    LNS_PERF="'LNS_Gap'=${LNS_GAP_PER}%"
-    THRES_PERF="'Page_cleaner_threshold'=${DIRTY_PAGE_THRESHOLD_PER}%"
-    LONG_PERFORMANCE="${LNS_PERF}\n${THRES_PERF}"
-    PERF_MK="${PERFORMANCE}|${LNS_PERF}|${THRES_PERF}"
+      # Checks the value of PBPCT
+      if [[ ${PBPCT} -lt ${WARNING_THRES} ]] ; then
+        RETURN=${OK}
+        OUTPUT="Percentage of Bad Page cleaner trigger is OK"
+      elif [[ ${PBPCT} -lt ${CRITICAL_THRES} ]] ; then
+        RETURN=${WARNING}
+        OUTPUT="Bad page cleaner tirgger is increasing, check writes"
+      else
+        RETURN=${CRITICAL}
+        OUTPUT="Bad page cleaner trigger is impacting the performance"
+      fi
+      PERFORMANCE="'PBPCT'=${PBPCT}%;${WARNING_THRES};${CRITICAL_THRES};0;100"
+      LNS_PERF="'LNS_Gap'=${LNS_GAP_PER}%"
+      THRES_PERF="'Page_cleaner_threshold'=${DIRTY_PAGE_THRESHOLD_PER}%"
+      LONG_PERFORMANCE="${LNS_PERF}\n${THRES_PERF}"
+      PERF_MK="${PERFORMANCE}|${LNS_PERF}|${THRES_PERF}"
+    fi  
   else
     TYPE="Ratio"
     BP_DATA_WRITES=$(awk '/Buffer pool data writes/ {print $6}' ${TMP_FILE})
     BP_ASYNC_DATA_WRITES=$(awk '/Asynchronous pool data page writes/ {print $7}' ${TMP_FILE})
     BP_INDEX_WRITES=$(awk '/Buffer pool index writes/ {print $6}' ${TMP_FILE})
     BP_ASYNC_INDEX_WRITES=$(awk '/Asynchronous pool index page writes/ {print $7}' ${TMP_FILE})
-    if [[ ${BP_DATA_WRITES} -eq 0 ]] ; then
-      ASYNC_DATA_WRITES_PER=100
-    else
-      ASYNC_DATA_WRITES_PER=$(( ${BP_ASYNC_DATA_WRITES} * 100 / ${BP_DATA_WRITES} ))
-    fi
-    if [[ ${BP_INDEX_WRITES} -eq 0 ]] ; then
-      ASYNC_INDEX_WRITES_PER=100
-    else
-      ASYNC_INDEX_WRITES_PER=$(( ${BP_ASYNC_INDEX_WRITES} * 100 / ${BP_INDEX_WRITES} ))
-    fi
-    if [[ ${VERBOSE} -ge 3 ]] ; then
-      echo "Data writes:'${BP_DATA_WRITES}'"
-      echo "Data async writes:'${BP_ASYNC_DATA_WRITES}'"
-      echo "Index writes:'${BP_INDEX_WRITES}'"
-      echo "Index async writes:'${BP_ASYNC_INDEX_WRITES}'"
-      echo "Data async%=${ASYNC_DATA_WRITES_PER}"
-      echo "Index async%=${ASYNC_INDEX_WRITES_PER}"
-    fi
-
-    # Checks the asynchronous writes.
-    if [[ ${ASYNC_DATA_WRITES_PER} -gt ${WARNING_THRES} ]] ; then
-      RETURN=${OK}
-      OUTPUT="The quantity of asynchornous writes is Ok"
-    elif [[ ${ASYNC_DATA_WRITES_PER} -gt ${CRITICAL_THRES} ]] ; then
-      RETURN=${WARNING}
-      OUTPUT="Quantity of asynchronous writes is increasing"
-    else
-      RETURN=${CRITICAL}
-      OUTPUT="Quantity of asynchronous writes is bad and it is impacting the performance"
-    fi
-    if [[ ${ASYNC_INDEX_WRITES_PER} -gt ${WARNING_THRES} ]] ; then
-      # The return is the same as in writes.
-      OUTPUT="The quantity of asynchornous writes is Ok"
-    elif [[ ${ASYNC_INDEX_WRITES_PER} -gt ${CRITICAL_THRES} ]] ; then
-      if [[ ${RETURN} -lt ${WARNING} ]] ; then
-        RETURN=${WARNING}
+    if [[ ${BP_DATA_WRITES} == "Not" || ${BP_ASYNC_DATA_WRITES} == "Not"
+        || ${BP_INDEX_WRITES} == "Not" || ${BP_ASYNC_INDEX_WRITES} == "Not" ]] ; then
+      OUTPUT="Performance data is not collected"
+      RETURN=${UNKNOWN}
+    else 
+      if [[ ${BP_DATA_WRITES} -eq 0 ]] ; then
+        ASYNC_DATA_WRITES_PER=100
+      else
+        ASYNC_DATA_WRITES_PER=$(( ${BP_ASYNC_DATA_WRITES} * 100 / ${BP_DATA_WRITES} ))
       fi
-      OUTPUT="Quantity of asynchronous writes is increasing"
-    else
-      RETURN=${CRITICAL}
-      OUTPUT="Quantity of asynchronous writes is bad and it is impacting the performance"
+      if [[ ${BP_INDEX_WRITES} -eq 0 ]] ; then
+        ASYNC_INDEX_WRITES_PER=100
+      else
+        ASYNC_INDEX_WRITES_PER=$(( ${BP_ASYNC_INDEX_WRITES} * 100 / ${BP_INDEX_WRITES} ))
+      fi
+      if [[ ${VERBOSE} -ge 3 ]] ; then
+        echo "Data writes:'${BP_DATA_WRITES}'"
+        echo "Data async writes:'${BP_ASYNC_DATA_WRITES}'"
+        echo "Index writes:'${BP_INDEX_WRITES}'"
+        echo "Index async writes:'${BP_ASYNC_INDEX_WRITES}'"
+        echo "Data async%=${ASYNC_DATA_WRITES_PER}"
+        echo "Index async%=${ASYNC_INDEX_WRITES_PER}"
+      fi
+
+      # Checks the asynchronous writes.
+      if [[ ${ASYNC_DATA_WRITES_PER} -gt ${WARNING_THRES} ]] ; then
+        RETURN=${OK}
+        OUTPUT="The quantity of asynchornous writes is Ok"
+      elif [[ ${ASYNC_DATA_WRITES_PER} -gt ${CRITICAL_THRES} ]] ; then
+        RETURN=${WARNING}
+        OUTPUT="Quantity of asynchronous writes is increasing"
+      else
+        RETURN=${CRITICAL}
+        OUTPUT="Quantity of asynchronous writes is bad and it is impacting the performance"
+      fi
+      if [[ ${ASYNC_INDEX_WRITES_PER} -gt ${WARNING_THRES} ]] ; then
+        # The return is the same as in writes.
+        OUTPUT="The quantity of asynchornous writes is Ok"
+      elif [[ ${ASYNC_INDEX_WRITES_PER} -gt ${CRITICAL_THRES} ]] ; then
+        if [[ ${RETURN} -lt ${WARNING} ]] ; then
+          RETURN=${WARNING}
+        fi
+        OUTPUT="Quantity of asynchronous writes is increasing"
+      else
+        RETURN=${CRITICAL}
+        OUTPUT="Quantity of asynchronous writes is bad and it is impacting the performance"
+      fi
+      ASYNC_DATA_PERF="'Async_data_writes'=${ASYNC_DATA_WRITES_PER}%;${WARNING_THRES};${CRITICAL_THRES};0;100"
+      ASYNC_INDEX_PERF="'Async_index_writes'=${ASYNC_INDEX_WRITES_PER}%;${WARNING_THRES};${CRITICAL_THRES};0;100"
+      PERFORMANCE="${ASYNC_DATA_PERF} ${ASYNC_INDEX_PERF}"
+      PERF_MK="${ASYNC_DATA_PERF}|${ASYNC_INDEX_PERF}"
     fi
-    ASYNC_DATA_PERF="'Async_data_writes'=${ASYNC_DATA_WRITES_PER}%;${WARNING_THRES};${CRITICAL_THRES};0;100"
-    ASYNC_INDEX_PERF="'Async_index_writes'=${ASYNC_INDEX_WRITES_PER}%;${WARNING_THRES};${CRITICAL_THRES};0;100"
-    PERFORMANCE="${ASYNC_DATA_PERF} ${ASYNC_INDEX_PERF}"
-    PERF_MK="${ASYNC_DATA_PERF}|${ASYNC_INDEX_PERF}"
   fi
 fi
 
 # Prints the output.
 if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
+  CONTINUE=false
+  if [[ ${ASYNC} == false ]] ; then
+    TYPE="PBPCT"
+  else
+    TYPE="Ratio"
+  fi
 fi
 # Builds the output.
 if [[ ${CHECK_MK} == true ]] ; then
