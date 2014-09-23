@@ -55,6 +55,7 @@
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
+# -K | --mk : Change the output for Check_MK.
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
@@ -93,7 +94,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory [-c][-w] | -h | -V } [-T][-v]
+Usage: ${1} { -i instanceHomeDirectory [-c][-w][-K] | -h | -V } [-T][-v]
 __EOT
 }
 
@@ -112,6 +113,8 @@ Checks the quantity of open files an compares this value with the soft max.
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1.
+-K | --mk
+   Changes the output to be compatible with Check_MK.
 -T | --trace
    Trace mode: writes date and output in /tmp.
 -v | --verbose
@@ -145,6 +148,7 @@ OUTPUT=
 PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
+PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
@@ -157,7 +161,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o c:hi:TvVw: --long critical:,help,instance:,trace,verbose,version,warning: \
+TEMP=$(getopt -o c:hi:KTvVw: --long critical:,help,instance:,mk,trace,verbose,version,warning: \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -172,6 +176,7 @@ if [[ ${CONTINUE} == true ]] ; then
 
   HELP=false
   VERSION=false
+  CHECK_MK=false
   # Verbosity level
   VERBOSE=0
   # Trace activated
@@ -185,6 +190,7 @@ if [[ ${CONTINUE} == true ]] ; then
       -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -K | --mk ) CHECK_MK=true ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
       -V | --version ) VERSION=true ; shift ;;
@@ -198,12 +204,12 @@ fi
 if [[ ${TRACE} == true ]] ; then
   echo ">>>>>" >> ${LOG}
   date >> ${LOG}
-  echo "Instance at ${INSTANCE_HOME}"
+  echo "Instance at ${INSTANCE_HOME}" >> ${LOG}
   echo "PID ${$}" >> ${LOG}
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
-ECHO="${ECHO}, directory:${INSTANCE_HOME}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}, check_mk:${CHECK_MK}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
@@ -248,6 +254,7 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . ${INSTANCE_HOME}/sqllib/db2profile
+    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
   else
     OUTPUT="Instance directory is invalid."
     RETURN=${UNKNOWN}
@@ -314,8 +321,9 @@ if [[ ${CONTINUE} == true ]] ; then
       OUTPUT="List of open files for instance ${DB2INSTANCE} is ${OUTPUT_LSOF} is critical"
       RETURN=${CRITICAL}
     fi
-    PERFORMANCE="'Open files'=${OUTPUT_LSOF};;;;${OUTPUT_SOFT_LIMIT}"
-    LONG_PERFORMANCE="'Hard limit'=${OUTPUT_HARD_LIMIT}"
+    PERFORMANCE="'Open_files'=${OUTPUT_LSOF};;;;${OUTPUT_SOFT_LIMIT}"
+    LONG_PERFORMANCE="'Hard_limit'=${OUTPUT_HARD_LIMIT}"
+    PERF_MK="${PERFORMANCE}|${LONG_PERFORMANCE}"
   fi
 fi
 
@@ -324,8 +332,11 @@ if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "${OUTPUT}|${PERFORMANCE}
-${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+if [[ ${CHECK_MK} == true ]] ; then
+  echo "${RETURN} openFiles-${INSTANCE_NAME} ${PERF_MK} ${OUTPUT}"
+else
+  echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+fi
 # Returns the error code.
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo "Return code: ${RETURN}"
@@ -336,6 +347,5 @@ if [[ ${TRACE} == true ]] ; then
   echo -e "<<<<<\n" >> ${LOG}
 fi
 exit ${RETURN}
-
 
 
