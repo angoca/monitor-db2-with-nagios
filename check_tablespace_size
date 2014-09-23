@@ -451,14 +451,14 @@ if [[ ${CONTINUE} == true ]] ; then
     echo "RESULT:'${TB_ALLOCATED}'"
   fi
   LONG_OUTPUT="Tablespace ${TABLESPACE_NAME}${TABLESPACE_ID} has allocated ${TB_ALLOCATED} MB"
-  ALLOC_PERF="Allocated=${TB_ALLOCATED}"
+  ALLOC_PERF="Allocated=${TB_ALLOCATED}MB"
 
   ## Used size
   TB_SIZE=$(printf '%s\n' "${TS}" | awk '{print $8}')
   if [[ ${VERBOSE} -ge 3 ]] ; then
     echo "RESULT:'${TB_SIZE}'"
   fi
-  PERFORMANCE="Tablespace=${TB_SIZE}"
+  PERFORMANCE="Tablespace=${TB_SIZE}MB"
 
   ## High water mark
   TB_HWM=$(printf '%s\n' "${TS}" | awk '{print $9}')
@@ -466,7 +466,7 @@ if [[ ${CONTINUE} == true ]] ; then
     echo "RESULT:'${TB_HWM}'"
   fi
   LONG_OUTPUT="${LONG_OUTPUT} and its watermark is at ${TB_HWM}"
-  WATER_PERF="Watermark=${TB_HWM}"
+  WATER_PERF="Watermark=${TB_HWM}MB"
   LONG_PERFORMANCE="${ALLOC_PERF}\n${WATER_PERF}"
   PERF_MK="${PERFORMANCE}|${ALLOC_PERF}|${WATER_PERF}"
   # TODO As part of the performance, display the status (backup pending, restore pending, etc.
