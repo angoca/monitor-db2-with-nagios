@@ -406,6 +406,7 @@ if [[ ${CONTINUE} == true ]] ; then
       LNS_PERF="'LNS_Gap'=${LNS_GAP_PER}%"
       THRES_PERF="'Page_cleaner_threshold'=${DIRTY_PAGE_THRESHOLD_PER}%"
       LONG_PERFORMANCE="${LNS_PERF}\n${THRES_PERF}"
+      SINGLE_PERFORMANCE="${PERFORMANCE} ${LNS_PERF} ${THRES_PERF}"
       PERF_MK="${PERFORMANCE}|${LNS_PERF}|${THRES_PERF}"
     fi  
   else
@@ -464,6 +465,7 @@ if [[ ${CONTINUE} == true ]] ; then
       ASYNC_DATA_PERF="'Async_data_writes'=${ASYNC_DATA_WRITES_PER}%;${WARNING_THRES};${CRITICAL_THRES};0;100"
       ASYNC_INDEX_PERF="'Async_index_writes'=${ASYNC_INDEX_WRITES_PER}%;${WARNING_THRES};${CRITICAL_THRES};0;100"
       PERFORMANCE="${ASYNC_DATA_PERF} ${ASYNC_INDEX_PERF}"
+      SINGLE_PERFORMANCE="${ASYNC_DATA_PERF} ${ASYNC_INDEX_PERF}"
       PERF_MK="${ASYNC_DATA_PERF}|${ASYNC_INDEX_PERF}"
     fi
   fi
@@ -484,7 +486,7 @@ if [[ ${CHECK_MK} == true ]] ; then
   echo "${RETURN} ioCleaners${TYPE}-${INSTANCE_NAME} ${PERF_MK} ${OUTPUT}"
 else
   if [[ ${SINGLE} == true ]] ; then
-    echo "${OUTPUT}|${PERFORMANCE}${LONG_PERFORMANCE}"
+    echo "${OUTPUT}|${SINGLE_PERFORMANCE}"
   else
     echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
   fi
