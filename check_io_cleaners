@@ -341,24 +341,41 @@ if [[ ${CONTINUE} == true ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
+  if [[ ${ASYNC} == false ]] ; then
+    TYPE="PBPCT"
+  else
+    TYPE="Ratio"
+  fi
+  TMP_FILE="${TMP_FILE}.${TYPE}"
   touch ${TMP_FILE}
-  chmod 666 ${TMP_FILE}
+  chmod 666 ${TMP_FILE} 2> /dev/null
+  if [[  ! ( -r "${TMP_FILE}" ) ]] ; then
+    OUTPUT="Temporal file is nor writable"
+    RETURN=${UNKNOWN}
+    CONTINUE=false
+  fi
   COMMAND_SNAPSHOT="db2 get snapshot for database on ${DATABASE}"
   if [[ ${VERBOSE} -ge 2 ]] ; then
     echo "COMMAND: ${COMMAND_SNAPSHOT}"
   fi
   ${COMMAND_SNAPSHOT} > ${TMP_FILE}
 
+  if [[  ! ( -r "${TMP_FILE}" ) ]] ; then
+    OUTPUT="Temporal file is nor readable"
+    RETURN=${UNKNOWN}
+    CONTINUE=false
+  fi
   ERROR_START=$(grep SQL1032N ${TMP_FILE})
   if [[ ${ERROR_START} != "" ]] ; then
     OUTPUT="Instance not started"
     RETURN=${UNKNOWN}
     CONTINUE=false
-    if [[ ${ASYNC} == false ]] ; then
-      TYPE="PBPCT"
-    else
-      TYPE="Ratio"
-    fi
+  fi
+  ERROR_DATA=$(grep SQL1611 ${TMP_FILE})
+  if [[ ${ERROR_DATA} != "" ]] ; then
+    OUTPUT="Snapshot could not be taken"
+    RETURN=${UNKNOWN}
+    CONTINUE=false
   fi
 fi
 if [[ ${CONTINUE} == true ]] ; then
