@@ -176,6 +176,7 @@ if [[ ${CONTINUE} == true ]] ; then
   # Trace activated
   TRACE=false
   LOG=/tmp/${APPL_NAME}.log
+  TMP_FILE=/tmp/${APPL_NAME}.tmp
   INSTANCE_HOME=
   DATABASE_NAME=
   WARNING_THRES=80
@@ -301,20 +302,27 @@ if [[ ${CONTINUE} == true ]] ; then
 fi
 # Checks if the tablespace exist.
 if [[ ${CONTINUE} == true ]] ; then
-  COMMAND_EXIST="db2 list tablespaces"
+  if [[ ${TABLESPACE_NAME} != "" ]] ; then
+    COMMAND_EXIST="db2 -x select trim(TBSP_NAME) from sysibmadm.TBSP_UTILIZATION where TBSP_NAME = '${TABLESPACE_NAME}'"
+    TMP_FILE="${TMP_FILE}.${TABLESPACE_NAME}"
+  else
+    COMMAND_EXIST="db2 -x select trim(TBSP_ID) from sysibmadm.TBSP_UTILIZATION where TBSP_ID = '${TABLESPACE_ID}'"
+    TMP_FILE="${TMP_FILE}.${TABLESPACE_ID}"
+  fi
   if [[ ${VERBOSE} -ge 2 ]] ; then
     echo "COMMAND: ${COMMAND_EXIST}"
   fi
-  if [[ ${TABLESPACE_NAME} != "" ]] ; then
-    EXIST=$(db2 connect to ${DATABASE_NAME} > /dev/null ; if [[ ${?} -ne 0 ]] ; then echo "error" ; fi ; ${COMMAND_EXIST} | grep Name | grep -w ${TABLESPACE_NAME} | awk '{print $3}' ; db2 connect reset > /dev/null)
-  else
-    EXIST=$(db2 connect to ${DATABASE_NAME} > /dev/null ; if [[ ${?} -ne 0 ]] ; then echo "error" ; fi ; ${COMMAND_EXIST} | grep ID | grep -w ${TABLESPACE_ID} | awk '{print $4}' ; db2 connect reset > /dev/null)
+  db2 connect to ${DATABASE_NAME} > /dev/null 2>&1
+  if [[ ${?} -ne 0 ]] ; then
+    CONN_ERROR="error"
   fi
+  ${COMMAND_EXIST} > ${TMP_FILE}
+  EXIST=$(cat ${TMP_FILE} | tr -d ' ')
   if [[ ${VERBOSE} -ge 3 ]] ; then
     echo "RESULT:'${EXIST}'"
   fi
 
-  # Substring para ver si hubo un error
+  # Substring to check any error.
   EXIST_ERROR=$(echo ${EXIST} | cut -c 1-5)
   if [[ ${EXIST_ERROR} == "error" ]] ; then
     OUTPUT="Connection problem"
@@ -337,7 +345,7 @@ if [[ ${CONTINUE} == true ]] ; then
     echo "COMMAND: ${COMMAND_TS}"
   fi
   set -f
-  TS=$(db2 connect to ${DATABASE_NAME} > /dev/null ; if [[ ${?} -ne 0 ]] ; then echo "error" ; fi ; ${COMMAND_TS} ; db2 connect reset > /dev/null)
+  TS="${CONN_ERROR}$(${COMMAND_TS})"
   set +f
   TS_ERROR=$(echo ${TS} | cut -c 1-5)
   if [[ ${TS_ERROR} == "error" ]] ; then
