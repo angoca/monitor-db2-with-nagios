@@ -384,7 +384,7 @@ if [[ ${CONTINUE} == true ]] ; then
     OUTPUT="First execution, there is not a reference point."
     RETURN=${UNKNOWN}
     touch ${DATE_FILE}
-    chmod 666 ${DATE_FILE}
+    chmod 666 ${DATE_FILE} 2> /dev/null
     if [[ -w ${DATE_FILE} ]] ; then
       date +"%Y-%m-%d-%H.%M.%S" > ${DATE_FILE}
     else
