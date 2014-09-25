@@ -243,7 +243,7 @@ if [[ ${OUTPUT} == "" ]] ; then
 fi
 # Builds the output.
 if [[ ${CHECK_MK} == true ]] ; then
-  echo "${RETURN} logConsumption${TYPE}-${INSTANCE_NAME}-${DATABASE_NAME} ${PERF_MK} ${OUTPUT}"
+  echo "${RETURN} memoryUsage ${PERF_MK} ${OUTPUT}"
 else
   echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 fi
