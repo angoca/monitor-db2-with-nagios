@@ -61,6 +61,7 @@
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
+# -K | --mk : Change the output for Check_MK.
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
@@ -100,7 +101,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w]
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][-K]
 [--update] | -h | -V }[-T][-v]
 __EOT
 }
@@ -121,6 +122,8 @@ Checks for long lock waits in the database.
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1.
+-K | --mk
+   Changes the output to be compatible with Check_MK
 -T | --trace
    Trace mode: writes date and output in /tmp.
 -v | --verbose
@@ -155,6 +158,7 @@ OUTPUT=
 PERFORMANCE=
 LONG_OUTPUT=
 LONG_PERFORMANCE=
+PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
@@ -167,7 +171,7 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o c:d:hi:TvVw: --long critical:,database:,help,instance:,trace,update,verbose,version,warning: \
+TEMP=$(getopt -o c:d:hi:KTvVw: --long critical:,database:,help,instance:,mk,trace,update,verbose,version,warning: \
              -n ${APPL_NAME} -- "${@}")
 
 if [[ ${?} -ne 0 ]] ; then
@@ -182,6 +186,7 @@ if [[ ${CONTINUE} == true ]] ; then
 
   HELP=false
   VERSION=false
+  CHECK_MK=false
   # Verbosity level
   VERBOSE=0
   # Trace activated
@@ -198,6 +203,7 @@ if [[ ${CONTINUE} == true ]] ; then
       -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
       -h | --help ) HELP=true ; shift ;;
       -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+      -K | --mk ) CHECK_MK=true ; shift ;;
       -T | --trace ) TRACE=true ; shift ;;
       -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
       -V | --version ) VERSION=true ; shift ;;
@@ -212,14 +218,14 @@ fi
 if [[ ${TRACE} == true ]] ; then
   echo ">>>>>" >> ${LOG}
   date >> ${LOG}
-  echo "Instance at ${INSTANCE_HOME}"
+  echo "Instance at ${INSTANCE_HOME}" >> ${LOG}
   echo "PID ${$}" >> ${LOG}
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
-ECHO="${ECHO}, update:${UPDATE_MON}"
+ECHO="${ECHO}, update:${UPDATE_MON}, check_mk:${CHECK_MK}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo ${ECHO}
@@ -269,6 +275,7 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
     # Load the DB2 profile.
     . ${INSTANCE_HOME}/sqllib/db2profile
+    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
   else
     OUTPUT="Instance directory is invalid."
     RETURN=${UNKNOWN}
@@ -298,92 +305,44 @@ if [[ ${CONTINUE} == true ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  COMMAND_LOCKS="db2 -x select rtrim(char(locks_waiting)) as locks from table(snapshot_database('${DATABASE_NAME}', -1)) as snapshot_database"
+  COMMAND_LOCKS="db2 -x select rtrim(char(NUM_LOCKS_WAITING)), LOCK_WAIT_TIME from table(sysproc.MON_GET_DATABASE (-1)) as snapshot_database"
   if [[ ${VERBOSE} -ge 2 ]] ; then
     echo "COMMAND: ${COMMAND_LOCKS}"
   fi
 
-  LOCKS=$(db2 connect to ${DATABASE_NAME} > /dev/null ; ${COMMAND_LOCKS} ; db2 connect reset > /dev/null)
+  RESULT_LOCKS=$(db2 connect to ${DATABASE_NAME} > /dev/null ; ${COMMAND_LOCKS} ; db2 connect reset > /dev/null)
   if [[ ${TRACE} == true ]] ; then
-    echo "RESULT:'${LOCKS}'" >> ${LOG}
+    echo "RESULT:'${RESULT_LOCKS}'" >> ${LOG}
   fi
-
+  if [[ ${VERBOSE} -ge 3 ]] ; then 
+    echo "RESULT:'${RESULT_LOCKS}'"
+  fi
   # Check for errors
-  CONN_ERROR=$(echo ${LOCKS} | grep SQL1024)
-  SYS_ERROR=$(echo ${LOCKS} | grep SQL1042)
+  CONN_ERROR=$(echo ${RESULT_LOCKS} | grep SQL1024)
   if [[ ${CONN_ERROR} != "" ]] ; then
     OUTPUT="Connection problem"
     RETURN=${UNKNOWN}
     CONTINUE=false
-  elif [[ ${SYS_ERROR} != "" ]] ; then
-    OUTPUT="Unexpected error"
-    RETURN=${UNKNOWN}
-    CONTINUE=false
-  fi
-  LOCKS=$(echo ${LOCKS} | cut -d' ' -f1)
-  if [[ ${VERBOSE} -ge 3 ]] ; then 
-    echo "RESULT:'${LOCKS}'"
   fi
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  COMMAND_LOCK="db2 get snapshot for locks on ${DATABASE_NAME}"
-  if [[ ${VERBOSE} == true ]] ; then
-    echo "COMMAND: ${COMMAND_LOCK}"
-  fi
-  if [[ ${UPDATE_MON} == true ]] ; then
-    OUTPUT_LOCK=$(db2 update monitor switches using lock on > /dev/null ; ${COMMAND_LOCK})
-  else
-    OUTPUT_LOCK=$(${COMMAND_LOCK})
-  fi
-  if [[ ${TRACE} == true ]] ; then
-    echo "RESULT:'${OUTPUT_LOCK}'" >> ${LOG}
-  fi
+  LOCKS=$(echo ${RESULT_LOCKS} | awk '{print $1}')
+  LOCK_WAIT=$(echo ${RESULT_LOCKS} | awk '{print $2'})
 
-  LOCK_WAIT=$(printf '%s\n' "${OUTPUT_LOCK}" | grep "Total wait time (ms)" | awk -F"= " '{print $2}' | sort -rn | head -1) 
-  if [[ ${VERBOSE} -ge 3 ]] ; then 
-    echo "RESULT:'${LOCK_WAIT}'"
-  fi
-
-  # Validates that LOCKS is a number and does not contain errors.
-  if [[ ! ${LOCKS} =~ ^[0-9]+$ ]] ; then
-    OUTPUT="Problem retrieving the locks."
-    RETURN=${UNKNOWN}
-  elif [[ ${LOCKS} -eq 0 ]] ; then
-    OUTPUT="OK. There is not any application in lock-wait state."
-    PERFORMANCE="'Long duration locks'=0;${WARNING_THRES};${CRITICAL_THRES};0 "
-    RETURN=${OK}
-  elif [[ ${LOCK_WAIT} != "Not Collected" ]] ; then
-    LOCK_IDS=$(printf '%s\n' "${OUTPUT_LOCK}" | grep "ID of agent holding lock" | awk -F"= " '{print $2}' | sort -u)
-    if [[ ${VERBOSE} -ge 3 ]] ; then 
-      echo "RESULT:'${LOCK_IDS}'"
-    fi
-    LINES=$(printf '%s\n' "${LOCK_IDS}" | wc -l)
-    if [[ ${LINES} -gt 0 ]] ; then
-      LOCK_IDS=$(printf '%s\n' "${LOCK_IDS}" | sed 'N;s/\n/, /')
-    fi
-
-    if [[ ${LOCK_WAIT} -gt ${CRITICAL_THRES} ]] ; then
-      OUTPUT="There are ${LOCKS} application(s) in lock wait. Handle(s) ${LOCK_IDS}."
-      LONG_OUTPUT="The handles of the blocking applications are: ${LOCK_IDS}."
-      RETURN=${CRITICAL}
-    elif [[ ${LOCK_WAIT} -gt ${WARNING_THRES} ]] ; then
-      OUTPUT="There are ${LOCKS} application(s) in lock wait. Handle(s) ${LOCK_IDS}."
-      LONG_OUTPUT="The handles of the blocking applications are: ${LOCK_IDS}."
-      RETURN=${WARNING}
-    else
-      OUTPUT="OK. There are short time locks."
-      RETURN=${OK}
-    fi
-    if [[ ${VERBOSE} == true ]] ; then
-      OUTPUT="${OUTPUT} - IDs ${LOCK_IDS}"
-    fi
-    PERFORMANCE="'Long duration locks'=${LOCK_WAIT};${WARNING_THRES};${CRITICAL_THRES} "
-  else
-    OUTPUT="There are lock-waits, but the monitor switches are off."
+  if [[ ${LOCK_WAIT} -gt ${CRITICAL_THRES} ]] ; then
+    OUTPUT="There are ${LOCKS} application(s) in lock wait."
+    RETURN=${CRITICAL}
+  elif [[ ${LOCK_WAIT} -gt ${WARNING_THRES} ]] ; then
+    OUTPUT="There are ${LOCKS} application(s) in lock wait."
     RETURN=${WARNING}
+  else
+    OUTPUT="OK. There could be short time locks."
+    RETURN=${OK}
   fi
-  PERFORMANCE="'All locks'=${LOCKS} "
+  PERFORMANCE="'Long_duration_locks'=${LOCK_WAIT};${WARNING_THRES};${CRITICAL_THRES}"
+  LONG_PERFORMANCE="'All_locks'=${LOCKS}"
+  PERF_MK="${PERFORMANCE}|${LONG_PERFORMANCE}"
 fi
 
 # Prints the output.
@@ -391,8 +350,11 @@ if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
 fi
 # Builds the output.
-echo "${OUTPUT}|${PERFORMANCE}
-${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+if [[ ${CHECK_MK} == true ]] ; then
+  echo "${RETURN} logConsumption${TYPE}-${INSTANCE_NAME}-${DATABASE_NAME} ${PERF_MK} ${OUTPUT}"
+else
+  echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+fi
 # Returns the error code.
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo "Return code: ${RETURN}"
