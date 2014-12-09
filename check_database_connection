@@ -23,6 +23,8 @@
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
 #
+# In some UNIX the long parameters are not available.
+#
 # In order to be used in Nagios, you have to configure the following.
 #
 # # 'check_database_connection' command definition
@@ -161,8 +163,27 @@ fi
 # The following requieres GNU getopt. See the following discusion.
 # http://stackoverflow.com/questions/402377
 
-TEMP=$(getopt -o d:hi:KTvV --long database:,help,instance:,mk,trace,verbose,version \
+if [[ ${OS:0:5} == "Linux" ]] ; then
+  TEMP=$(getopt -o d:hi:KTvV --long database:,help,instance:,mk,trace,verbose,version \
              -n ${APPL_NAME} -- "${@}")
+elif [[ ${OS:0:3} == "AIX" ]] ; then
+  TEMP=$(getopt -o d:hi:KTvV -n ${APPL_NAME} -- "${@}")
+elif [[ ${OS:0:6} == "Darwin" || ${OS:0:5} == "SunOS" || ${OS:0:5} == "HP-UX" ]] ; then
+  echo "This plugin is not yet supported in your platform."
+  echo "Please create a ticket in GitHub if you want to enable your current platform."
+  echo "https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+elif [[ ${OS:0:6} == "CYGWIN" ]] ; then
+  echo "This plugin is not supported in Cygwin"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+else
+  echo "The platform is uknown: ${OS}"
+  echo "Please create a ticket in GitHub: https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
 
 if [[ ${?} -ne 0 ]] ; then
   print_usage ${APPL_NAME}
