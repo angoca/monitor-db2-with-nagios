@@ -287,7 +287,7 @@ if [[ ${CONTINUE} == true ]] ; then
     OUTPUT="Database is not in HADR"
     RETURN=${UNKNOWN}
   else
-    COMMAND_HADR="db2pd -db wfscpd -hadr"
+    COMMAND_HADR="db2pd -db ${DATABASE_NAME} -hadr"
     if [[ ${VERBOSE} -ge 2 ]] ; then
       echo "COMMAND: ${COMMAND_HADR}"
     fi
