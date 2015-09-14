@@ -268,7 +268,7 @@ if [[ ${CONTINUE} == true ]] ; then
       esac
     done
   elif [[ "${OS:0:3}" = "AIX" ]] ; then
-    while [ $1 != -- ] ; do
+    while [[ $1 != -- ]] ; do
       case "${1}" in
         -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -d) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
