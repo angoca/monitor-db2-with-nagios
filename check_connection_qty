@@ -194,16 +194,27 @@ fi
 # Checks the operating system. geopt works different in AIX than in Linux.
 OS=$(uname)
 
-if [ "${OS}" = "AIX" ] ; then
-  set -- $(getopt c:d:hi:IKsTvVw: ${*})
-elif [ "${OS}" = "Linux" ] ; then
-  # The following requieres GNU getopt. See the following discusion.
+if [[ "${OS:0:5}" = "Linux" ]] ; then
+  # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
   TEMP=$(getopt -o c:d:hi:IKsTvVw: --long critical:,database:,filter:,help,instance:,ignore,inverted,mk,state,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
+elif [[ "${OS:0:3}" = "AIX" ]] ; then
+  set -- $(getopt c:d:hi:IKsTvVw: ${*})
+elif [[ ${OS:0:6} == "Darwin" || ${OS:0:5} == "SunOS" || ${OS:0:5} == "HP-UX" ]] ; then
+  echo "This plugin is not yet supported in your platform."
+  echo "Please create a ticket in GitHub if you want to enable your current platform."
+  echo "https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+elif [[ ${OS:0:6} == "CYGWIN" ]] ; then
+  echo "This plugin is not supported in Cygwin"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
 else
-  OUTPUT="OS not supported for this plugin. Please contact the author."
+  echo "The platform is unknown: ${OS}"
+  echo "Please create a ticket in GitHub: https://github.com/angoca/monitor-db2-with-nagios/issues"
   RETURN=${UNKNOWN}
   CONTINUE=false
 fi
@@ -215,7 +226,7 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  if [ "${OS}" = "Linux" ] ; then
+  if [[ "${OS}" = "Linux" ]] ; then
     # Note the quotes around ${TEMP}: they are essential!
     eval set -- "${TEMP}"
   fi
@@ -236,25 +247,7 @@ if [[ ${CONTINUE} == true ]] ; then
   STATE=false
   FILTER=
   FILTER_INVERTED=false
-  if [ "${OS}" = "AIX" ] ; then
-    while [ $1 != -- ] ; do
-      case "${1}" in
-        -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        -d) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        -h) HELP=true ; shift ;;
-        -i) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        -I) IGNORE_THRES=true ; shift ;;
-        -K) CHECK_MK=true ; shift ;;
-        -s) STATE=true ; shift ;;
-        -T) TRACE=true ; shift ;;
-        -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
-        -V) VERSION=true ; shift ;;
-        -w) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        -f) FILTER=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        -n) FILTER_INVERTED=true ; shift ;;
-      esac
-    done
-  elif [ "${OS}" = "Linux" ] ; then
+  if [[ "${OS:0:5}" = "Linux" ]] ; then
     while true; do
       case "${1}" in
         -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
@@ -272,6 +265,24 @@ if [[ ${CONTINUE} == true ]] ; then
         --inverted ) FILTER_INVERTED=true ; shift ;;
         -- ) shift; break ;;
         * ) break ;;
+      esac
+    done
+  elif [[ "${OS:0:3}" = "AIX" ]] ; then
+    while [ $1 != -- ] ; do
+      case "${1}" in
+        -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -d) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -h) HELP=true ; shift ;;
+        -i) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -I) IGNORE_THRES=true ; shift ;;
+        -K) CHECK_MK=true ; shift ;;
+        -s) STATE=true ; shift ;;
+        -T) TRACE=true ; shift ;;
+        -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+        -V) VERSION=true ; shift ;;
+        -w) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -f) FILTER=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -n) FILTER_INVERTED=true ; shift ;;
       esac
     done
   fi
@@ -527,5 +538,4 @@ if [[ ${TRACE} == true ]] ; then
   echo -e "<<<<<\n" >> ${LOG}
 fi
 exit ${RETURN}
-
 
