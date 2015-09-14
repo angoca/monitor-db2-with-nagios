@@ -77,6 +77,8 @@
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
 #
+# In AIX, the long name options are not supported.
+#
 # The exit codes are the standard for Nagios.
 #
 # 0 The plugin was able to check the service and it appeared to be functioning
@@ -145,6 +147,8 @@ that the provided percentage.
    Executes the script in verbose mode (multiple times).
 -V | --version
    Shows the current version of this script.
+
+In AIX, the long name options are not supported.
 __EOT
 }
 
@@ -178,11 +182,33 @@ if [[ ${#} -eq 0 ]] ; then
   CONTINUE=false
 fi
 
-# The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377
+# Checks the operating system. geopt works different in AIX than in Linux.
+OS=$(uname)
 
-TEMP=$(getopt -o c:d:hi:Kp:r:TvV --long critical:,database:,help,instance:,mk,percentage:,refresh:,trace,verbose,version \
+if [[ "${OS:0:5}" = "Linux" ]] ; then
+  # The following requieres GNU getopt. See the following discusion.
+  # http://stackoverflow.com/questions/402377
+
+  TEMP=$(getopt -o c:d:hi:Kp:r:TvV --long critical:,database:,help,instance:,mk,percentage:,refresh:,trace,verbose,version \
              -n ${APPL_NAME} -- "${@}")
+elif [[ "${OS:0:3}" = "AIX" ]] ; then
+  set -- $(getopt c:d:hi:Kp:r:TvV ${*})
+elif [[ ${OS:0:6} == "Darwin" || ${OS:0:5} == "SunOS" || ${OS:0:5} == "HP-UX" ]] ; then
+  echo "This plugin is not yet supported in your platform."
+  echo "Please create a ticket in GitHub if you want to enable your current platform."
+  echo "https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+elif [[ ${OS:0:6} == "CYGWIN" ]] ; then
+  echo "This plugin is not supported in Cygwin"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+else
+  echo "The platform is unknown: ${OS}"
+  echo "Please create a ticket in GitHub: https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
 
 if [[ ${?} -ne 0 ]] ; then
   print_usage ${APPL_NAME}
@@ -191,8 +217,10 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  # Note the quotes around ${TEMP}: they are essential!
-  eval set -- "${TEMP}"
+  if [[ "${OS}" = "Linux" ]] ; then
+    # Note the quotes around ${TEMP}: they are essential!
+    eval set -- "${TEMP}"
+  fi
 
   HELP=false
   VERSION=false
@@ -209,22 +237,39 @@ if [[ ${CONTINUE} == true ]] ; then
   PERCENTAGE=-1
   PERCENTAGE_SET=false
   REFRESH=-1
-  while true; do
-    case "${1}" in
-      -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; CRITICAL_SET=true ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true ; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -K | --mk ) CHECK_MK=true ; shift ;;
-      -p | --percentage ) PERCENTAGE=$(echo ${2} | cut -d' ' -f1) ; PERCENTAGE_SET=true ; shift 2 ;;
-      -r | --refresh ) REFRESH=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -T | --trace ) TRACE=true ; shift ;;
-      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
-      -V | --version ) VERSION=true ; shift ;;
-      -- ) shift ; break ;;
-      * ) break ;;
-    esac
-  done
+  if [[ "${OS:0:5}" = "Linux" ]] ; then
+    while true; do
+      case "${1}" in
+        -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; CRITICAL_SET=true ; shift 2 ;;
+        -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -h | --help ) HELP=true ; shift ;;
+        -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -K | --mk ) CHECK_MK=true ; shift ;;
+        -p | --percentage ) PERCENTAGE=$(echo ${2} | cut -d' ' -f1) ; PERCENTAGE_SET=true ; shift 2 ;;
+        -r | --refresh ) REFRESH=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -T | --trace ) TRACE=true ; shift ;;
+        -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+        -V | --version ) VERSION=true ; shift ;;
+        -- ) shift ; break ;;
+        * ) break ;;
+      esac
+    done
+  elif [[ "${OS:0:3}" = "AIX" ]] ; then
+    while [[ $1 != -- ]] ; do
+      case "${1}" in
+        -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; CRITICAL_SET=true ; shift 2 ;;
+        -d) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -h) HELP=true ; shift ;;
+        -i) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -K) CHECK_MK=true ; shift ;;
+        -p) PERCENTAGE=$(echo ${2} | cut -d' ' -f1) ; PERCENTAGE_SET=true ; shift 2 ;;
+        -r) REFRESH=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -T) TRACE=true ; shift ;;
+        -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+        -V) VERSION=true ; shift ;;
+      esac
+    done
+  fi
 fi
 
 if [[ ${TRACE} == true ]] ; then
@@ -437,5 +482,4 @@ if [[ ${TRACE} == true ]] ; then
   echo -e "<<<<<\n" >> ${LOG}
 fi
 exit ${RETURN}
-
 
