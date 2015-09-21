@@ -271,6 +271,26 @@ if [[ ${CONTINUE} == true ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
+  COMMAND_VERSION="db2level"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_VERSION}"
+  fi
+  VERSION=$(${COMMAND_VERSION})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${VERSION}'" >> ${LOG}
+  fi
+  VERSION=$(printf '%s\n' "${VERSION}" | awk '/Informational tokens/ {print $5}' | awk -F. '{print $1"."$2}')
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${VERSION}'"
+  fi
+  if [[ ( ${VERSION} != "v10.5" ) && ( ${VERSION} != "v10.1" ) && ( ${VERSION} != "v9.5" ) ]] ; then
+    OUTPUT="The current DB2 version (${VERSION}) is not supported."
+    RETURN=${UNKNOWN}
+    CONTINUE=false
+  fi
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
   COMMAND_ROLE="db2 get db cfg for ${DATABASE_NAME}"
   if [[ ${VERBOSE} -ge 2 ]] ; then
     echo "COMMAND: ${COMMAND_ROLE}"
@@ -295,57 +315,108 @@ if [[ ${CONTINUE} == true ]] ; then
     if [[ ${TRACE} == true ]] ; then
       echo "RESULT:'${OUTPUT_HADR}'" >> ${LOG}
     fi
-    CONNECTED=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/onnected/ {print $1}' | tail -1)
-    if [[ ${ROLE} == "PRIMARY" ]] ; then
-      HADR_STATUS=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/^Primary / {print $2}')
+    if [[ ${VERSION} == "v9.7" ]] ; then
+      CONNECTED=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/onnected/ {print $1}' | tail -1)
+      if [[ ${ROLE} == "PRIMARY" ]] ; then
+        HADR_STATUS=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/^Primary / {print $2}')
+        if [[ ${VERBOSE} -ge 3 ]] ; then
+          echo "RESULT:'${CONNECTED}'"
+          echo "RESULT:'${HADR_STATUS}'"
+        fi
+        if [[ ${HADR_STATUS} == "Peer" ]] ; then
+          OUTPUT="OK. Database is primary and peer"
+          RETURN=${OK}
+        elif [[ ${HADR_STATUS} == "Disconnected" ]] ; then
+          OUTPUT="Standby database is not reachable (${CONNECTED})."
+          RETURN=${CRITICAL}
+        else
+          OUTPUT="Database is primary and not peer. ${HADR_STATUS} ${CONNECTED}"
+          RETURN=${UNKNOWN}
+        fi
+      elif [[ ${ROLE} == "STANDBY" ]] ; then
+        HADR_STATUS=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/^Standby/ {print $2}')
+        if [[ ${VERBOSE} -ge 3 ]] ; then
+          echo "RESULT:'${CONNECTED}'"
+          echo "RESULT:'${HADR_STATUS}'"
+        fi
+        if [[ ${HADR_STATUS} == "Peer" ]] ; then
+          OUTPUT="OK. Database is standby and peer"
+          RETURN=${OK}
+        elif [[ ${HADR_STATUS} == "DisconnectedPeer" ]] ; then
+          OUTPUT="Pimary database is not reachable (${CONNECTED})."
+          RETURN=${CRITICAL}
+        elif [[ ${HADR_STATUS} == "RemoteCatchupPending" ]] ; then
+          OUTPUT="StandBy in remote catchup pending. Make sure database primary is reachable (${CONNECTED})."
+          RETRUN=${WARNING}
+        else
+          OUTPUT="Database is standby and not peer. ${HADR_STATUS} ${CONNECTED}"
+          RETURN=${UNKNOWN}
+        fi
+        # Divided by 1000 (3E8)
+        HEX_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $3}' | cut -dx -f2 | sed 'N;s/\n/-/' | awk '{print "ibase=16;("$1")/3E8"}' | bc)
+        PERFORMANCE="HexDiff_K=${HEX_DIFF}" 
+        PAGE_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $2}' | sed 'N;s/\n/-/' | bc)
+        LOG_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $1}' | cut -d. -f1 | sed 's/^.//' | sed 'N;s/\n/-/' | bc)
+        if [[ ${PAGE_DIFF} -lt 0 ]] ; then
+          # The 2000 value is based on observation, but not sure.
+          PAGE_DIFF=$((${PAGE_DIFF}+2000))
+        fi
+        LONG_PERFORMANCE="PageDiff=${PAGE_DIFF}\nLogDiff=${LOG_DIFF}" 
+        PERF_MK="${PERFORMANCE}|${PAGE_DIFF}|${LOG_DIFF}"
+      else
+        OUTPUT="Database role is unknown (${ROLE})"
+        RETURN=${UNKNOWN}
+        CONTINUE=false
+      fi
+    elif [[ ( ${VERSION} == "v10.5" ) || ( ${VERSION} == "v10.1" ) ]] ; then
+      CONNECTED=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/HADR_CONNECT_STATUS / {print $3}')
+      HADR_STATUS=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/HADR_STATE/ {print $3}')
       if [[ ${VERBOSE} -ge 3 ]] ; then
         echo "RESULT:'${CONNECTED}'"
         echo "RESULT:'${HADR_STATUS}'"
       fi
-      if [[ ${HADR_STATUS} == "Peer" ]] ; then
-        OUTPUT="OK. Database is primary and peer"
-        RETURN=${OK}
-      elif [[ ${HADR_STATUS} == "Disconnected" ]] ; then
-        OUTPUT="Standby database is not reachable (${CONNECTED})."
-        RETURN=${CRITICAL}
+      if [[ ${ROLE} == "PRIMARY" ]] ; then
+        if [[ ${HADR_STATUS} == "PEER" ]] ; then
+          OUTPUT="OK. Database is primary and peer"
+          RETURN=${OK}
+        elif [[ ${HADR_STATUS} == "DISCONNECTED" ]] ; then
+          OUTPUT="Standby database is not reachable (${CONNECTED})."
+          RETURN=${CRITICAL}
+        else
+          OUTPUT="Database is primary and not peer. ${HADR_STATUS} ${CONNECTED}"
+          RETURN=${UNKNOWN}
+        fi
+      elif [[ ${ROLE} == "STANDBY" ]] ; then
+        if [[ ${HADR_STATUS} == "PEER" ]] ; then
+          OUTPUT="OK. Database is standby and peer"
+          RETURN=${OK}
+        elif [[ ${HADR_STATUS} == "DISCONNECTED" ]] ; then
+          OUTPUT="Pimary database is not reachable (${CONNECTED})."
+          RETURN=${CRITICAL}
+        elif [[ ${HADR_STATUS} == "REMOTE_CATCHUP_PENDING" ]] ; then
+          OUTPUT="StandBy in remote catchup pending. Make sure database primary is reachable (${CONNECTED})."
+          RETRUN=${WARNING}
+        else
+          OUTPUT="Database is standby and not peer. ${HADR_STATUS} ${CONNECTED}"
+          RETURN=${UNKNOWN}
+        fi
+        PAGE_PRI=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/PRIMARY_LOG_FILE/ {print $4}' | awk -F, '{print $1}')
+        PAGE_STA=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/STANDBY_LOG_FILE/ {print $4}' | awk -F, '{print $1}')
+        PAGE_DIFF=$((${PAGE_PRI}-${PAGE_STA}))
+        LOG_PRI=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/PRIMARY_LOG_FILE/ {print $r3}' | cut -c2-8)
+        LOG_STA=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/STANDBY_LOG_FILE/ {print $r3}' | cut -c2-8)
+        LOG_DIFF=$((${LOG_PRI}-${LOG_STA}))
+        if [[ ${PAGE_DIFF} -lt 0 ]] ; then
+          # The 2000 value is based on observation, but not sure.
+          PAGE_DIFF=$((${PAGE_DIFF}+2000))
+        fi
+        LONG_PERFORMANCE="PageDiff=${PAGE_DIFF}\nLogDiff=${LOG_DIFF}"
+        PERF_MK="${PERFORMANCE}|${PAGE_DIFF}|${LOG_DIFF}"
       else
-        OUTPUT="Database is primary and not peer. ${HADR_STATUS} ${CONNECTED}"
+        OUTPUT="Database role is unknown (${ROLE})"
         RETURN=${UNKNOWN}
+        CONTINUE=false
       fi
-    elif [[ ${ROLE} == "STANDBY" ]] ; then
-      HADR_STATUS=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/^Standby/ {print $2}')
-      if [[ ${VERBOSE} -ge 3 ]] ; then
-        echo "RESULT:'${CONNECTED}'"
-        echo "RESULT:'${HADR_STATUS}'"
-      fi
-      if [[ ${HADR_STATUS} == "Peer" ]] ; then
-        OUTPUT="OK. Database is standby and peer"
-        RETURN=${OK}
-      elif [[ ${HADR_STATUS} == "DisconnectedPeer" ]] ; then
-        OUTPUT="Pimary database is not reachable (${CONNECTED})."
-        RETURN=${CRITICAL}
-      elif [[ ${HADR_STATUS} == "RemoteCatchupPending" ]] ; then
-        OUTPUT="StandBy in remote catchup pending. Make sure database primary is reachable (${CONNECTED})."
-        RETRUN=${WARNING}
-      else
-        OUTPUT="Database is standby and not peer. ${HADR_STATUS} ${CONNECTED}"
-        RETURN=${UNKNOWN}
-      fi
-      # Divided by 1000 (3E8)
-      HEX_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $3}' | cut -dx -f2 | sed 'N;s/\n/-/' | awk '{print "ibase=16;("$1")/3E8"}' | bc)
-      PERFORMANCE="HexDiff_K=${HEX_DIFF}" 
-      PAGE_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $2}' | sed 'N;s/\n/-/' | bc)
-      LOG_DIFF=$(printf '%s\n' "${OUTPUT_HADR}" | awk '/LOG/ {print $1}' | cut -d. -f1 | sed 's/^.//' | sed 'N;s/\n/-/' | bc)
-      if [[ ${PAGE_DIFF} -lt 0 ]] ; then
-        # The 2000 value is based on observation, but not sure.
-        PAGE_DIFF=$((${PAGE_DIFF}+2000))
-      fi
-      LONG_PERFORMANCE="PageDiff=${PAGE_DIFF}\nLogDiff=${LOG_DIFF}" 
-      PERF_MK="${PERFORMANCE}|${PAGE_DIFF}|${LOG_DIFF}"
-    else
-      OUTPUT="Database role is unknown (${ROLE})"
-      RETURN=${UNKNOWN}
-      CONTINUE=false
     fi
   fi
 fi
