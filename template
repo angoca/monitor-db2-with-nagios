@@ -20,63 +20,20 @@
 
 # TODO This is a template for script. The script has to be silent, it means it
 # should not generate any output different to the OUTPUT variable.
-
-
-
-
 #
 # Here comes the documentation
-
-
-
-
 #
 # TODO Nagios usage.
 #
 # TODO Nagios with NRPE.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #
 # Parameters:
-
-
-
 # -c | --critical : TODO What is critical.
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
 # -K | --mk : Change the output for Check_MK.
-
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
@@ -130,16 +87,9 @@ function print_help {
 -------------------------------------------------------------------------------
 TODO Add a global description.
 TODO Add arguments in detail.
-
-
-
-
-
 -c | --critical INTEGER
-
    TODO What is critical.
    TODO Default 2.
-
 -d | --database STRING
    Database name.
 -h | --help
@@ -148,8 +98,6 @@ TODO Add arguments in detail.
    Instance home directory. It is usually /home/db2inst1.
 -K | --mk
    Changes the output to be compatible with Check_MK.
-
-
 -T | --trace
    Trace mode: writes date and output in /tmp.
 -v | --verbose
@@ -158,10 +106,7 @@ TODO Add arguments in detail.
    Shows the current version of this script.
 -w | --warning INTEGER
    TODO What is warning.
-
-
    TODO Default 1.
-
 
 In AIX, the long name options are not supported.
 __EOT
@@ -196,11 +141,6 @@ if [[ ${#} -eq 0 ]] ; then
   RETURN=${UNKNOWN}
   CONTINUE=false
 fi
-
-
-
-
-
 
 # Checks the operating system. geopt works different in AIX than in Linux.
 OS=$(uname)
@@ -242,20 +182,14 @@ if [[ ${CONTINUE} == true ]] ; then
     # Note the quotes around ${TEMP}: they are essential!
     eval set -- "${TEMP}"
   fi
-
   HELP=false
   VERSION=false
   CHECK_MK=false
-
-
   # Verbosity level
   VERBOSE=0
-
-
   # Trace activated
   TRACE=false
   LOG=/tmp/${APPL_NAME}.log
-
   INSTANCE_HOME=
   DATABASE_NAME=
   WARNING_THRES=1
@@ -263,15 +197,11 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ "${OS:0:5}" = "Linux" ]] ; then
     while true; do
       case "${1}" in
-
-
-
         -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -h | --help ) HELP=true ; shift ;;
         -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -K | --mk ) CHECK_MK=true ; shift ;;
-
         -T | --trace ) TRACE=true ; shift ;;
         -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V | --version ) VERSION=true ; shift ;;
@@ -296,7 +226,6 @@ if [[ ${CONTINUE} == true ]] ; then
       esac
     done
   fi
-
 fi
 
 if [[ ${TRACE} == true ]] ; then
@@ -307,7 +236,6 @@ if [[ ${TRACE} == true ]] ; then
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
-
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 ECHO="${ECHO}, check_mk:${CHECK_MK}"
@@ -345,7 +273,6 @@ if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
 fi
 
 if [[ ${CONTINUE} == true
-
     && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
     || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
     || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
@@ -355,20 +282,6 @@ if [[ ${CONTINUE} == true
   echo "Threshold should be greater than 0."
   RETURN=${UNKNOWN}
   CONTINUE=false
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
@@ -440,169 +353,20 @@ fi
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 if [[ ${CONTINUE} == true ]] ; then
   # TODO add the logic
   echo "Logic goes here!"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 fi
 
 # Prints the output.
 if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
-
-
-
-
-
-
 fi
 # Builds the output.
 if [[ ${CHECK_MK} == true ]] ; then
   echo "${RETURN} connectionsQty${TYPE}-${INSTANCE_NAME}-${DATABASE_NAME} ${PERF_MK} ${OUTPUT}"
 else
-
-
-
   echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
-
 fi
 # Returns the error code.
 if [[ ${VERBOSE} -ge 2 ]] ; then
