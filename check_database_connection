@@ -2,7 +2,7 @@
 
 ###############################################################################
 # Monitor DB2 with Nagios
-# Copyright 2013 Andres Gomez Casanova
+# Copyright 2013,2014,2015 Andres Gomez Casanova
 # https://github.com/angoca/monitor-db2-with-nagios
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,7 +34,7 @@
 # }
 # define service{
 #         host_name               db2server
-#         service_description     Database conectivity
+#         service_description     Database connectivity
 #         check_command           check_database_connection!/home/db2inst1!sample
 #         use                     generic-service
 # }
@@ -52,7 +52,7 @@
 #
 # define service{
 #         host_name               db2server
-#         service_description     Database conectivity
+#         service_description     Database connectivity
 #         check_command           check_nrpe_1arg!check_database_connection
 #         use                     generic-service
 # }
@@ -87,7 +87,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.1 2013-05-25
+# Version: v1.2 2015-10-15
 
 # Flag for debugging.
 #set -xv
@@ -98,7 +98,7 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.1 2013-05-25
+  echo v1.2 2015-10-15
 }
 # Function to show the help
 function print_usage {
@@ -313,7 +313,7 @@ if [[ ${CONTINUE} == true ]] ; then
   fi
 
   if [[ ${DATABASE} == "" ]] ; then
-    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    OUTPUT="The database ${DATABASE_NAME} is not catalogued."
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
@@ -365,7 +365,7 @@ if [[ ${CONTINUE} == true ]] ; then
     RETURN=${WARNING}
     PERFORMANCE="'Connectable_Database'=0.4;0.6;0.3"
   else
-    OUTPUT="A connection to database ${DATABASE_NAME} was not succesful. "${OUTPUT_ACTIVE}
+    OUTPUT="A connection to database ${DATABASE_NAME} was not successful. "${OUTPUT_ACTIVE}
     LONG_OUTPUT="${LONG_OUTPUT} ${CONNECTABLE}"
     RETURN=${CRITICAL}
     PERFORMANCE="'Connectable_Database'=0.1;0.6;0.3"
