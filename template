@@ -322,7 +322,6 @@ if [[ ${CONTINUE} == true ]] ; then
   echo "Logic goes here!"
 fi
 
-
 # Prints the output.
 if [[ ${OUTPUT} == "" ]] ; then
   OUTPUT="Note: The test was not executed."
