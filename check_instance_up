@@ -18,15 +18,6 @@
 # limitations under the License.
 ###############################################################################
 
-
-
-
-
-
-
-
-
-
 # This script queries the status of the instance by retrieving the port number
 # or service name from the configuration, and then querying netstat to check if
 # there is an associated service with that port.
@@ -48,7 +39,6 @@
 # }
 # define service{
 #         host_name               db2server
-
 #         service_description     Instance status
 #         check_command           check_instance_up!/home/db2inst1
 #         use                     generic-service
@@ -61,33 +51,27 @@
 # command[check_instance_up]=/home/nagios/scripts/check_instance_up -i /home/db2inst1
 #
 # Then modify the path according to your script location and instance home dir.
-
 #
 # In the Nagios server:
 #
 # define service{
 #         host_name               db2server
-
 #         service_description     Instance status
 #         check_command           check_nrpe_1arg!check_instance_up
 #         use                     generic-service
 # }
-
 #
 # It is necessary to execute this script with a user with at least SYSMON authority, in
 # order to execute db2pd.
 #
 # Parameters:
-
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
 # -K | --mk : Change the output for Check_MK.
-
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
-
 #
 # In AIX, the long name options are not supported.
 #
@@ -124,7 +108,6 @@ function print_revision {
 function print_usage {
   /bin/cat <<__EOT
 Usage: ${1} { -i instanceHomeDirectory [-K]| -h | -V }[-T][-v]"
-
 __EOT
 }
 
@@ -134,10 +117,6 @@ function print_help {
   # Max 80 chars width.
   /bin/cat <<__EOT
 -------------------------------------------------------------------------------
-
-
-
-
 This script checks if the instance is active by querying netstats.
 -h | --help
    Shows the current documentation.
@@ -145,18 +124,12 @@ This script checks if the instance is active by querying netstats.
    Instance home directory. It is usually /home/db2inst1.
 -K | --mk
    Changes the output to be compatible with Check_MK.
-
-
-
 -T | --trace
    Trace mode: writes date and output in /tmp.
 -v | --verbose
    Executes the script in verbose mode (multiple times).
 -V | --version
    Shows the current version of this script.
-
-
-
 
 In AIX, the long name options are not supported.
 __EOT
@@ -199,11 +172,10 @@ if [[ "${OS:0:5}" = "Linux" ]] ; then
   # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
-  TEMP=$(getopt -o hi:iKTvV --long help,instance:,mk,trace,verbose,version \
+  TEMP=$(getopt -o hi:KTvV --long help,instance:,mk,trace,verbose,version \
              -n ${APPL_NAME} -- "${@}")
-
 elif [[ "${OS:0:3}" = "AIX" ]] ; then
-  set -- $(getopt hi:IKTvV ${*})
+  set -- $(getopt hi:KTvV ${*})
 elif [[ ${OS:0:6} == "Darwin" || ${OS:0:5} == "SunOS" || ${OS:0:5} == "HP-UX" ]] ; then
   echo "This plugin is not yet supported in your platform."
   echo "Please create a ticket in GitHub if you want to enable your current platform."
@@ -232,7 +204,6 @@ if [[ ${CONTINUE} == true ]] ; then
     # Note the quotes around ${TEMP}: they are essential!
     eval set -- "${TEMP}"
   fi
-
   HELP=false
   VERSION=false
   CHECK_MK=false
@@ -242,21 +213,15 @@ if [[ ${CONTINUE} == true ]] ; then
   TRACE=false
   LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
-
-
-
  if [[ "${OS:0:5}" = "Linux" ]] ; then
     while true; do
       case "${1}" in
-
         -h | --help ) HELP=true ; shift ;;
         -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -K | --mk ) CHECK_MK=true ; shift ;;
-
         -T | --trace ) TRACE=true ; shift ;;
         -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V | --version ) VERSION=true ; shift ;;
-
         -- ) shift; break ;;
         * ) break ;;
       esac
@@ -264,15 +229,12 @@ if [[ ${CONTINUE} == true ]] ; then
   elif [[ "${OS:0:3}" = "AIX" ]] ; then
     while [[ $1 != -- ]] ; do
       case "${1}" in
-
         -h) HELP=true ; shift ;;
         -i) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-
         -K) CHECK_MK=true ; shift ;;
         -T) TRACE=true ; shift ;;
         -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V) VERSION=true ; shift ;;
-
       esac
     done
   fi
@@ -288,7 +250,6 @@ fi
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}"
 ECHO="${ECHO}, check_mk:${CHECK_MK}"
-
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo ${ECHO}
@@ -312,18 +273,6 @@ fi
 
 if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
   print_usage ${APPL_NAME}
-
-
-
-
-
-
-
-
-
-
-
-
   RETURN=${UNKNOWN}
   CONTINUE=false
 fi
@@ -344,37 +293,19 @@ if [[ ${CONTINUE} == true ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-
   COMMAND_PID="db2pd -edus"
   if [[ ${VERBOSE} -ge 2 ]] ; then
     echo "COMMAND: ${COMMAND_PID}"
-
-
-
-
   fi
-
   OUTPUT_PID=$(${COMMAND_PID} | grep 'db2sysc PID' | cut -d' ' -f3)
   if [[ ${VERBOSE} -ge 3 ]] ; then
-
     echo "Result: ${OUTPUT_PID}"
   fi
 
   COMMAND_CONF="db2 get dbm cfg"
-
-
-
-
-
   if [[ ${VERBOSE} -ge 2 ]] ; then
     echo "COMMAND: ${COMMAND_CONF}"
   fi
-
-
-
-
-
-
   OUTPUT_CONF=$(${COMMAND_CONF})
   # Gets the service name configure in the instance. It could be a text or a number.
   SVCNAME=$(printf '%s\n' "${OUTPUT_CONF}" | grep SVCENAME | cut -d= -f2 | sed "s/^[ \t]*//")
@@ -397,38 +328,11 @@ if [[ ${CONTINUE} == true ]] ; then
     if [[ ${VERBOSE} -ge 2 ]] ; then
       echo "COMMAND: netstat -na | grep ${PORTNUM} | wc -l"
     fi
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     PROC=$(netstat -na | grep ${PORTNUM} | wc -l)
 	PROC=$(echo ${PROC})
     if [[ ${VERBOSE} -ge 3 ]] ; then
       echo "Result: ${PROC}"
     fi
-
-
-
-
-
-
   fi
 
   if [[ ${OUTPUT_PID} == "" || ! ${OUTPUT_PID} =~ ^[0-9]+$ ]] ; then
@@ -436,43 +340,6 @@ if [[ ${CONTINUE} == true ]] ; then
     PERFORMANCE="'Started_Instance'=0.1;;0.4"
     RETURN=${UNKNOWN}
   else
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     OUTPUT="PID: ${OUTPUT_PID}. "
   fi
   if [[ ${SVCNAME} == "" ]] ; then
