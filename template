@@ -317,46 +317,11 @@ if [[ ${CONTINUE} == true ]] ; then
   fi
 fi
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 if [[ ${CONTINUE} == true ]] ; then
   # TODO add the logic
   echo "Logic goes here!"
 fi
+
 
 # Prints the output.
 if [[ ${OUTPUT} == "" ]] ; then
