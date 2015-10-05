@@ -2,7 +2,7 @@
 
 ###############################################################################
 # Monitor DB2 with Nagios
-# Copyright 2013 Andres Gomez Casanova
+# Copyright 2013,2014,2015 Andres Gomez Casanova
 # https://github.com/angoca/monitor-db2-with-nagios
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -95,7 +95,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.1 2013-05-26
+# Version: v1.2 2015-10-15
 
 # Flag for debugging.
 #set -xv
@@ -106,7 +106,7 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.1 2013-05-26
+  echo v1.2 2015-10-15
 }
 # Function to show the help
 function print_usage {
@@ -186,7 +186,7 @@ fi
 OS=$(uname)
 
 if [[ "${OS:0:5}" = "Linux" ]] ; then
-  # The following requieres GNU getopt. See the following discusion.
+  # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
   TEMP=$(getopt -o c:d:hi:Kp:r:TvV --long critical:,database:,help,instance:,mk,percentage:,refresh:,trace,verbose,version \
@@ -372,7 +372,7 @@ if [[ ${CONTINUE} == true ]] ; then
   fi
 
   if [[ ${DATABASE} == "" ]] ; then
-    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    OUTPUT="The database ${DATABASE_NAME} is not catalogued."
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
@@ -419,7 +419,7 @@ if [[ ${CONTINUE} == true ]] ; then
     CONTINUE=false
   elif [[ ${UNKNOWN_ERROR} != "" ]] ; then
     OUTPUT="Unknown problem while executing the SP CALL GET_DBSIZE_INFO(?, ?, ?, ${REFRESH})"
-    LONG_OUTPUT="Reexecute the script with multiple verbosity mode."
+    LONG_OUTPUT="Re-execute the script with multiple verbosity mode."
     RETURN=${UNKNOWN}
     CONTINUE=false
   elif [[ ${DBSIZE} == "" ]] ; then
