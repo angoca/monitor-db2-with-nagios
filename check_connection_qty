@@ -77,8 +77,8 @@
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
 # -w | --warning :  Quantity of connections to be considered as a warning.
-# --filter : Extra filter for the grep.
-# --inverted : Filter inverted.
+# -f | --filter : Extra filter for the grep.
+# -n | --inverted : Filter inverted.
 #
 # In AIX, the long name options are not supported.
 #
@@ -115,7 +115,7 @@ function print_revision {
 function print_usage {
   /bin/cat <<__EOT
 Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][-K]
-[--filter][--inverted]][-I][-s] | -h | -V }[-T][-v]
+[-f][-n]][-I][-s] | -h | -V }[-T][-v]
 __EOT
 }
 
@@ -137,7 +137,7 @@ This script checks the quantity of established connections.
    Instance home directory. It is usually /home/db2inst1
 -I | --ignore
    Ignore thresholds, show only informative information. Useful to create
-   graphs descriving the activity.
+   graphs describing the activity.
 -K | --mk
    Changes the output to be compatible with Check_MK.
 -s | --state
@@ -152,9 +152,9 @@ This script checks the quantity of established connections.
 -w | --warning INTEGER
    Quantity of connections to consider as warning.
    Default 10.
---filter STRING
+-f | --filter STRING
    Criterion to filter the data on.
---inverted STRING
+-n | --inverted STRING
    Filter inverted.
 
 In AIX, the long name options are not supported.
@@ -198,10 +198,10 @@ if [[ "${OS:0:5}" = "Linux" ]] ; then
   # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
-  TEMP=$(getopt -o c:d:hi:IKsTvVw: --long critical:,database:,filter:,help,instance:,ignore,inverted,mk,state,trace,verbose,version,warning: \
+  TEMP=$(getopt -o c:d:f:hi:IKnsTvVw: --long critical:,database:,filter:,help,instance:,ignore,inverted,mk,state,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
 elif [[ "${OS:0:3}" = "AIX" ]] ; then
-  set -- $(getopt c:d:hi:IKsTvVw: ${*})
+  set -- $(getopt c:d:f:hi:IKnsTvVw: ${*})
 elif [[ ${OS:0:6} == "Darwin" || ${OS:0:5} == "SunOS" || ${OS:0:5} == "HP-UX" ]] ; then
   echo "This plugin is not yet supported in your platform."
   echo "Please create a ticket in GitHub if you want to enable your current platform."
@@ -261,8 +261,8 @@ if [[ ${CONTINUE} == true ]] ; then
         -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V | --version ) VERSION=true ; shift ;;
         -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        --filter ) FILTER=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        --inverted ) FILTER_INVERTED=true ; shift ;;
+        -f | --filter ) FILTER=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -n | --inverted ) FILTER_INVERTED=true ; shift ;;
         -- ) shift; break ;;
         * ) break ;;
       esac
