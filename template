@@ -57,7 +57,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.1 2015-09-25
+# Version: v1.2 2015-10-15
 
 # Flag for debugging.
 #set -xv
@@ -68,7 +68,7 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.1 2013-09-25
+  echo v1.2 2015-10-15
 }
 # Function to show the help
 function print_usage {
@@ -95,9 +95,9 @@ TODO Add arguments in detail.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
+   Instance home directory. It is usually /home/db2inst1.
 -K | --mk
    Changes the output to be compatible with Check_MK.
-   Instance home directory. It is usually /home/db2inst1.
 -T | --trace
    Trace mode: writes date and output in /tmp.
 -v | --verbose
@@ -150,7 +150,7 @@ if [[ "${OS:0:5}" = "Linux" ]] ; then
   # http://stackoverflow.com/questions/402377
 
   # TODO Add the arguments here. One char in -o, multiple char in -long.
-  TEMP=$(getopt -o c:d:hi:TvVw: --long critical:,database:,help,instance:,trace,verbose,version,warning: \
+  TEMP=$(getopt -o c:d:hi:KTvVw: --long critical:,database:,help,instance:,mk,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
 elif [[ "${OS:0:3}" = "AIX" ]] ; then
   set -- $(getopt c:d:hi:IKsTvVw: ${*})
@@ -311,11 +311,33 @@ if [[ ${CONTINUE} == true ]] ; then
   fi
 
   if [[ ${DATABASE} == "" ]] ; then
-    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    OUTPUT="The database ${DATABASE_NAME} is not catalogued."
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
 fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 if [[ ${CONTINUE} == true ]] ; then
   # TODO add the logic
