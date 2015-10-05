@@ -2,7 +2,7 @@
 
 ###############################################################################
 # Monitor DB2 with Nagios
-# Copyright 2013 Andres Gomez Casanova
+# Copyright 2013,2014,2015 Andres Gomez Casanova
 # https://github.com/angoca/monitor-db2-with-nagios
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -98,7 +98,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.2 2013-05-25
+# Version: v1.3 2015-10-15
 
 # Flag for debugging.
 #set -xv
@@ -109,7 +109,7 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-05-25
+  echo v1.3 2015-10-15
 }
 # Function to show the help
 function print_usage {
@@ -372,7 +372,7 @@ if [[ ${CONTINUE} == true ]] ; then
   fi
 
   if [[ ${DATABASE} == "" ]] ; then
-    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    OUTPUT="The database ${DATABASE_NAME} is not catalogued."
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
@@ -475,13 +475,10 @@ if [[ ${CONTINUE} == true ]] ; then
       if [[ ${VERBOSE} -ge 3 ]] ; then
         echo "RESULT FILTER:'${QTY_FILTERED}'"
       fi
-      AGREGATE=0
       while IFS= read LINE ; do
         USERNAME=$(echo ${LINE} | awk '{print $2}')
         QTY_USER=$(echo ${LINE} | awk '{print $1}')
-        #AGREGATE=$((${AGREGATE} + ${QTY_USER}))
         LONG_OUTPUT="${USERNAME} has ${QTY_USER},"
-        #LONG_PERFORMANCE="'User_${USERNAME}'=${AGREGATE}"
         LONG_PERFORMANCE="'User_${USERNAME}'=${QTY_USER}"
         PERF_MK=${LONG_PERFORMANCE}
       done < <( printf '%s\n' "${QTY_FILTERED}" )
@@ -508,7 +505,7 @@ if [[ ${CONTINUE} == true ]] ; then
       PERFORMANCE="'Connections'=${QTY}"
     fi
   else
-    OUTPUT="Problem retreiving the applications list"
+    OUTPUT="Problem retrieving the applications list"
     RETURN=${UNKNOWN}
     if [[ ${STATE} == true ]] ; then
       TYPE="PerStatus"
