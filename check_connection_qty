@@ -76,7 +76,7 @@
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
-# -w | --warning :  Quantity of connections to be considered as a warning.
+# -w | --warning : Quantity of connections to be considered as a warning.
 # -f | --filter : Extra filter for the grep.
 # -n | --inverted : Filter inverted.
 #
@@ -125,6 +125,7 @@ function print_help {
   # Max 80 chars width.
   /bin/cat <<__EOT
 -------------------------------------------------------------------------------
+
 This script checks the quantity of established connections.
 -c | --critical INTEGER
    Quantity of connections to consider as critical.
@@ -185,6 +186,46 @@ PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Started ${APPL_NAME} $@" >> /tmp/${APPL_NAME}.log
+
+# Checks the lock file does not exist.
+# The lock file is the way the command was called with its parameters
+# without spaces.
+COPY_ARGS=("${@}") 
+LOCK_FILE=
+for VALUE in "${COPY_ARGS[@]}" ; do
+  LOCK_FILE="${LOCK_FILE}${VALUE}"
+done
+LOCK_FILE=${LOCK_FILE//\//}
+LOCK_FILE=${LOCK_FILE//\\/}
+LOCK_FILE=${LOCK_FILE//\:/}
+LOCK_FILE=${LOCK_FILE//\*/}
+LOCK_FILE=${LOCK_FILE//\|/}
+LOCK_FILE="/tmp/${APPL_NAME}${LOCK_FILE}.lock"
+if [[ ! -r ${LOCK_FILE} ]] ; then
+  echo $$ > ${LOCK_FILE}
+  LOCKED=true
+else
+  # If it exist, then check if the process is running.
+  EXIST=$(ps -ef | grep $(cat ${LOCK_FILE}) | grep ${APPL_NAME})
+  # If process is not running, delete it.
+  if [[ ${EXIST} == "" ]] ; then
+    rm ${LOCK_FILE}
+    if [[ ! -r ${LOCK_FILE} ]] ; then
+      echo $$ > ${LOCK_FILE}
+      LOCKED=true
+    else
+      OUTPUT="The lock file cannot be replaced: ${LOCK_FILE}"
+      CONTINUE=false
+      RETURN=${UNKNOWN}
+    fi
+  else
+    OUTPUT="An instance of the script with the same parameters is already running."
+    CONTINUE=false
+    RETURN=${UNKNOWN}
+  fi
+fi
+
 if [[ ${#} -eq 0 ]] ; then
   print_usage ${APPL_NAME}
   RETURN=${UNKNOWN}
@@ -194,21 +235,22 @@ fi
 # Checks the operating system. geopt works different in AIX than in Linux.
 OS=$(uname)
 
-if [[ "${OS:0:5}" = "Linux" ]] ; then
+if [[ "${OS:0:5}" == "Linux" ]] ; then
   # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
   TEMP=$(getopt -o c:d:f:hi:IKnsTvVw: --long critical:,database:,filter:,help,instance:,ignore,inverted,mk,state,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
-elif [[ "${OS:0:3}" = "AIX" ]] ; then
+
+elif [[ "${OS:0:3}" == "AIX" ]] ; then
   set -- $(getopt c:d:f:hi:IKnsTvVw: ${*})
-elif [[ ${OS:0:6} == "Darwin" || ${OS:0:5} == "SunOS" || ${OS:0:5} == "HP-UX" ]] ; then
+elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
   echo "This plugin is not yet supported in your platform."
   echo "Please create a ticket in GitHub if you want to enable your current platform."
   echo "https://github.com/angoca/monitor-db2-with-nagios/issues"
   RETURN=${UNKNOWN}
   CONTINUE=false
-elif [[ ${OS:0:6} == "CYGWIN" ]] ; then
+elif [[ "${OS:0:6}" == "CYGWIN" ]] ; then
   echo "This plugin is not supported in Cygwin"
   RETURN=${UNKNOWN}
   CONTINUE=false
@@ -247,7 +289,7 @@ if [[ ${CONTINUE} == true ]] ; then
   STATE=false
   FILTER=
   FILTER_INVERTED=false
-  if [[ "${OS:0:5}" = "Linux" ]] ; then
+  if [[ "${OS:0:5}" == "Linux" ]] ; then
     while true; do
       case "${1}" in
         -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
@@ -263,7 +305,7 @@ if [[ ${CONTINUE} == true ]] ; then
         -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -f | --filter ) FILTER=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -n | --inverted ) FILTER_INVERTED=true ; shift ;;
-        -- ) shift; break ;;
+        -- ) shift ; break ;;
         * ) break ;;
       esac
     done
@@ -283,6 +325,7 @@ if [[ ${CONTINUE} == true ]] ; then
         -w) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -f) FILTER=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -n) FILTER_INVERTED=true ; shift ;;
+        * ) break ;;
       esac
     done
   fi
@@ -297,6 +340,7 @@ fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
+
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 ECHO="${ECHO}, filter:${FILTER}, inverted:${FILTER_INVERTED}, state:${STATE}"
 ECHO="${ECHO}, ignore:${IGNORE_THRES}, check_mk:${CHECK_MK}"
@@ -370,7 +414,6 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ ${VERBOSE} -ge 3 ]] ; then
     echo "RESULT:'${DATABASE}'"
   fi
-
   if [[ ${DATABASE} == "" ]] ; then
     OUTPUT="The database ${DATABASE_NAME} is not catalogued."
     RETURN=${UNKNOWN}
@@ -403,6 +446,7 @@ if [[ ${CONTINUE} == true ]] ; then
       CONNS=$(printf '%s\n' "${QTY_RESULT}" | grep ${DATABASE})
     fi
     QTY=$(printf '%s\n' "${CONNS}" | wc -l)
+
     if [[ ${STATE} == true ]] ; then
       TYPE="PerStatus"
       BACKUP=0
@@ -488,6 +532,7 @@ if [[ ${CONTINUE} == true ]] ; then
     fi
 
     if [[ ${IGNORE_THRES} == false ]] ; then
+
       if [[ ${QTY} -lt ${WARNING_THRES} ]] ; then
          OUTPUT="OK. Normal quantity of connections (${QTY})."
          RETURN=${OK}
@@ -534,5 +579,12 @@ if [[ ${TRACE} == true ]] ; then
   date >> ${LOG}
   echo -e "<<<<<\n" >> ${LOG}
 fi
+
+if [[ ${LOCKED} == true && -r ${LOCK_FILE} ]] ; then
+  rm ${LOCK_FILE}
+fi
+
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Ended ${APPL_NAME} ${COPY_ARGS[@]}" >> /tmp/${APPL_NAME}.log
+
 exit ${RETURN}
 
