@@ -68,7 +68,7 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.2 2015-10-15
+  echo v1.3 2015-10-15
 }
 # Function to show the help
 function print_usage {
@@ -136,6 +136,46 @@ PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Started ${APPL_NAME} $@" >> /tmp/${APPL_NAME}.log
+
+# Checks the lock file does not exist.
+# The lock file is the way the command was called with its parameters
+# without spaces.
+COPY_ARGS=("${@}") 
+LOCK_FILE=
+for VALUE in "${COPY_ARGS[@]}" ; do
+  LOCK_FILE="${LOCK_FILE}${VALUE}"
+done
+LOCK_FILE=${LOCK_FILE//\//}
+LOCK_FILE=${LOCK_FILE//\\/}
+LOCK_FILE=${LOCK_FILE//\:/}
+LOCK_FILE=${LOCK_FILE//\*/}
+LOCK_FILE=${LOCK_FILE//\|/}
+LOCK_FILE="/tmp/${APPL_NAME}${LOCK_FILE}.lock"
+if [[ ! -r ${LOCK_FILE} ]] ; then
+  echo $$ > ${LOCK_FILE}
+  LOCKED=true
+else
+  # If it exist, then check if the process is running.
+  EXIST=$(ps -ef | grep $(cat ${LOCK_FILE}) | grep ${APPL_NAME})
+  # If process is not running, delete it.
+  if [[ ${EXIST} == "" ]] ; then
+    rm ${LOCK_FILE}
+    if [[ ! -r ${LOCK_FILE} ]] ; then
+      echo $$ > ${LOCK_FILE}
+      LOCKED=true
+    else
+      OUTPUT="The lock file cannot be replaced: ${LOCK_FILE}"
+      CONTINUE=false
+      RETURN=${UNKNOWN}
+    fi
+  else
+    OUTPUT="An instance of the script with the same parameters is already running."
+    CONTINUE=false
+    RETURN=${UNKNOWN}
+  fi
+fi
+
 if [[ ${#} -eq 0 ]] ; then
   print_usage ${APPL_NAME}
   RETURN=${UNKNOWN}
@@ -145,22 +185,23 @@ fi
 # Checks the operating system. geopt works different in AIX than in Linux.
 OS=$(uname)
 
-if [[ "${OS:0:5}" = "Linux" ]] ; then
+if [[ "${OS:0:5}" == "Linux" ]] ; then
   # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
   # TODO Add the arguments here. One char in -o, multiple char in -long.
   TEMP=$(getopt -o c:d:hi:KTvVw: --long critical:,database:,help,instance:,mk,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
-elif [[ "${OS:0:3}" = "AIX" ]] ; then
-  set -- $(getopt c:d:hi:IKsTvVw: ${*})
-elif [[ ${OS:0:6} == "Darwin" || ${OS:0:5} == "SunOS" || ${OS:0:5} == "HP-UX" ]] ; then
+
+elif [[ "${OS:0:3}" == "AIX" ]] ; then
+  set -- $(getopt c:d:hi:KTvVw: ${*})
+elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
   echo "This plugin is not yet supported in your platform."
   echo "Please create a ticket in GitHub if you want to enable your current platform."
   echo "https://github.com/angoca/monitor-db2-with-nagios/issues"
   RETURN=${UNKNOWN}
   CONTINUE=false
-elif [[ ${OS:0:6} == "CYGWIN" ]] ; then
+elif [[ "${OS:0:6}" == "CYGWIN" ]] ; then
   echo "This plugin is not supported in Cygwin"
   RETURN=${UNKNOWN}
   CONTINUE=false
@@ -178,7 +219,7 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  if [[ "${OS}" = "Linux" ]] ; then
+  if [[ "${OS}" == "Linux" ]] ; then
     # Note the quotes around ${TEMP}: they are essential!
     eval set -- "${TEMP}"
   fi
@@ -194,7 +235,7 @@ if [[ ${CONTINUE} == true ]] ; then
   DATABASE_NAME=
   WARNING_THRES=1
   CRITICAL_THRES=2
-  if [[ "${OS:0:5}" = "Linux" ]] ; then
+  if [[ "${OS:0:5}" == "Linux" ]] ; then
     while true; do
       case "${1}" in
         -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
@@ -207,7 +248,7 @@ if [[ ${CONTINUE} == true ]] ; then
         -V | --version ) VERSION=true ; shift ;;
         -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         # TODO Validate any new argument.
-        -- ) shift; break ;;
+        -- ) shift ; break ;;
         * ) break ;;
       esac
     done
@@ -223,6 +264,7 @@ if [[ ${CONTINUE} == true ]] ; then
         -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V) VERSION=true ; shift ;;
         -w) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        * ) break ;;
       esac
     done
   fi
@@ -309,7 +351,6 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ ${VERBOSE} -ge 3 ]] ; then
     echo "RESULT:'${DATABASE}'"
   fi
-
   if [[ ${DATABASE} == "" ]] ; then
     OUTPUT="The database ${DATABASE_NAME} is not catalogued."
     RETURN=${UNKNOWN}
@@ -341,5 +382,12 @@ if [[ ${TRACE} == true ]] ; then
   date >> ${LOG}
   echo -e "<<<<<\n" >> ${LOG}
 fi
+
+if [[ ${LOCKED} == true && -r ${LOCK_FILE} ]] ; then
+  rm ${LOCK_FILE}
+fi
+
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Ended ${APPL_NAME} ${COPY_ARGS[@]}" >> /tmp/${APPL_NAME}.log
+
 exit ${RETURN}
 
