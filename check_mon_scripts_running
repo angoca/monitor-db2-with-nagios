@@ -18,26 +18,53 @@
 # limitations under the License.
 ###############################################################################
 
-# TODO This is a template for script. The script has to be silent, it means it
-# should not generate any output different to the OUTPUT variable.
+# This script checks the quantity of scripts running on the server with the
+# same user id that this script runs, and that the program running starts with
+# 'check_'. This helps to control hung processes or long-running processes,
+# that sometimes could exhaust the server.
 #
-# Here comes the documentation
+# The script does not need special permissions on the server, just list the
+# running processes.
 #
-# TODO Nagios usage.
+# # 'check_running_scripts' command definition
+# define command {
+#         command_name    check_running_scripts
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -t 20 -C "scripts/check_running_scripts"
+# }
+# define service{
+#         host_name               db2sever
+#         service_description     Check running monitor scripts
+#         check_command           check_running_scripts
+#         use                     generic-service
+# }
 #
-# TODO Nagios with NRPE.
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_running_scripts]=/home/nagios/scripts/check_running_scripts
+#
+# Then modify the path according to your script location and thresholds.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     Check running monitor scripts
+#         check_command           check_nrpe_1arg!check_running_scripts
+#         use                     generic-service
+# }
 #
 # Parameters:
-# -c | --critical : TODO What is critical.
-# -d | --database : Database name.
+# -c | --critical : Quantity of monitor scripts currently running that is
+# considered as critical.
 # -h | --help : Show the help of this script.
-# -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1.
 # -K | --mk : Change the output for Check_MK.
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
-# -w | --warning : TODO What is warning.
+# -w | --warning : Quantity of monitor scripts currently running that is
+# considered as warning.
 #
 # In AIX, the long name options are not supported.
 #
@@ -68,14 +95,12 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.3 2015-10-15
+  echo v1.0 2015-10-15
 }
 # Function to show the help
 function print_usage {
-  # TODO Add arguments.
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][-K] | -h | -V }
-[-T][-v]
+Usage: ${1} { [-c][-w][-K] | -h | -V } [-T][-v]
 __EOT
 }
 
@@ -85,17 +110,12 @@ function print_help {
   # Max 80 chars width.
   /bin/cat <<__EOT
 -------------------------------------------------------------------------------
-TODO Add a global description.
-TODO Add arguments in detail.
+Checks the quantity of monitor scripts currently running on the server.
 -c | --critical INTEGER
-   TODO What is critical.
-   TODO Default 2.
--d | --database STRING
-   Database name.
+   Quantity of running scripts to be considered as critical.
+   Default 20.
 -h | --help
    Shows the current documentation.
--i | --instance STRING
-   Instance home directory. It is usually /home/db2inst1.
 -K | --mk
    Changes the output to be compatible with Check_MK.
 -T | --trace
@@ -105,8 +125,8 @@ TODO Add arguments in detail.
 -V | --version
    Shows the current version of this script.
 -w | --warning INTEGER
-   TODO What is warning.
-   TODO Default 1.
+   Quantity of running scripts to be considered as critical.
+   Default 15.
 
 In AIX, the long name options are not supported.
 __EOT
@@ -176,12 +196,6 @@ else
   fi
 fi
 
-if [[ ${#} -eq 0 ]] ; then
-  print_usage ${APPL_NAME}
-  RETURN=${UNKNOWN}
-  CONTINUE=false
-fi
-
 # Checks the operating system. geopt works different in AIX than in Linux.
 OS=$(uname)
 
@@ -189,12 +203,11 @@ if [[ "${OS:0:5}" == "Linux" ]] ; then
   # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
-  # TODO Add the arguments here. One char in -o, multiple char in -long.
-  TEMP=$(getopt -o c:d:hi:KTvVw: --long critical:,database:,help,instance:,mk,trace,verbose,version,warning: \
+  TEMP=$(getopt -o c:hKTvVw: --long critical:,help,mk,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
 
 elif [[ "${OS:0:3}" == "AIX" ]] ; then
-  set -- $(getopt c:d:hi:KTvVw: ${*})
+  set -- $(getopt c:hKTvVw: ${*})
 elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
   echo "This plugin is not yet supported in your platform."
   echo "Please create a ticket in GitHub if you want to enable your current platform."
@@ -231,23 +244,18 @@ if [[ ${CONTINUE} == true ]] ; then
   # Trace activated
   TRACE=false
   LOG=/tmp/${APPL_NAME}.log
-  INSTANCE_HOME=
-  DATABASE_NAME=
-  WARNING_THRES=1
-  CRITICAL_THRES=2
+  WARNING_THRES=15
+  CRITICAL_THRES=20
   if [[ "${OS:0:5}" == "Linux" ]] ; then
     while true; do
       case "${1}" in
         -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -h | --help ) HELP=true ; shift ;;
-        -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -K | --mk ) CHECK_MK=true ; shift ;;
         -T | --trace ) TRACE=true ; shift ;;
         -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V | --version ) VERSION=true ; shift ;;
         -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        # TODO Validate any new argument.
         -- ) shift ; break ;;
         * ) break ;;
       esac
@@ -256,9 +264,7 @@ if [[ ${CONTINUE} == true ]] ; then
     while [[ $1 != -- ]] ; do
       case "${1}" in
         -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        -d) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -h) HELP=true ; shift ;;
-        -i) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -K) CHECK_MK=true ; shift ;;
         -T) TRACE=true ; shift ;;
         -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
@@ -273,12 +279,10 @@ fi
 if [[ ${TRACE} == true ]] ; then
   echo ">>>>>" >> ${LOG}
   date >> ${LOG}
-  echo "Instance at ${INSTANCE_HOME}" >> ${LOG}
   echo "PID ${$}" >> ${LOG}
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
-ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 ECHO="${ECHO}, check_mk:${CHECK_MK}"
 
@@ -302,18 +306,6 @@ if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
   CONTINUE=false
 fi
 
-if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
-  print_usage ${APPL_NAME}
-  RETURN=${UNKNOWN}
-  CONTINUE=false
-fi
-
-if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
-  print_usage ${APPL_NAME}
-  RETURN=${UNKNOWN}
-  CONTINUE=false
-fi
-
 if [[ ${CONTINUE} == true
     && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
     || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
@@ -327,40 +319,27 @@ if [[ ${CONTINUE} == true
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
-    # Load the DB2 profile.
-    . ${INSTANCE_HOME}/sqllib/db2profile
-    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
-  else
-    OUTPUT="Instance directory is invalid."
-    RETURN=${UNKNOWN}
-    CONTINUE=false
-  fi
-fi
-
-if [[ ${CONTINUE} == true ]] ; then
-  COMMAND_DATABASE="db2 list db directory"
+  COMMAND="ps -ef | grep -e '^ *${USER} ' | wc -l"
   if [[ ${VERBOSE} -ge 2 ]] ; then
-    echo "COMMAND: ${COMMAND_DATABASE}"
+    echo "COMMAND: ${COMMAND}"
   fi
-  DATABASE=$(${COMMAND_DATABASE})
+  PROCESSES=$(eval ${COMMAND})
   if [[ ${TRACE} == true ]] ; then
-    echo "RESULT:'${DATABASE}'" >> ${LOG}
+    echo "RESULT:'${PROCESSES}'" >> ${LOG}
   fi
-  DATABASE=$(printf '%s\n' "${DATABASE}" | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
-  if [[ ${VERBOSE} -ge 3 ]] ; then
-    echo "RESULT:'${DATABASE}'"
+  
+  if [[ ${PROCESSES} -lt ${WARNING_THRES} ]] ; then
+    OUTPUT="The quantity of monitor scripts currently running is OK"
+    RETURN=${OK}
+  elif [[ ${PROCESSES} -lt ${CRITICAL_THRES} ]] ; then
+    OUTPUT="The quantity of monitor scripts currently running is getting big"
+    RETURN=${WARNING}
+  else
+    OUTPUT="The quantity of monitor scripts currently running is critical"
+    RETURN=${CRITICAL}
   fi
-  if [[ ${DATABASE} == "" ]] ; then
-    OUTPUT="The database ${DATABASE_NAME} is not catalogued."
-    RETURN=${UNKNOWN}
-    CONTINUE=false
-  fi
-fi
-
-if [[ ${CONTINUE} == true ]] ; then
-  # TODO add the logic
-  echo "Logic goes here!"
+  # Performance data
+  PERFORMANCE="'Monitor scripts running'=$(echo ${PROCESSES});${WARNING_THRES};${CRITICAL_THRES}"
 fi
 
 # Prints the output.
@@ -369,7 +348,7 @@ if [[ ${OUTPUT} == "" ]] ; then
 fi
 # Builds the output.
 if [[ ${CHECK_MK} == true ]] ; then
-  echo "${RETURN} connectionsQty${TYPE}-${INSTANCE_NAME}-${DATABASE_NAME} ${PERF_MK} ${OUTPUT}"
+  echo "${RETURN} connectionsQty${TYPE} ${PERF_MK} ${OUTPUT}"
 else
   echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 fi
