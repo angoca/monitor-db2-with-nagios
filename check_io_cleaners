@@ -436,7 +436,7 @@ if [[ ${CONTINUE} == true ]] ; then
   touch ${TMP_FILE}
   chmod 666 ${TMP_FILE} 2> /dev/null
   if [[  ! ( -r "${TMP_FILE}" ) ]] ; then
-    OUTPUT="Temporal file is nor writeable"
+    OUTPUT="Temporal file is not writeable"
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
@@ -447,7 +447,7 @@ if [[ ${CONTINUE} == true ]] ; then
   ${COMMAND_SNAPSHOT} > ${TMP_FILE}
 
   if [[  ! ( -r "${TMP_FILE}" ) ]] ; then
-    OUTPUT="Temporal file is nor readable"
+    OUTPUT="Temporal file is not readable"
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
