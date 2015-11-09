@@ -241,7 +241,6 @@ if [[ "${OS:0:5}" == "Linux" ]] ; then
 
   TEMP=$(getopt -o c:d:f:hi:IKnsTvVw: --long critical:,database:,filter:,help,instance:,ignore,inverted,mk,state,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
-
 elif [[ "${OS:0:3}" == "AIX" ]] ; then
   set -- $(getopt c:d:f:hi:IKnsTvVw: ${*})
 elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
@@ -268,11 +267,10 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  if [[ "${OS}" = "Linux" ]] ; then
+  if [[ "${OS}" == "Linux" ]] ; then
     # Note the quotes around ${TEMP}: they are essential!
     eval set -- "${TEMP}"
   fi
-
   HELP=false
   VERSION=false
   CHECK_MK=false
@@ -340,7 +338,6 @@ fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
-
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
 ECHO="${ECHO}, filter:${FILTER}, inverted:${FILTER_INVERTED}, state:${STATE}"
 ECHO="${ECHO}, ignore:${IGNORE_THRES}, check_mk:${CHECK_MK}"
