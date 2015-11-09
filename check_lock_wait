@@ -18,7 +18,7 @@
 # limitations under the License.
 ###############################################################################
 
-# This script checks for long lock waits in the database. This plugins only
+# This script checks for long lock waits in the database. This plugin only
 # works in DB2 10.5 due to the MON_GET_DATABASE table function; this table
 # function does not exist in previous versions.
 #
@@ -139,6 +139,8 @@ Checks for long lock waits in the database.
 -w | --warning INTEGER
    Quantity of milliseconds to consider a lock-wait as warning.
    Default 10000.
+
+In AIX, the long name options are not supported. This script needs DB2 V10.5.
 __EOT
 }
 
