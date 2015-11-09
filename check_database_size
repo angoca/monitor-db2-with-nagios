@@ -71,7 +71,7 @@
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
 # -K | --mk : Change the output for Check_MK.
-# -p | --percentage : Usage percentage (size : allocated).
+# -p | --percentage : Use percentage (size : allocated).
 # -r | --refresh : Cache minutes before refresh (Stored procedure).
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
@@ -137,7 +137,7 @@ that the provided percentage.
 -K | --mk
    Changes the output to be compatible with Check_MK.
 -p | --percentage INTEGER
-   Usage percentage (size : allocated). Value between 1 and 99.
+   Use percentage (size : allocated). Value between 1 and 99.
 -r | --refresh INTEGER
    Quantity of minutes before refresh cache values in the database.
    Used to call the stored procedure GET_DBSIZE_INFO.
