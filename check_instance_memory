@@ -255,7 +255,6 @@ if [[ ${CONTINUE} == true ]] ; then
     # Note the quotes around ${TEMP}: they are essential!
     eval set -- "${TEMP}"
   fi
-
   HELP=false
   VERSION=false
   CHECK_MK=false
@@ -268,7 +267,7 @@ if [[ ${CONTINUE} == true ]] ; then
   LIMIT=false
   WARNING_THRES=800
   CRITICAL_THRES=900
-  if [[ "${OS:0:5}" = "Linux" ]] ; then
+  if [[ "${OS:0:5}" == "Linux" ]] ; then
     while true; do
       case "${1}" in
         -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
