@@ -96,7 +96,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.1  2015-10-15
+# Version: v1.1 2015-10-15
 
 # Flag for debugging.
 #set -xv
@@ -265,7 +265,7 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  if [[ "${OS}" = "Linux" ]] ; then
+  if [[ "${OS}" == "Linux" ]] ; then
     # Note the quotes around ${TEMP}: they are essential!
     eval set -- "${TEMP}"
   fi
