@@ -97,6 +97,8 @@ function print_help {
 -------------------------------------------------------------------------------
 This script retrieves the size of the archive log in the day.
 This is only for performance data.
+-d | --database STRING
+   Database name.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
