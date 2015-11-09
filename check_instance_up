@@ -213,7 +213,7 @@ if [[ "${OS:0:5}" == "Linux" ]] ; then
   # http://stackoverflow.com/questions/402377
 
   TEMP=$(getopt -o hi:KTvV --long help,instance:,mk,trace,verbose,version \
-             -n ${APPL_NAME} -- "${@}")
+               -n ${APPL_NAME} -- "${@}")
 elif [[ "${OS:0:3}" == "AIX" ]] ; then
   set -- $(getopt hi:KTvV ${*})
 elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
@@ -420,8 +420,8 @@ if [[ ${CONTINUE} == true ]] ; then
     echo "Result: ${ACTIVE}"
   fi
 
-  LONG_OUTPUT="There are ${ACTIVE} active databases"
-  LONG_PERFORMANCE="'Active_Databases'=${ACTIVE}"
+  LONG_OUTPUT="There are $(echo ${ACTIVE}) active databases"
+  LONG_PERFORMANCE="'Active_Databases'=$(echo ${ACTIVE})"
   PERF_MK="${PERFORMANCE}|${LONG_PERFORMANCE}"
 fi
 
