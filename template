@@ -57,7 +57,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.2 2015-10-15
+# Version: v1.3 2015-10-15
 
 # Flag for debugging.
 #set -xv
@@ -192,7 +192,6 @@ if [[ "${OS:0:5}" == "Linux" ]] ; then
   # TODO Add the arguments here. One char in -o, multiple char in -long.
   TEMP=$(getopt -o c:d:hi:KTvVw: --long critical:,database:,help,instance:,mk,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
-
 elif [[ "${OS:0:3}" == "AIX" ]] ; then
   set -- $(getopt c:d:hi:KTvVw: ${*})
 elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
