@@ -443,8 +443,8 @@ if [[ ${CONTINUE} == true ]] ; then
         PERF_MK="${PERFORMANCE}|'Msg_Severe'=${QTY_SEVERE}|'Msg_Critical'=${QTY_CRITICAL}|'Msg_Error'=${QTY_ERROR}|'Msg_Warning'=${QTY_WARNING}|'Msg_Info'=${QTY_INFO}|'Msg_Event'=${QTY_EVENT}"
         if [[ ${EXTRA} == true ]] ; then
           QTY_CHAR_K=$((${QTY_CHARS}/1024))
-          LONG_OUTPUT="${LONG_OUTPUT}, Lines: ${QTY_LINES}, Size: ${QTY_CHAR_K}"
-          LONG_PERFORMANCE="${LONG_PERFORMANCE}\n'Lines'=${QTY_LINES}\n'Size'=${QTY_CHAR_K}"
+          LONG_OUTPUT="${LONG_OUTPUT}, Lines: $(echo ${QTY_LINES}), Size: ${QTY_CHAR_K}"
+          LONG_PERFORMANCE="${LONG_PERFORMANCE}\n'Lines'=$(echo ${QTY_LINES})\n'Size'=${QTY_CHAR_K}"
           PERF_MK="${PERF_MK}|'Lines'=${QTY_LINES}|'Size'=${QTY_CHAR_K}"
         fi
       fi
