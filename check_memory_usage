@@ -2,7 +2,7 @@
 
 ###############################################################################
 # Monitor DB2 with Nagios
-# Copyright 2013 Andres Gomez Casanova
+# Copyright 2013,2014,2015 Andres Gomez Casanova
 # https://github.com/angoca/monitor-db2-with-nagios
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,12 +30,14 @@
 # Parameters:
 # -c | --critical : Percentage of usage memory considered as critical.
 # -h | --help : Show the help of this script.
-# -I | --ignore : Ignore thresholds.
+# -i | --ignore : Ignore thresholds.
 # -K | --mk : Change the output for Check_MK.
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
 # -w | --warning : Percentage of usage memory considered as warning.
+#
+# In AIX, the long name options are not supported.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -53,7 +55,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.0 2013-11-07
+# Version: v1.1 2015-10-15
 
 # Flag for debugging.
 #set -xv
@@ -64,7 +66,7 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-11-07
+  echo v1.1 2015-10-15
 }
 # Function to show the help
 function print_usage {
@@ -87,7 +89,7 @@ Checks the memory usage: total, free, usage.
 -i | --ignore
    Ignore thresholds. Always returns OK.
 -K | --mk
-   Changes the output to be compatible with Check_MK
+   Changes the output to be compatible with Check_MK.
 -T | --trace
    Trace mode: writes date and output in /tmp.
 -v | --verbose
@@ -96,6 +98,8 @@ Checks the memory usage: total, free, usage.
    Shows the current version of this script.
 -w | --warning INTEGER
    Percentage of usage memory considered as warning.
+
+In AIX, the long name options are not supported.
 __EOT
 }
 
@@ -123,11 +127,82 @@ PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
-# The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Started ${APPL_NAME} $@" >> /tmp/${APPL_NAME}.log
 
-TEMP=$(getopt -o c:hiKTvVw: --long critical:,help,ignore,mk,trace,verbose,version,warning: \
-             -n ${APPL_NAME} -- "${@}")
+# Checks the lock file does not exist.
+# The lock file is the way the command was called with its parameters
+# without spaces.
+COPY_ARGS=("${@}") 
+LOCK_FILE=
+for VALUE in "${COPY_ARGS[@]}" ; do
+  LOCK_FILE="${LOCK_FILE}${VALUE}"
+done
+LOCK_FILE=${LOCK_FILE//\//}
+LOCK_FILE=${LOCK_FILE//\\/}
+LOCK_FILE=${LOCK_FILE//\:/}
+LOCK_FILE=${LOCK_FILE//\*/}
+LOCK_FILE=${LOCK_FILE//\|/}
+LOCK_FILE="/tmp/${APPL_NAME}${LOCK_FILE}.lock"
+if [[ ! -r ${LOCK_FILE} ]] ; then
+  echo $$ > ${LOCK_FILE}
+  LOCKED=true
+else
+  # If it exist, then check if the process is running.
+  EXIST=$(ps -ef | grep $(cat ${LOCK_FILE}) | grep ${APPL_NAME})
+  # If process is not running, delete it.
+  if [[ ${EXIST} == "" ]] ; then
+    rm ${LOCK_FILE}
+    if [[ ! -r ${LOCK_FILE} ]] ; then
+      echo $$ > ${LOCK_FILE}
+      LOCKED=true
+    else
+      OUTPUT="The lock file cannot be replaced: ${LOCK_FILE}"
+      CONTINUE=false
+      RETURN=${UNKNOWN}
+    fi
+  else
+    OUTPUT="An instance of the script with the same parameters is already running."
+    CONTINUE=false
+    RETURN=${UNKNOWN}
+  fi
+fi
+
+if [[ ${#} -eq 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
+
+# Checks the operating system. geopt works different in AIX than in Linux.
+OS=$(uname)
+
+if [[ "${OS:0:5}" == "Linux" ]] ; then
+  # The following requires GNU getopt. See the following discussion.
+  # http://stackoverflow.com/questions/402377
+
+  TEMP=$(getopt -o c:hiKTvVw: --long critical:,help,ignore,mk,trace,verbose,version,warning: \
+               -n ${APPL_NAME} -- "${@}")
+
+elif [[ "${OS:0:3}" == "AIX" ]] ; then
+  echo "This plugin is not supported in AIX"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
+  echo "This plugin is not yet supported in your platform."
+  echo "Please create a ticket in GitHub if you want to enable your current platform."
+  echo "https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+elif [[ "${OS:0:6}" == "CYGWIN" ]] ; then
+  echo "This plugin is not supported in Cygwin"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+else
+  echo "The platform is unknown: ${OS}"
+  echo "Please create a ticket in GitHub: https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
 
 if [[ ${?} -ne 0 ]] ; then
   print_usage ${APPL_NAME}
@@ -136,9 +211,10 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  # Note the quotes around ${TEMP}: they are essential!
-  eval set -- "${TEMP}"
-
+  if [[ "${OS}" == "Linux" ]] ; then
+    # Note the quotes around ${TEMP}: they are essential!
+    eval set -- "${TEMP}"
+  fi
   HELP=false
   VERSION=false
   CHECK_MK=false
@@ -150,20 +226,36 @@ if [[ ${CONTINUE} == true ]] ; then
   IGNORE_THRES=false
   WARNING_THRES=90
   CRITICAL_THRES=95
-  while true; do
-    case "${1}" in
-      -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true ; shift ;;
-      -i | --ignore ) IGNORE_THRES=true ; shift ;;
-      -K | --mk ) CHECK_MK=true ; shift ;;
-      -T | --trace ) TRACE=true ; shift ;;
-      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
-      -V | --version ) VERSION=true ; shift ;;
-      -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -- ) shift; break ;;
-      * ) break ;;
-    esac
-  done
+  if [[ "${OS:0:5}" == "Linux" ]] ; then
+    while true; do
+      case "${1}" in
+        -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -h | --help ) HELP=true ; shift ;;
+        -i | --ignore ) IGNORE_THRES=true ; shift ;;
+        -K | --mk ) CHECK_MK=true ; shift ;;
+        -T | --trace ) TRACE=true ; shift ;;
+        -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+        -V | --version ) VERSION=true ; shift ;;
+        -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -- ) shift ; break ;;
+        * ) break ;;
+      esac
+    done
+  elif [[ "${OS:0:3}" = "AIX" ]] ; then
+    while [[ $1 != -- ]] ; do
+      case "${1}" in
+        -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -h) HELP=true ; shift ;;
+        -i) IGNORE_THRES=true ; shift ;;
+        -K) CHECK_MK=true ; shift ;;
+        -T) TRACE=true ; shift ;;
+        -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+        -V) VERSION=true ; shift ;;
+        -w) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        * ) break ;;
+      esac
+    done
+  fi
 fi
 
 if [[ ${TRACE} == true ]] ; then
@@ -173,8 +265,8 @@ if [[ ${TRACE} == true ]] ; then
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
-ECHO="${ECHO}, check_mk:${CHECK_MK}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
+ECHO="${ECHO}, check_mk:${CHECK_MK}, ignore:${IGNORE_THRES}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo ${ECHO}
@@ -256,6 +348,12 @@ if [[ ${TRACE} == true ]] ; then
   date >> ${LOG}
   echo -e "<<<<<\n" >> ${LOG}
 fi
-exit ${RETURN}
 
+if [[ ${LOCKED} == true && -r ${LOCK_FILE} ]] ; then
+  rm ${LOCK_FILE}
+fi
+
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Ended ${APPL_NAME} ${COPY_ARGS[@]}" >> /tmp/${APPL_NAME}.log
+
+exit ${RETURN}
 
