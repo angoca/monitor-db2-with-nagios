@@ -19,15 +19,11 @@
 ###############################################################################
 
 # This script analyzes the allocated and used space in a tablespace.
-
-
 #
 # This script was based on the plugins written by Felipe Alkain de Souza.
 # http://www.dbatodba.com/db2/scripts-db2/nagios-plugins
-
 #
 # In order to be used in Nagios, you have to configure the following.
-
 #
 # # 'check_tablespace_size' command definition
 # define command {
@@ -40,11 +36,9 @@
 #         check_command           check_tablespace_size!/home/db2inst1!sample!USERSPACE1
 #         use                     generic-service
 # }
-
 #
 # Parameters:
 # -c | --critical : Critical threshold in milliseconds.
-
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
@@ -56,9 +50,6 @@
 # -V | --version : Show the current version of this script.
 # -w | --warning : Warning threshold in milliseconds.
 # --id : Tablespace ID (instead of name).
-
-
-
 #
 # The exit codes are the standard for Nagios.
 #
@@ -92,12 +83,9 @@ function print_revision {
 # Function to show the help
 function print_usage {
 
-
   /bin/cat <<__EOT
 Usage: ${1} { -i instanceHomeDirectory -d databaseName
 [-n tablespaceName | -I tablespaceId] [-c][-w][-K] | -h | -V } [-T][-v]
-
-
 __EOT
 }
 
@@ -108,11 +96,8 @@ function print_help {
   /bin/cat <<__EOT
 -------------------------------------------------------------------------------
 This script check the usage of a tablespace.
-
-
 -c | --critical INTEGER
    Critical percentage of usage.
-
    Default 90.
 -d | --database STRING
    Database name.
@@ -134,7 +119,6 @@ This script check the usage of a tablespace.
    Shows the current version of this script.
 -w | --warning INTEGER
    Warning level of usage.
-
    Default 80.
 
 In AIX, the long name options are not supported.
@@ -218,7 +202,6 @@ if [[ "${OS:0:5}" == "Linux" ]] ; then
   # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
-
   TEMP=$(getopt -o c:d:hi:I:Kn:TvVw: --long critical:,database:,help,id:,instance:,mk,name:,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
 elif [[ "${OS:0:3}" == "AIX" ]] ; then
@@ -280,7 +263,6 @@ if [[ ${CONTINUE} == true ]] ; then
         -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V | --version ) VERSION=true ; shift ;;
         -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-
         -- ) shift ; break ;;
         * ) break ;;
       esac
@@ -581,8 +563,6 @@ if [[ ${CONTINUE} == true ]] ; then
   LONG_PERFORMANCE="${ALLOC_PERF}\n${WATER_PERF}"
   PERF_MK="${PERFORMANCE}|${ALLOC_PERF}|${WATER_PERF}"
   # TODO As part of the performance, display the status (backup pending, restore pending, etc.
-
-
 fi
 
 # Prints the output.
