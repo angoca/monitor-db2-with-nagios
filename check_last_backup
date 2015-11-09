@@ -280,7 +280,6 @@ if [[ "${OS:0:5}" == "Linux" ]] ; then
 
   TEMP=$(getopt -o c:d:hi:KTvVw: --long critical:,database:,help,instance:,mk,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
-
 elif [[ "${OS:0:3}" == "AIX" ]] ; then
   set -- $(getopt c:d:hi:KTvVw: ${*})
 elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
