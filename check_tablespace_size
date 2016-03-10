@@ -2,7 +2,7 @@
 
 ###############################################################################
 # Monitor DB2 with Nagios
-# Copyright 2013,2014,2015 Andres Gomez Casanova
+# Copyright 2013,2014,2015,2016 Andres Gomez Casanova
 # https://github.com/angoca/monitor-db2-with-nagios
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,6 +41,7 @@
 # -c | --critical : Critical threshold in milliseconds.
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
+# -E | --exist : Returns OK if the tablespace does not exist.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
 # -K | --mk : Change the output for Check_MK.
@@ -85,7 +86,7 @@ function print_usage {
 
   /bin/cat <<__EOT
 Usage: ${1} { -i instanceHomeDirectory -d databaseName
-[-n tablespaceName | -I tablespaceId] [-c][-w][-K] | -h | -V } [-T][-v]
+[-n tablespaceName | -I tablespaceId] [-E][-c][-w][-K] | -h | -V } [-T][-v]
 __EOT
 }
 
@@ -101,6 +102,8 @@ This script check the usage of a tablespace.
    Default 90.
 -d | --database STRING
    Database name.
+-E | --exist
+   Returns OK if the given tablespace does not exist.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
@@ -202,10 +205,10 @@ if [[ "${OS:0:5}" == "Linux" ]] ; then
   # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
-  TEMP=$(getopt -o c:d:hi:I:Kn:TvVw: --long critical:,database:,help,id:,instance:,mk,name:,trace,verbose,version,warning: \
+  TEMP=$(getopt -o c:d:Ehi:I:Kn:TvVw: --long critical:,database:,exist,help,id:,instance:,mk,name:,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
 elif [[ "${OS:0:3}" == "AIX" ]] ; then
-  set -- $(getopt c:d:hi:I:Kn:TvVw: ${*})
+  set -- $(getopt c:d:Ehi:I:Kn:TvVw: ${*})
 elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
   echo "This plugin is not yet supported in your platform."
   echo "Please create a ticket in GitHub if you want to enable your current platform."
@@ -249,11 +252,13 @@ if [[ ${CONTINUE} == true ]] ; then
   CRITICAL_THRES=90
   TABLESPACE_NAME=
   TABLESPACE_ID=
+  IGNORE_INEXISTANT=false
   if [[ "${OS:0:5}" == "Linux" ]] ; then
     while true; do
       case "${1}" in
         -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -E | --exist ) IGNORE_INEXISTANT=true ; shift ;;
         -h | --help ) HELP=true ; shift ;;
         -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -I | --id ) TABLESPACE_ID=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
@@ -272,6 +277,7 @@ if [[ ${CONTINUE} == true ]] ; then
       case "${1}" in
         -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -d) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -E) IGNORE_INEXISTANT=true ; shift ;;
         -h) HELP=true ; shift ;;
         -i) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -I) TABLESPACE_ID=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
@@ -297,7 +303,7 @@ fi
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
-ECHO="${ECHO}, check_mk:${CHECK_MK}"
+ECHO="${ECHO}, check_mk:${CHECK_MK}, exist:${IGNORE_INEXISTANT}"
 ECHO="${ECHO}, ts_name:${TABLESPACE_NAME}, ts_id:${TABLESPACE_ID}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
@@ -413,13 +419,13 @@ if [[ ${CONTINUE} == true ]] ; then
     OUTPUT="Connection problem"
     RETURN=${UNKNOWN}
     CONTINUE=false
-  elif [[ ${EXIST_ERROR:0:3} == "SQL" ]] ; then
-    OUTPUT="The user cannot access the tablespace information"
-    RETURN=${UNKNOWN}
-    CONTINUE=false
   elif [[ ( ${TABLESPACE_ID} == "" && ${EXIST} != ${TABLESPACE_NAME} ) || ( ${TABLESPACE_NAME} == "" && ${EXIST} != ${TABLESPACE_ID} ) ]] ; then
     OUTPUT="Tablespace ${TABLESPACE_NAME}${TABLESPACE_ID} does not exist."
-    RETURN=${UNKNOWN}
+    if [[ ${IGNORE_INEXISTANT} == true ]] ; then
+      RETURN=${OK}
+    else
+      RETURN=${UNKNOWN}
+    fi
     CONTINUE=false
   fi
 fi
