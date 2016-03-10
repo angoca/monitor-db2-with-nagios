@@ -419,6 +419,10 @@ if [[ ${CONTINUE} == true ]] ; then
     OUTPUT="Connection problem"
     RETURN=${UNKNOWN}
     CONTINUE=false
+  elif [[ ${EXIST_ERROR:0:3} == "SQL" ]] ; then
+    OUTPUT="The user cannot access the tablespace information"
+    RETURN=${UNKNOWN}
+    CONTINUE=false
   elif [[ ( ${TABLESPACE_ID} == "" && ${EXIST} != ${TABLESPACE_NAME} ) || ( ${TABLESPACE_NAME} == "" && ${EXIST} != ${TABLESPACE_ID} ) ]] ; then
     OUTPUT="Tablespace ${TABLESPACE_NAME}${TABLESPACE_ID} does not exist."
     if [[ ${IGNORE_INEXISTANT} == true ]] ; then
