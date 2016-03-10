@@ -480,6 +480,9 @@ if [[ ${CONTINUE} == true ]] ; then
       if [[ ${CONTENT} == "SYSTEMP" || ${CONTENT} == "USRTEMP" ]] ; then
         OUTPUT="Temporary tablespace is being used. - ${SIZE}"
         RETURN=${OK}
+      elif [[ ${CONTENT} == "ANY" ]] ; then
+        OUTPUT="Please check the file system, the tablespace is SMS"
+        RETURN=${OK}
       else
         OUTPUT="Script error for SMS tablespace. - ${SIZE}"
         RETURN=${CRITICAL}
