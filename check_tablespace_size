@@ -2,7 +2,7 @@
 
 ###############################################################################
 # Monitor DB2 with Nagios
-# Copyright 2013 Andres Gomez Casanova
+# Copyright 2013,2014,2015,2016 Andres Gomez Casanova
 # https://github.com/angoca/monitor-db2-with-nagios
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,6 +41,7 @@
 # -c | --critical : Critical threshold in milliseconds.
 # -d | --database : Database name.
 # -h | --help : Show the help of this script.
+# -E | --exist : Returns OK if the tablespace does not exist.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
 # -K | --mk : Change the output for Check_MK.
@@ -67,7 +68,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.0 2013-01-18
+# Version: v1.1 2015-10-15
 
 # Flag for debugging.
 #set -xv
@@ -78,13 +79,14 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-01-18
+  echo v1.1 2015-10-15
 }
 # Function to show the help
 function print_usage {
+
   /bin/cat <<__EOT
 Usage: ${1} { -i instanceHomeDirectory -d databaseName
-[-n tablespaceName | --id tablespaceId] [-c][-w][-K] | -h | -V } [-T][-v]
+[-n tablespaceName | -I tablespaceId] [-E][-c][-w][-K] | -h | -V } [-T][-v]
 __EOT
 }
 
@@ -100,10 +102,14 @@ This script check the usage of a tablespace.
    Default 90.
 -d | --database STRING
    Database name.
+-E | --exist
+   Returns OK if the given tablespace does not exist.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
    Instance home directory. It is usually /home/db2inst1.
+-I | --id
+   ID of the tablespace. This should be usage when the name is unknown.
 -K | --mk
    Changes the output to be compatible with Check_MK.
 -n | --name STRING
@@ -117,8 +123,8 @@ This script check the usage of a tablespace.
 -w | --warning INTEGER
    Warning level of usage.
    Default 80.
---id
-   ID of the tablespace. This should be usage when the name is unknown.
+
+In AIX, the long name options are not supported.
 __EOT
 }
 
@@ -146,17 +152,79 @@ PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Started ${APPL_NAME} $@" >> /tmp/${APPL_NAME}.log
+
+# Checks the lock file does not exist.
+# The lock file is the way the command was called with its parameters
+# without spaces.
+COPY_ARGS=("${@}") 
+LOCK_FILE=
+for VALUE in "${COPY_ARGS[@]}" ; do
+  LOCK_FILE="${LOCK_FILE}${VALUE}"
+done
+LOCK_FILE=${LOCK_FILE//\//}
+LOCK_FILE=${LOCK_FILE//\\/}
+LOCK_FILE=${LOCK_FILE//\:/}
+LOCK_FILE=${LOCK_FILE//\*/}
+LOCK_FILE=${LOCK_FILE//\|/}
+LOCK_FILE="/tmp/${APPL_NAME}${LOCK_FILE}.lock"
+if [[ ! -r ${LOCK_FILE} ]] ; then
+  echo $$ > ${LOCK_FILE}
+  LOCKED=true
+else
+  # If it exist, then check if the process is running.
+  EXIST=$(ps -ef | grep $(cat ${LOCK_FILE}) | grep ${APPL_NAME})
+  # If process is not running, delete it.
+  if [[ ${EXIST} == "" ]] ; then
+    rm ${LOCK_FILE}
+    if [[ ! -r ${LOCK_FILE} ]] ; then
+      echo $$ > ${LOCK_FILE}
+      LOCKED=true
+    else
+      OUTPUT="The lock file cannot be replaced: ${LOCK_FILE}"
+      CONTINUE=false
+      RETURN=${UNKNOWN}
+    fi
+  else
+    OUTPUT="An instance of the script with the same parameters is already running."
+    CONTINUE=false
+    RETURN=${UNKNOWN}
+  fi
+fi
+
 if [[ ${#} -eq 0 ]] ; then
   print_usage ${APPL_NAME}
   RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-# The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377
+# Checks the operating system. geopt works different in AIX than in Linux.
+OS=$(uname)
 
-TEMP=$(getopt -o c:d:hi:Kn:TvVw: --long critical:,database:,help,id:,instance:,mk,name:,trace,verbose,version,warning: \
-             -n ${APPL_NAME} -- "${@}")
+if [[ "${OS:0:5}" == "Linux" ]] ; then
+  # The following requires GNU getopt. See the following discussion.
+  # http://stackoverflow.com/questions/402377
+
+  TEMP=$(getopt -o c:d:Ehi:I:Kn:TvVw: --long critical:,database:,exist,help,id:,instance:,mk,name:,trace,verbose,version,warning: \
+               -n ${APPL_NAME} -- "${@}")
+elif [[ "${OS:0:3}" == "AIX" ]] ; then
+  set -- $(getopt c:d:Ehi:I:Kn:TvVw: ${*})
+elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
+  echo "This plugin is not yet supported in your platform."
+  echo "Please create a ticket in GitHub if you want to enable your current platform."
+  echo "https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+elif [[ "${OS:0:6}" == "CYGWIN" ]] ; then
+  echo "This plugin is not supported in Cygwin"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+else
+  echo "The platform is unknown: ${OS}"
+  echo "Please create a ticket in GitHub: https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
 
 if [[ ${?} -ne 0 ]] ; then
   print_usage ${APPL_NAME}
@@ -165,9 +233,10 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  # Note the quotes around ${TEMP}: they are essential!
-  eval set -- "${TEMP}"
-
+  if [[ "${OS}" == "Linux" ]] ; then
+    # Note the quotes around ${TEMP}: they are essential!
+    eval set -- "${TEMP}"
+  fi
   HELP=false
   VERSION=false
   CHECK_MK=false
@@ -183,23 +252,45 @@ if [[ ${CONTINUE} == true ]] ; then
   CRITICAL_THRES=90
   TABLESPACE_NAME=
   TABLESPACE_ID=
-  while true; do
-    case "${1}" in
-      -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true ; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -K | --mk ) CHECK_MK=true ; shift ;;
-      -n | --name ) TABLESPACE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -T | --trace ) TRACE=true ; shift ;;
-      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
-      -V | --version ) VERSION=true ; shift ;;
-      -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      --id ) TABLESPACE_ID=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -- ) shift; break ;;
-      * ) break ;;
-    esac
-  done
+  IGNORE_INEXISTANT=false
+  if [[ "${OS:0:5}" == "Linux" ]] ; then
+    while true; do
+      case "${1}" in
+        -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -E | --exist ) IGNORE_INEXISTANT=true ; shift ;;
+        -h | --help ) HELP=true ; shift ;;
+        -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -I | --id ) TABLESPACE_ID=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -K | --mk ) CHECK_MK=true ; shift ;;
+        -n | --name ) TABLESPACE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -T | --trace ) TRACE=true ; shift ;;
+        -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+        -V | --version ) VERSION=true ; shift ;;
+        -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -- ) shift ; break ;;
+        * ) break ;;
+      esac
+    done
+  elif [[ "${OS:0:3}" = "AIX" ]] ; then
+    while [[ $1 != -- ]] ; do
+      case "${1}" in
+        -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -d) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -E) IGNORE_INEXISTANT=true ; shift ;;
+        -h) HELP=true ; shift ;;
+        -i) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -I) TABLESPACE_ID=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -K) CHECK_MK=true ; shift ;;
+        -n) TABLESPACE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -T) TRACE=true ; shift ;;
+        -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+        -V) VERSION=true ; shift ;;
+        -w) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        * ) break ;;
+      esac
+    done
+  fi
 fi
 
 if [[ ${TRACE} == true ]] ; then
@@ -212,7 +303,7 @@ fi
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
 ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
 ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
-ECHO="${ECHO}, check_mk:${CHECK_MK}"
+ECHO="${ECHO}, check_mk:${CHECK_MK}, exist:${IGNORE_INEXISTANT}"
 ECHO="${ECHO}, ts_name:${TABLESPACE_NAME}, ts_id:${TABLESPACE_ID}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
@@ -295,7 +386,7 @@ if [[ ${CONTINUE} == true ]] ; then
   fi
 
   if [[ ${DATABASE} == "" ]] ; then
-    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    OUTPUT="The database ${DATABASE_NAME} is not catalogued."
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
@@ -328,9 +419,17 @@ if [[ ${CONTINUE} == true ]] ; then
     OUTPUT="Connection problem"
     RETURN=${UNKNOWN}
     CONTINUE=false
+  elif [[ ${EXIST_ERROR:0:3} == "SQL" ]] ; then
+    OUTPUT="The user cannot access the tablespace information"
+    RETURN=${UNKNOWN}
+    CONTINUE=false
   elif [[ ( ${TABLESPACE_ID} == "" && ${EXIST} != ${TABLESPACE_NAME} ) || ( ${TABLESPACE_NAME} == "" && ${EXIST} != ${TABLESPACE_ID} ) ]] ; then
     OUTPUT="Tablespace ${TABLESPACE_NAME}${TABLESPACE_ID} does not exist."
-    RETURN=${UNKNOWN}
+    if [[ ${IGNORE_INEXISTANT} == true ]] ; then
+      RETURN=${OK}
+    else
+      RETURN=${UNKNOWN}
+    fi
     CONTINUE=false
   fi
 fi
@@ -380,6 +479,9 @@ if [[ ${CONTINUE} == true ]] ; then
       fi
       if [[ ${CONTENT} == "SYSTEMP" || ${CONTENT} == "USRTEMP" ]] ; then
         OUTPUT="Temporary tablespace is being used. - ${SIZE}"
+        RETURN=${OK}
+      elif [[ ${CONTENT} == "ANY" ]] ; then
+        OUTPUT="Please check the file system, the tablespace is SMS"
         RETURN=${OK}
       else
         OUTPUT="Script error for SMS tablespace. - ${SIZE}"
@@ -435,7 +537,7 @@ if [[ ${CONTINUE} == true ]] ; then
     echo "RESULT:'${STATUS}'"
   fi
 
-  # Substring para ver si hubo un error
+  # Substring to check if an error occurred.
   STATUS_ERROR=$(echo ${STATUS} | cut -c 1-5)
   if [[ ${STATUS_ERROR} == "error" ]] ; then
     OUTPUT="Connection problem"
@@ -499,6 +601,12 @@ if [[ ${TRACE} == true ]] ; then
   date >> ${LOG}
   echo -e "<<<<<\n" >> ${LOG}
 fi
-exit ${RETURN}
 
+if [[ ${LOCKED} == true && -r ${LOCK_FILE} ]] ; then
+  rm ${LOCK_FILE}
+fi
+
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Ended ${APPL_NAME} ${COPY_ARGS[@]}" >> /tmp/${APPL_NAME}.log
+
+exit ${RETURN}
 

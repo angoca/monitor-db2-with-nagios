@@ -2,7 +2,7 @@
 
 ###############################################################################
 # Monitor DB2 with Nagios
-# Copyright 2013 Andres Gomez Casanova
+# Copyright 2013,2014,2015 Andres Gomez Casanova
 # https://github.com/angoca/monitor-db2-with-nagios
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -76,9 +76,9 @@
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
-# -w | --warning :  Quantity of connections to be considered as a warning.
-# --filter : Extra filter for the grep.
-# --inverted : Filter inverted.
+# -w | --warning : Quantity of connections to be considered as a warning.
+# -f | --filter : Extra filter for the grep.
+# -n | --inverted : Filter inverted.
 #
 # In AIX, the long name options are not supported.
 #
@@ -98,7 +98,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.2 2013-05-25
+# Version: v1.3 2015-10-15
 
 # Flag for debugging.
 #set -xv
@@ -109,13 +109,13 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2013-05-25
+  echo v1.3 2015-10-15
 }
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
 Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][-K]
-[--filter][--inverted]][-I][-s] | -h | -V }[-T][-v]
+[-f][-n]][-I][-s] | -h | -V }[-T][-v]
 __EOT
 }
 
@@ -125,6 +125,7 @@ function print_help {
   # Max 80 chars width.
   /bin/cat <<__EOT
 -------------------------------------------------------------------------------
+
 This script checks the quantity of established connections.
 -c | --critical INTEGER
    Quantity of connections to consider as critical.
@@ -137,7 +138,7 @@ This script checks the quantity of established connections.
    Instance home directory. It is usually /home/db2inst1
 -I | --ignore
    Ignore thresholds, show only informative information. Useful to create
-   graphs descriving the activity.
+   graphs describing the activity.
 -K | --mk
    Changes the output to be compatible with Check_MK.
 -s | --state
@@ -152,9 +153,9 @@ This script checks the quantity of established connections.
 -w | --warning INTEGER
    Quantity of connections to consider as warning.
    Default 10.
---filter STRING
+-f | --filter STRING
    Criterion to filter the data on.
---inverted STRING
+-n | --inverted STRING
    Filter inverted.
 
 In AIX, the long name options are not supported.
@@ -185,6 +186,46 @@ PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Started ${APPL_NAME} $@" >> /tmp/${APPL_NAME}.log
+
+# Checks the lock file does not exist.
+# The lock file is the way the command was called with its parameters
+# without spaces.
+COPY_ARGS=("${@}") 
+LOCK_FILE=
+for VALUE in "${COPY_ARGS[@]}" ; do
+  LOCK_FILE="${LOCK_FILE}${VALUE}"
+done
+LOCK_FILE=${LOCK_FILE//\//}
+LOCK_FILE=${LOCK_FILE//\\/}
+LOCK_FILE=${LOCK_FILE//\:/}
+LOCK_FILE=${LOCK_FILE//\*/}
+LOCK_FILE=${LOCK_FILE//\|/}
+LOCK_FILE="/tmp/${APPL_NAME}${LOCK_FILE}.lock"
+if [[ ! -r ${LOCK_FILE} ]] ; then
+  echo $$ > ${LOCK_FILE}
+  LOCKED=true
+else
+  # If it exist, then check if the process is running.
+  EXIST=$(ps -ef | grep $(cat ${LOCK_FILE}) | grep ${APPL_NAME})
+  # If process is not running, delete it.
+  if [[ ${EXIST} == "" ]] ; then
+    rm ${LOCK_FILE}
+    if [[ ! -r ${LOCK_FILE} ]] ; then
+      echo $$ > ${LOCK_FILE}
+      LOCKED=true
+    else
+      OUTPUT="The lock file cannot be replaced: ${LOCK_FILE}"
+      CONTINUE=false
+      RETURN=${UNKNOWN}
+    fi
+  else
+    OUTPUT="An instance of the script with the same parameters is already running."
+    CONTINUE=false
+    RETURN=${UNKNOWN}
+  fi
+fi
+
 if [[ ${#} -eq 0 ]] ; then
   print_usage ${APPL_NAME}
   RETURN=${UNKNOWN}
@@ -194,21 +235,21 @@ fi
 # Checks the operating system. geopt works different in AIX than in Linux.
 OS=$(uname)
 
-if [[ "${OS:0:5}" = "Linux" ]] ; then
+if [[ "${OS:0:5}" == "Linux" ]] ; then
   # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
-  TEMP=$(getopt -o c:d:hi:IKsTvVw: --long critical:,database:,filter:,help,instance:,ignore,inverted,mk,state,trace,verbose,version,warning: \
+  TEMP=$(getopt -o c:d:f:hi:IKnsTvVw: --long critical:,database:,filter:,help,instance:,ignore,inverted,mk,state,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
-elif [[ "${OS:0:3}" = "AIX" ]] ; then
-  set -- $(getopt c:d:hi:IKsTvVw: ${*})
-elif [[ ${OS:0:6} == "Darwin" || ${OS:0:5} == "SunOS" || ${OS:0:5} == "HP-UX" ]] ; then
+elif [[ "${OS:0:3}" == "AIX" ]] ; then
+  set -- $(getopt c:d:f:hi:IKnsTvVw: ${*})
+elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
   echo "This plugin is not yet supported in your platform."
   echo "Please create a ticket in GitHub if you want to enable your current platform."
   echo "https://github.com/angoca/monitor-db2-with-nagios/issues"
   RETURN=${UNKNOWN}
   CONTINUE=false
-elif [[ ${OS:0:6} == "CYGWIN" ]] ; then
+elif [[ "${OS:0:6}" == "CYGWIN" ]] ; then
   echo "This plugin is not supported in Cygwin"
   RETURN=${UNKNOWN}
   CONTINUE=false
@@ -226,11 +267,10 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  if [[ "${OS}" = "Linux" ]] ; then
+  if [[ "${OS}" == "Linux" ]] ; then
     # Note the quotes around ${TEMP}: they are essential!
     eval set -- "${TEMP}"
   fi
-
   HELP=false
   VERSION=false
   CHECK_MK=false
@@ -247,7 +287,7 @@ if [[ ${CONTINUE} == true ]] ; then
   STATE=false
   FILTER=
   FILTER_INVERTED=false
-  if [[ "${OS:0:5}" = "Linux" ]] ; then
+  if [[ "${OS:0:5}" == "Linux" ]] ; then
     while true; do
       case "${1}" in
         -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
@@ -261,9 +301,9 @@ if [[ ${CONTINUE} == true ]] ; then
         -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V | --version ) VERSION=true ; shift ;;
         -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        --filter ) FILTER=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        --inverted ) FILTER_INVERTED=true ; shift ;;
-        -- ) shift; break ;;
+        -f | --filter ) FILTER=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -n | --inverted ) FILTER_INVERTED=true ; shift ;;
+        -- ) shift ; break ;;
         * ) break ;;
       esac
     done
@@ -283,6 +323,7 @@ if [[ ${CONTINUE} == true ]] ; then
         -w) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -f) FILTER=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -n) FILTER_INVERTED=true ; shift ;;
+        * ) break ;;
       esac
     done
   fi
@@ -370,9 +411,8 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ ${VERBOSE} -ge 3 ]] ; then
     echo "RESULT:'${DATABASE}'"
   fi
-
   if [[ ${DATABASE} == "" ]] ; then
-    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    OUTPUT="The database ${DATABASE_NAME} is not catalogued."
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
@@ -403,6 +443,7 @@ if [[ ${CONTINUE} == true ]] ; then
       CONNS=$(printf '%s\n' "${QTY_RESULT}" | grep ${DATABASE})
     fi
     QTY=$(printf '%s\n' "${CONNS}" | wc -l)
+
     if [[ ${STATE} == true ]] ; then
       TYPE="PerStatus"
       BACKUP=0
@@ -475,13 +516,10 @@ if [[ ${CONTINUE} == true ]] ; then
       if [[ ${VERBOSE} -ge 3 ]] ; then
         echo "RESULT FILTER:'${QTY_FILTERED}'"
       fi
-      AGREGATE=0
       while IFS= read LINE ; do
         USERNAME=$(echo ${LINE} | awk '{print $2}')
         QTY_USER=$(echo ${LINE} | awk '{print $1}')
-        #AGREGATE=$((${AGREGATE} + ${QTY_USER}))
         LONG_OUTPUT="${USERNAME} has ${QTY_USER},"
-        #LONG_PERFORMANCE="'User_${USERNAME}'=${AGREGATE}"
         LONG_PERFORMANCE="'User_${USERNAME}'=${QTY_USER}"
         PERF_MK=${LONG_PERFORMANCE}
       done < <( printf '%s\n' "${QTY_FILTERED}" )
@@ -491,6 +529,7 @@ if [[ ${CONTINUE} == true ]] ; then
     fi
 
     if [[ ${IGNORE_THRES} == false ]] ; then
+
       if [[ ${QTY} -lt ${WARNING_THRES} ]] ; then
          OUTPUT="OK. Normal quantity of connections (${QTY})."
          RETURN=${OK}
@@ -508,7 +547,7 @@ if [[ ${CONTINUE} == true ]] ; then
       PERFORMANCE="'Connections'=${QTY}"
     fi
   else
-    OUTPUT="Problem retreiving the applications list"
+    OUTPUT="Problem retrieving the applications list"
     RETURN=${UNKNOWN}
     if [[ ${STATE} == true ]] ; then
       TYPE="PerStatus"
@@ -537,5 +576,12 @@ if [[ ${TRACE} == true ]] ; then
   date >> ${LOG}
   echo -e "<<<<<\n" >> ${LOG}
 fi
+
+if [[ ${LOCKED} == true && -r ${LOCK_FILE} ]] ; then
+  rm ${LOCK_FILE}
+fi
+
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Ended ${APPL_NAME} ${COPY_ARGS[@]}" >> /tmp/${APPL_NAME}.log
+
 exit ${RETURN}
 

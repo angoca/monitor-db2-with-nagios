@@ -2,7 +2,7 @@
 
 ###############################################################################
 # Monitor DB2 with Nagios
-# Copyright 2013 Andres Gomez Casanova
+# Copyright 2013,2014,2015 Andres Gomez Casanova
 # https://github.com/angoca/monitor-db2-with-nagios
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -63,8 +63,8 @@
 # order to execute db2pd.
 #
 # Parameters:
-# -a | --async : Changes the behavoiur of the script to check the percentage
-#   of synchronous versus asynchornous writes. By default, the script checks
+# -a | --async : Changes the behaviour of the script to check the percentage
+#   of synchronous versus asynchronous writes. By default, the script checks
 #   the PBPCT.
 # -c | --critical : Percentage of PBPCT that is considered as critical.
 # -d | --database : Database name.
@@ -77,6 +77,8 @@
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
 # -w | --warning : Percentage of PBPCT that is considered as warning.
+#
+# In AIX, the long name options are not supported.
 #
 # The exit codes are the standard for Nagios.
 #
@@ -94,7 +96,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.0 2014-09-19
+# Version: v1.1 2015-10-15
 
 # Flag for debugging.
 #set -xv
@@ -105,7 +107,7 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.0 2014-09-19
+  echo v1.1 2015-10-15
 }
 # Function to show the help
 function print_usage {
@@ -152,6 +154,8 @@ proportion between Sync and Async writes.
    warning.
    Default 20.
    With -a: 80.
+
+In AIX, the long name options are not supported.
 __EOT
 }
 
@@ -179,17 +183,80 @@ PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Started ${APPL_NAME} $@" >> /tmp/${APPL_NAME}.log
+
+# Checks the lock file does not exist.
+# The lock file is the way the command was called with its parameters
+# without spaces.
+COPY_ARGS=("${@}") 
+LOCK_FILE=
+for VALUE in "${COPY_ARGS[@]}" ; do
+  LOCK_FILE="${LOCK_FILE}${VALUE}"
+done
+LOCK_FILE=${LOCK_FILE//\//}
+LOCK_FILE=${LOCK_FILE//\\/}
+LOCK_FILE=${LOCK_FILE//\:/}
+LOCK_FILE=${LOCK_FILE//\*/}
+LOCK_FILE=${LOCK_FILE//\|/}
+LOCK_FILE="/tmp/${APPL_NAME}${LOCK_FILE}.lock"
+if [[ ! -r ${LOCK_FILE} ]] ; then
+  echo $$ > ${LOCK_FILE}
+  LOCKED=true
+else
+  # If it exist, then check if the process is running.
+  EXIST=$(ps -ef | grep $(cat ${LOCK_FILE}) | grep ${APPL_NAME})
+  # If process is not running, delete it.
+  if [[ ${EXIST} == "" ]] ; then
+    rm ${LOCK_FILE}
+    if [[ ! -r ${LOCK_FILE} ]] ; then
+      echo $$ > ${LOCK_FILE}
+      LOCKED=true
+    else
+      OUTPUT="The lock file cannot be replaced: ${LOCK_FILE}"
+      CONTINUE=false
+      RETURN=${UNKNOWN}
+    fi
+  else
+    OUTPUT="An instance of the script with the same parameters is already running."
+    CONTINUE=false
+    RETURN=${UNKNOWN}
+  fi
+fi
+
 if [[ ${#} -eq 0 ]] ; then
   print_usage ${APPL_NAME}
   RETURN=${UNKNOWN}
   CONTINUE=false
 fi
 
-# The following requieres GNU getopt. See the following discusion.
-# http://stackoverflow.com/questions/402377
+# Checks the operating system. geopt works different in AIX than in Linux.
+OS=$(uname)
 
-TEMP=$(getopt -o ac:d:hi:KSTvVw: --long async,critical:,database:,help,instance:,mk,simple,trace,verbose,version,warning: \
-             -n ${APPL_NAME} -- "${@}")
+if [[ "${OS:0:5}" == "Linux" ]] ; then
+  # The following requires GNU getopt. See the following discussion.
+  # http://stackoverflow.com/questions/402377
+
+  # TODO Add the arguments here. One char in -o, multiple char in -long.
+  TEMP=$(getopt -o ac:d:hi:KSTvVw: --long async,critical:,database:,help,instance:,mk,simple,trace,verbose,version,warning: \
+               -n ${APPL_NAME} -- "${@}")
+elif [[ "${OS:0:3}" == "AIX" ]] ; then
+  set -- $(getopt ac:d:hi:KSTvVw: ${*})
+elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
+  echo "This plugin is not yet supported in your platform."
+  echo "Please create a ticket in GitHub if you want to enable your current platform."
+  echo "https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+elif [[ "${OS:0:6}" == "CYGWIN" ]] ; then
+  echo "This plugin is not supported in Cygwin"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+else
+  echo "The platform is unknown: ${OS}"
+  echo "Please create a ticket in GitHub: https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
 
 if [[ ${?} -ne 0 ]] ; then
   print_usage ${APPL_NAME}
@@ -198,9 +265,10 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  # Note the quotes around ${TEMP}: they are essential!
-  eval set -- "${TEMP}"
-
+  if [[ "${OS}" == "Linux" ]] ; then
+    # Note the quotes around ${TEMP}: they are essential!
+    eval set -- "${TEMP}"
+  fi
   HELP=false
   VERSION=false
   CHECK_MK=false
@@ -218,23 +286,42 @@ if [[ ${CONTINUE} == true ]] ; then
   DATABASE_NAME=
   WARNING_THRES=20
   CRITICAL_THRES=40
-  while true; do
-    case "${1}" in
-      -a | --async ) ASYNC=true ; shift ;;
-      -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -h | --help ) HELP=true ; shift ;;
-      -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -K | --mk ) CHECK_MK=true ; shift ;;
-      -S | --single ) SINGLE=true ; shift ;;
-      -T | --trace ) TRACE=true ; shift ;;
-      -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
-      -V | --version ) VERSION=true ; shift ;;
-      -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-      -- ) shift; break ;;
-      * ) break ;;
-    esac
-  done
+  if [[ "${OS:0:5}" = "Linux" ]] ; then
+    while true; do
+      case "${1}" in
+        -a | --async ) ASYNC=true ; shift ;;
+        -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -h | --help ) HELP=true ; shift ;;
+        -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -K | --mk ) CHECK_MK=true ; shift ;;
+        -S | --single ) SINGLE=true ; shift ;;
+        -T | --trace ) TRACE=true ; shift ;;
+        -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+        -V | --version ) VERSION=true ; shift ;;
+        -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -- ) shift ; break ;;
+        * ) break ;;
+      esac
+    done
+  elif [[ "${OS:0:3}" = "AIX" ]] ; then
+    while [[ $1 != -- ]] ; do
+      case "${1}" in
+        -a) ASYNC=true ; shift ;;
+        -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -d) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -h) HELP=true ; shift ;;
+        -i) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -K) CHECK_MK=true ; shift ;;
+        -S) SINGLE=true ; shift ;;
+        -T) TRACE=true ; shift ;;
+        -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+        -V) VERSION=true ; shift ;;
+        -w) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        * ) break ;;
+      esac
+    done
+  fi
 fi
 
 if [[ ${TRACE} == true ]] ; then
@@ -332,9 +419,8 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ ${VERBOSE} -ge 3 ]] ; then
     echo "RESULT:'${DATABASE}'"
   fi
-
   if [[ ${DATABASE} == "" ]] ; then
-    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    OUTPUT="The database ${DATABASE_NAME} is not catalogued."
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
@@ -350,7 +436,7 @@ if [[ ${CONTINUE} == true ]] ; then
   touch ${TMP_FILE}
   chmod 666 ${TMP_FILE} 2> /dev/null
   if [[  ! ( -r "${TMP_FILE}" ) ]] ; then
-    OUTPUT="Temporal file is nor writable"
+    OUTPUT="Temporal file is not writeable"
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
@@ -361,7 +447,7 @@ if [[ ${CONTINUE} == true ]] ; then
   ${COMMAND_SNAPSHOT} > ${TMP_FILE}
 
   if [[  ! ( -r "${TMP_FILE}" ) ]] ; then
-    OUTPUT="Temporal file is nor readable"
+    OUTPUT="Temporal file is not readable"
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
@@ -414,7 +500,7 @@ if [[ ${CONTINUE} == true ]] ; then
         OUTPUT="Percentage of Bad Page cleaner trigger is OK"
       elif [[ ${PBPCT} -lt ${CRITICAL_THRES} ]] ; then
         RETURN=${WARNING}
-        OUTPUT="Bad page cleaner tirgger is increasing, check writes"
+        OUTPUT="Bad page cleaner trigger is increasing, check writes"
       else
         RETURN=${CRITICAL}
         OUTPUT="Bad page cleaner trigger is impacting the performance"
@@ -459,7 +545,7 @@ if [[ ${CONTINUE} == true ]] ; then
       # Checks the asynchronous writes.
       if [[ ${ASYNC_DATA_WRITES_PER} -gt ${WARNING_THRES} ]] ; then
         RETURN=${OK}
-        OUTPUT="The quantity of asynchornous writes is Ok"
+        OUTPUT="The quantity of asynchronous writes is Ok"
       elif [[ ${ASYNC_DATA_WRITES_PER} -gt ${CRITICAL_THRES} ]] ; then
         RETURN=${WARNING}
         OUTPUT="Quantity of asynchronous writes is increasing"
@@ -469,7 +555,7 @@ if [[ ${CONTINUE} == true ]] ; then
       fi
       if [[ ${ASYNC_INDEX_WRITES_PER} -gt ${WARNING_THRES} ]] ; then
         # The return is the same as in writes.
-        OUTPUT="The quantity of asynchornous writes is Ok"
+        OUTPUT="The quantity of asynchronous writes is Ok"
       elif [[ ${ASYNC_INDEX_WRITES_PER} -gt ${CRITICAL_THRES} ]] ; then
         if [[ ${RETURN} -lt ${WARNING} ]] ; then
           RETURN=${WARNING}
@@ -517,6 +603,12 @@ if [[ ${TRACE} == true ]] ; then
   date >> ${LOG}
   echo -e "<<<<<\n" >> ${LOG}
 fi
-exit ${RETURN}
 
+if [[ ${LOCKED} == true && -r ${LOCK_FILE} ]] ; then
+  rm ${LOCK_FILE}
+fi
+
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Ended ${APPL_NAME} ${COPY_ARGS[@]}" >> /tmp/${APPL_NAME}.log
+
+exit ${RETURN}
 

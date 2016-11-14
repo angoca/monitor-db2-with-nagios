@@ -1,0 +1,201 @@
+#! /usr/bin/env bash
+
+###############################################################################
+# Monitor DB2 with Nagios
+# Copyright 2013,2014,2015 Andres Gomez Casanova
+# https://github.com/angoca/monitor-db2-with-nagios
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+###############################################################################
+
+# Wraps the execution of a check when using an active-passive cluster. When the
+# execution is on the passive cluster, it returns OK. In order to identify the
+# active or passive cluster it checks if a file system (directory) is present.
+# The wrapped command is called normally, with all parameters.
+#
+# In order to be used in Nagios, you have to configure the following.
+# (Example with check_instance_up)
+#
+# # 'check_instance_up' command definition
+# define command {
+#         command_name    check_connection_qty
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -C "scripts/check_on_cluster -f /data/db2 scripts/check_instance_up -i /home/db2inst1"
+# }
+# define service{
+#         host_name               db2server
+#         service_description     Quantity of current connections
+#         check_command           check_instance_up
+#         use                     generic-service
+# }
+#
+# When using NRPE (Example with check_instance_up):
+#
+# In the database server:
+#
+# command[check_instance_up]=/home/nagios/scripts/check_on_cluste -d /data/db2 check_instance_up -i /home/db2inst1
+#
+# Parameters:
+# -d : Directory presented only in the active node.
+# Followed by the set of parameters and the command to execute.
+#
+# The exit codes are the standard for Nagios.
+#
+# 0 The plugin was able to check the service and it appeared to be functioning
+#   properly.
+# 1 The plugin was able to check the service, but it appeared to be above some
+#   "warning" threshold or did not appear to be working properly.
+# 2 The plugin detected that either the service was not running or it was above
+#   some "critical" threshold.
+# 3 Invalid command line arguments were supplied to the plugin or low-level
+#   failures internal to the plugin (such as unable to fork, or open a tcp
+#   socket) that prevent it from performing the specified operation.
+#   Higher-level errors (such as name resolution errors, socket timeouts, etc)
+#   are outside of the control of plugins and should generally NOT be reported
+#   as UNKNOWN states.
+#
+# Author: Andres Gomez Casanova
+# Version: v1.0 2015-12-15
+
+# Flag for debugging.
+#set -xv
+
+# Locale to print messages in English. Prevent language problems.
+export LANG=en_US
+
+# Version of this script.
+function print_revision {
+  echo Andres Gomez Casanova - AngocA
+  echo v1.0 2015-12-15
+}
+# Function to show the help
+function print_usage {
+  /bin/cat <<__EOT
+Usage: ${1} { -d directory commandWithParameters }
+__EOT
+}
+
+function print_help {
+  print_revision
+  print_usage ${1}
+  # Max 80 chars width.
+  /bin/cat <<__EOT
+-------------------------------------------------------------------------------
+Wraps the execution of a command, useful when using an active-passive node.
+-d
+   Directory to check if the current node is the active (if present) or the
+   passive (not present).
+
+Followed by the command name and set of parameters to execute as the active
+node.
+__EOT
+}
+
+# Variable to control the flow execution. Prevent Spaghetti code.
+CONTINUE=true
+
+# Nagios return codes
+OK=0
+WARNING=1
+CRITICAL=2
+UNKNOWN=3
+# This is the returned code.
+RETURN=${UNKNOWN}
+
+# Nagios output
+OUTPUT=
+
+APPL_NAME=$(basename ${0})
+
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Started ${APPL_NAME} $@" >> /tmp/${APPL_NAME}.log
+
+# Checks the lock file does not exist.
+# The lock file is the way the command was called with its parameters
+# without spaces.
+COPY_ARGS=("${@}")
+PARAMS=("${@}")
+LOCK_FILE=
+for VALUE in "${COPY_ARGS[@]}" ; do
+  LOCK_FILE="${LOCK_FILE}${VALUE}"
+done
+LOCK_FILE=${LOCK_FILE//\//}
+LOCK_FILE=${LOCK_FILE//\\/}
+LOCK_FILE=${LOCK_FILE//\:/}
+LOCK_FILE=${LOCK_FILE//\*/}
+LOCK_FILE=${LOCK_FILE//\|/}
+LOCK_FILE="/tmp/${APPL_NAME}${LOCK_FILE}.lock"
+if [[ ! -r ${LOCK_FILE} ]] ; then
+  echo $$ > ${LOCK_FILE}
+  LOCKED=true
+else
+  # If it exist, then check if the process is running.
+  EXIST=$(ps -ef | grep $(cat ${LOCK_FILE}) | grep ${APPL_NAME})
+  # If process is not running, delete it.
+  if [[ ${EXIST} == "" ]] ; then
+    rm ${LOCK_FILE}
+    if [[ ! -r ${LOCK_FILE} ]] ; then
+      echo $$ > ${LOCK_FILE}
+      LOCKED=true
+    else
+      OUTPUT="The lock file cannot be replaced: ${LOCK_FILE}"
+      CONTINUE=false
+      RETURN=${UNKNOWN}
+    fi
+  else
+    OUTPUT="An instance of the script with the same parameters is already running."
+    CONTINUE=false
+    RETURN=${UNKNOWN}
+  fi
+fi
+
+if [[ ${#} -eq 0 ]] ; then
+  print_help ${APPL_NAME}
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
+
+#set -xv
+if [[ "${1}" = "-d" ]] ; then
+  DIRECTORY=$2
+  COMMAND=${@:3}
+else
+  echo "The first parameter should be -d followed by the directory"
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -d ${DIRECTORY} ]] ; then
+    OUTPUT=$(${COMMAND})
+    RETURN=${?}
+  else
+    RETURN=${OK}
+    OUTPUT="Ok, el nodo es pasivo"
+  fi
+fi
+
+# Prints the output.
+if [[ ${OUTPUT} == "" ]] ; then
+  OUTPUT="Note: The test was not executed."
+fi
+# Builds the output.
+echo "${OUTPUT}"
+
+if [[ ${LOCKED} == true && -r ${LOCK_FILE} ]] ; then
+  rm ${LOCK_FILE}
+fi
+
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Ended ${APPL_NAME} ${COPY_ARGS[@]}" >> /tmp/${APPL_NAME}.log
+
+exit ${RETURN}
+

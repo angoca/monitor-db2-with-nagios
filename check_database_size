@@ -2,7 +2,7 @@
 
 ###############################################################################
 # Monitor DB2 with Nagios
-# Copyright 2013 Andres Gomez Casanova
+# Copyright 2013,2014,2015 Andres Gomez Casanova
 # https://github.com/angoca/monitor-db2-with-nagios
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -71,7 +71,7 @@
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
 # -K | --mk : Change the output for Check_MK.
-# -p | --percentage : Usage percentage (size : allocated).
+# -p | --percentage : Use percentage (size : allocated).
 # -r | --refresh : Cache minutes before refresh (Stored procedure).
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
@@ -95,7 +95,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.1 2013-05-26
+# Version: v1.2 2015-10-15
 
 # Flag for debugging.
 #set -xv
@@ -106,7 +106,7 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.1 2013-05-26
+  echo v1.2 2015-10-15
 }
 # Function to show the help
 function print_usage {
@@ -133,11 +133,11 @@ that the provided percentage.
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
-   Instance home directory. It is usually /home/db2inst1
+   Instance home directory. It is usually /home/db2inst1.
 -K | --mk
    Changes the output to be compatible with Check_MK.
 -p | --percentage INTEGER
-   Usage percentage (size : allocated). Value between 1 and 99.
+   Use percentage (size : allocated). Value between 1 and 99.
 -r | --refresh INTEGER
    Quantity of minutes before refresh cache values in the database.
    Used to call the stored procedure GET_DBSIZE_INFO.
@@ -176,6 +176,46 @@ PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Started ${APPL_NAME} $@" >> /tmp/${APPL_NAME}.log
+
+# Checks the lock file does not exist.
+# The lock file is the way the command was called with its parameters
+# without spaces.
+COPY_ARGS=("${@}") 
+LOCK_FILE=
+for VALUE in "${COPY_ARGS[@]}" ; do
+  LOCK_FILE="${LOCK_FILE}${VALUE}"
+done
+LOCK_FILE=${LOCK_FILE//\//}
+LOCK_FILE=${LOCK_FILE//\\/}
+LOCK_FILE=${LOCK_FILE//\:/}
+LOCK_FILE=${LOCK_FILE//\*/}
+LOCK_FILE=${LOCK_FILE//\|/}
+LOCK_FILE="/tmp/${APPL_NAME}${LOCK_FILE}.lock"
+if [[ ! -r ${LOCK_FILE} ]] ; then
+  echo $$ > ${LOCK_FILE}
+  LOCKED=true
+else
+  # If it exist, then check if the process is running.
+  EXIST=$(ps -ef | grep $(cat ${LOCK_FILE}) | grep ${APPL_NAME})
+  # If process is not running, delete it.
+  if [[ ${EXIST} == "" ]] ; then
+    rm ${LOCK_FILE}
+    if [[ ! -r ${LOCK_FILE} ]] ; then
+      echo $$ > ${LOCK_FILE}
+      LOCKED=true
+    else
+      OUTPUT="The lock file cannot be replaced: ${LOCK_FILE}"
+      CONTINUE=false
+      RETURN=${UNKNOWN}
+    fi
+  else
+    OUTPUT="An instance of the script with the same parameters is already running."
+    CONTINUE=false
+    RETURN=${UNKNOWN}
+  fi
+fi
+
 if [[ ${#} -eq 0 ]] ; then
   print_usage ${APPL_NAME}
   RETURN=${UNKNOWN}
@@ -185,21 +225,21 @@ fi
 # Checks the operating system. geopt works different in AIX than in Linux.
 OS=$(uname)
 
-if [[ "${OS:0:5}" = "Linux" ]] ; then
-  # The following requieres GNU getopt. See the following discusion.
+if [[ "${OS:0:5}" == "Linux" ]] ; then
+  # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
   TEMP=$(getopt -o c:d:hi:Kp:r:TvV --long critical:,database:,help,instance:,mk,percentage:,refresh:,trace,verbose,version \
-             -n ${APPL_NAME} -- "${@}")
-elif [[ "${OS:0:3}" = "AIX" ]] ; then
+               -n ${APPL_NAME} -- "${@}")
+elif [[ "${OS:0:3}" == "AIX" ]] ; then
   set -- $(getopt c:d:hi:Kp:r:TvV ${*})
-elif [[ ${OS:0:6} == "Darwin" || ${OS:0:5} == "SunOS" || ${OS:0:5} == "HP-UX" ]] ; then
+elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
   echo "This plugin is not yet supported in your platform."
   echo "Please create a ticket in GitHub if you want to enable your current platform."
   echo "https://github.com/angoca/monitor-db2-with-nagios/issues"
   RETURN=${UNKNOWN}
   CONTINUE=false
-elif [[ ${OS:0:6} == "CYGWIN" ]] ; then
+elif [[ "${OS:0:6}" == "CYGWIN" ]] ; then
   echo "This plugin is not supported in Cygwin"
   RETURN=${UNKNOWN}
   CONTINUE=false
@@ -217,11 +257,10 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  if [[ "${OS}" = "Linux" ]] ; then
+  if [[ "${OS}" == "Linux" ]] ; then
     # Note the quotes around ${TEMP}: they are essential!
     eval set -- "${TEMP}"
   fi
-
   HELP=false
   VERSION=false
   CHECK_MK=false
@@ -237,7 +276,7 @@ if [[ ${CONTINUE} == true ]] ; then
   PERCENTAGE=-1
   PERCENTAGE_SET=false
   REFRESH=-1
-  if [[ "${OS:0:5}" = "Linux" ]] ; then
+  if [[ "${OS:0:5}" == "Linux" ]] ; then
     while true; do
       case "${1}" in
         -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; CRITICAL_SET=true ; shift 2 ;;
@@ -267,6 +306,7 @@ if [[ ${CONTINUE} == true ]] ; then
         -T) TRACE=true ; shift ;;
         -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V) VERSION=true ; shift ;;
+        * ) break ;;
       esac
     done
   fi
@@ -370,9 +410,8 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ ${VERBOSE} -ge 3 ]] ; then
     echo "RESULT:'${DATABASE}'"
   fi
-
   if [[ ${DATABASE} == "" ]] ; then
-    OUTPUT="The database ${DATABASE_NAME} is not cataloged."
+    OUTPUT="The database ${DATABASE_NAME} is not catalogued."
     RETURN=${UNKNOWN}
     CONTINUE=false
   fi
@@ -419,7 +458,7 @@ if [[ ${CONTINUE} == true ]] ; then
     CONTINUE=false
   elif [[ ${UNKNOWN_ERROR} != "" ]] ; then
     OUTPUT="Unknown problem while executing the SP CALL GET_DBSIZE_INFO(?, ?, ?, ${REFRESH})"
-    LONG_OUTPUT="Reexecute the script with multiple verbosity mode."
+    LONG_OUTPUT="Re-execute the script with multiple verbosity mode."
     RETURN=${UNKNOWN}
     CONTINUE=false
   elif [[ ${DBSIZE} == "" ]] ; then
@@ -481,5 +520,12 @@ if [[ ${TRACE} == true ]] ; then
   date >> ${LOG}
   echo -e "<<<<<\n" >> ${LOG}
 fi
+
+if [[ ${LOCKED} == true && -r ${LOCK_FILE} ]] ; then
+  rm ${LOCK_FILE}
+fi
+
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Ended ${APPL_NAME} ${COPY_ARGS[@]}" >> /tmp/${APPL_NAME}.log
+
 exit ${RETURN}
 
