@@ -368,9 +368,9 @@ if [[ ${CONTINUE} == true ]] ; then
     if [[ ${VERBOSE} -ge 2 ]] ; then
       echo "COMMAND: ${COMMAND_DB_CFG}"
     fi
-    FILE=$(${COMMAND_DB_CFG} | awk '/LOGARCHMETH1/ {print $7}' | cut -d: -f1)
-    if [ ${FILE} != "FILE" ] ; then
-      OUTPUT="The script only checks with LOGARCHMETH1 as FILE."
+    DISK=$(${COMMAND_DB_CFG} | awk '/LOGARCHMETH1/ {print $7}' | cut -d: -f1)
+    if [ ${DISK} != "DISK" ] ; then
+      OUTPUT="The script only checks with LOGARCHMETH1 as DISK"
       RETURN=${UNKNOWN}
     else
       ARCHIVE=$(${COMMAND_DB_CFG} | awk '/LOGARCHMETH1/ {print $7}' | cut -d: -f2)
