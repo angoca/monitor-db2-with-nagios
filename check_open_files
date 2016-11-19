@@ -156,6 +156,8 @@ PERF_MK="-"
 
 APPL_NAME=$(basename ${0})
 
+umask 111
+
 echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Started ${APPL_NAME} $@" >> /tmp/${APPL_NAME}.log
 
 # Checks the lock file does not exist.
@@ -379,7 +381,7 @@ fi
 if [[ ${CONTINUE} == true ]] ; then
   OUTPUT_LSOF=$(cat ${TMP_FILE}| tail -n +3 | wc -l)
   if [[ ${VERBOSE} -ge 3 ]] ; then
-    echo "Result: ${OUTPUT_LSOF}"
+    echo "Result lsof: ${OUTPUT_LSOF}"
   fi
  
   COMMAND_HARD_LIMIT="ulimit -Hn"
@@ -391,8 +393,8 @@ if [[ ${CONTINUE} == true ]] ; then
   OUTPUT_HARD_LIMIT=$(${COMMAND_HARD_LIMIT})
   OUTPUT_SOFT_LIMIT=$(${COMMAND_SOFT_LIMIT})
   if [[ ${VERBOSE} -ge 3 ]] ; then
-    echo "Result: ${OUTPUT_HARD_LIMIT}"
-    echo "Result: ${OUTPUT_SOFT_LIMIT}"
+    echo "Result hard: ${OUTPUT_HARD_LIMIT}"
+    echo "Result soft: ${OUTPUT_SOFT_LIMIT}"
   fi
 
   WARN_VALUE=$((${OUTPUT_SOFT_LIMIT} * ${WARNING_THRES} / 100))
