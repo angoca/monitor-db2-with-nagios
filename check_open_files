@@ -379,7 +379,7 @@ if [[ ${CONTINUE} == true ]] ; then
 fi
 
 if [[ ${CONTINUE} == true ]] ; then
-  OUTPUT_LSOF=$(cat ${TMP_FILE}| tail -n +3 | wc -l)
+  OUTPUT_LSOF=$(cat ${TMP_FILE} | tail -n +3 | wc -l)
   if [[ ${VERBOSE} -ge 3 ]] ; then
     echo "Result lsof: ${OUTPUT_LSOF}"
   fi
@@ -411,9 +411,11 @@ if [[ ${CONTINUE} == true ]] ; then
       OUTPUT="OK. List of open files for instance ${DB2INSTANCE} is ${OUTPUT_LSOF}"
       RETURN=${OK}
     elif [[ ${OUTPUT_LSOF} -lt ${CRIT_VALUE} ]] ; then
+      mv ${TMP_FILE} ${TMP_FILE}_$(date +"%Y-%m-%d-%H.%M.%S") > /dev/null 2>&1
       OUTPUT="List of open files for instance ${DB2INSTANCE} is ${OUTPUT_LSOF} is getting bigger"
       RETURN=${WARNING}
     else
+      mv ${TMP_FILE} ${TMP_FILE}_$(date +"%Y-%m-%d-%H.%M.%S") > /dev/null 2>&1
       OUTPUT="List of open files for instance ${DB2INSTANCE} is ${OUTPUT_LSOF} is critical"
       RETURN=${CRITICAL}
     fi
