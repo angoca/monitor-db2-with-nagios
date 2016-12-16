@@ -21,6 +21,9 @@
 # TODO This is a template for script. The script has to be silent, it means it
 # should not generate any output different to the OUTPUT variable.
 #
+# Based on this blog written by Ian Bjorhovde:
+# http://www.idug.org/p/bl/et/blogaid=571
+#
 # Here comes the documentation
 #
 # TODO Nagios usage.
@@ -363,6 +366,7 @@ if [[ ${CONTINUE} == true ]] ; then
   FILE1=${DIR}/db2set.log
   FILE2=${DIR}/dbm.log
   FILE3=${DIR}/db_${DATABASE_NAME}.log
+  FILE4=${DIR}/sysctl.log
  
   # Creates directory
   if [[ ! -d ${DIR} ]] ; then
@@ -375,11 +379,12 @@ if [[ ${CONTINUE} == true ]] ; then
     db2set -all > ${FILE1}
     db2 get dbm cfg > ${FILE2}
     db2 get db cfg for ${DATABASE_NAME} > ${FILE3}
+    /sbin/sysctl -a > ${FILE4}
 
-    git add ${FILE1} ${FILE2} ${FILE3} > /dev/null
+    git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} > /dev/null
     git config user.email "${USER}@${HOSTNAME}" > /dev/null
     git config user.name "Nagios User - ${USERNAME}" > /dev/null
-    git commit ${FILE1} ${FILE2} ${FILE3} -m "Initial commit" > /dev/null
+    git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} -m "Initial commit" > /dev/null
 
     OUTPUT="First execution, nothing to compare"
     PERFORMANCE="Changes=0"
@@ -391,16 +396,20 @@ if [[ ${CONTINUE} == true ]] ; then
     db2set -all > ${FILE1}
     db2 get dbm cfg > ${FILE2}
     db2 get db cfg for ${DATABASE_NAME} > ${FILE3}
+    /sbin/sysctl -a > ${FILE4}
  
     # Gets and sets changes in Git
     DIFF_FILE1=$(git diff ${FILE1})
     DIFF_FILE2=$(git diff ${FILE2})
     DIFF_FILE3=$(git diff ${FILE3})
+    DIFF_FILE3=$(git diff ${FILE4})
     git commit ${FILE1} -m "Changes in Registry values $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
     git commit ${FILE2} -m "Changes in Database Manager Configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
     git commit ${FILE3} -m "Changes in Database Configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
+    git commit ${FILE4} -m "Changes in Kernel $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
  
-    if [[ "${DIFF_FILE1}" == "" && "${DIFF_FILE2}" == "" && "${DIFF_FILE3}" == "" ]] ; then
+    if [[ "${DIFF_FILE1}" == "" && "${DIFF_FILE2}" == ""
+        && "${DIFF_FILE3}" == "" && "${DIFF_FILE4}" == "" ]] ; then
       OUTPUT="No changes in the configuration"
       PERFORMANCE=1
       RETURN=${OK}
@@ -409,13 +418,14 @@ if [[ ${CONTINUE} == true ]] ; then
         echo "There were changes in the configuration"
       fi
       if [[ ${VERBOSE} -ge 2 ]] ; then
-        echo -e ${DIFF_FILE1}
-        echo -e ${DIFF_FILE2}
-        echo -e ${DIFF_FILE3}
+        echo -E ${DIFF_FILE1}
+        echo -E ${DIFF_FILE2}
+        echo -E ${DIFF_FILE3}
+        echo -E ${DIFF_FILE4}
       fi
  
       if [[ "${DIFF_FILE1}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in the Registry value - "
+        OUTPUT="${OUTPUT}Changes in the Registry values - "
         PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
         RETURN=${WARNING}
       fi
@@ -426,6 +436,11 @@ if [[ ${CONTINUE} == true ]] ; then
       fi
       if [[ "${DIFF_FILE3}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in the Database Configuration - "
+        PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE4}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in the Kernel Configuration - "
         PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
         RETURN=${WARNING}
       fi
