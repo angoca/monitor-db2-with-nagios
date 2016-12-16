@@ -367,6 +367,8 @@ if [[ ${CONTINUE} == true ]] ; then
   FILE2=${DIR}/dbm.log
   FILE3=${DIR}/db_${DATABASE_NAME}.log
   FILE4=${DIR}/sysctl.log
+  FILE5=${DIR}/passwd.log
+  FILE6=${DIR}/group.log
  
   # Creates directory
   if [[ ! -d ${DIR} ]] ; then
@@ -380,11 +382,13 @@ if [[ ${CONTINUE} == true ]] ; then
     db2 get dbm cfg > ${FILE2}
     db2 get db cfg for ${DATABASE_NAME} > ${FILE3}
     /sbin/sysctl -a > ${FILE4}
+    cat /etc/passwd > ${FILE5}
+    cat /etc/group > ${FILE6}
 
-    git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} > /dev/null
+    git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} > /dev/null
     git config user.email "${USER}@${HOSTNAME}" > /dev/null
     git config user.name "Nagios User - ${USERNAME}" > /dev/null
-    git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} -m "Initial commit" > /dev/null
+    git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} -m "Initial commit" > /dev/null
 
     OUTPUT="First execution, nothing to compare"
     PERFORMANCE="Changes=0"
@@ -397,19 +401,26 @@ if [[ ${CONTINUE} == true ]] ; then
     db2 get dbm cfg > ${FILE2}
     db2 get db cfg for ${DATABASE_NAME} > ${FILE3}
     /sbin/sysctl -a > ${FILE4}
+    cat /etc/passwd > ${FILE5}
+    cat /etc/group > ${FILE6}
  
     # Gets and sets changes in Git
     DIFF_FILE1=$(git diff ${FILE1})
     DIFF_FILE2=$(git diff ${FILE2})
     DIFF_FILE3=$(git diff ${FILE3})
     DIFF_FILE3=$(git diff ${FILE4})
+    DIFF_FILE3=$(git diff ${FILE5})
+    DIFF_FILE3=$(git diff ${FILE6})
     git commit ${FILE1} -m "Changes in Registry values $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
     git commit ${FILE2} -m "Changes in Database Manager Configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
     git commit ${FILE3} -m "Changes in Database Configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
     git commit ${FILE4} -m "Changes in Kernel $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE4} -m "Changes in passwd file $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE4} -m "Changes in group file $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
  
     if [[ "${DIFF_FILE1}" == "" && "${DIFF_FILE2}" == ""
-        && "${DIFF_FILE3}" == "" && "${DIFF_FILE4}" == "" ]] ; then
+        && "${DIFF_FILE3}" == "" && "${DIFF_FILE4}" == "" 
+        && "${DIFF_FILE5}" == "" && "${DIFF_FILE6}" == "" ]] ; then
       OUTPUT="No changes in the configuration"
       PERFORMANCE=1
       RETURN=${OK}
@@ -422,6 +433,8 @@ if [[ ${CONTINUE} == true ]] ; then
         echo -E ${DIFF_FILE2}
         echo -E ${DIFF_FILE3}
         echo -E ${DIFF_FILE4}
+        echo -E ${DIFF_FILE5}
+        echo -E ${DIFF_FILE6}
       fi
  
       if [[ "${DIFF_FILE1}" != "" ]] ; then
@@ -441,6 +454,16 @@ if [[ ${CONTINUE} == true ]] ; then
       fi
       if [[ "${DIFF_FILE4}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in the Kernel Configuration - "
+        PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE5}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in passwd file - "
+        PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE6}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in group file - "
         PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
         RETURN=${WARNING}
       fi
