@@ -18,21 +18,56 @@
 # limitations under the License.
 ###############################################################################
 
-# TODO This is a template for script. The script has to be silent, it means it
-# should not generate any output different to the OUTPUT variable.
+# Checks modifications in the database configuration. This includes:
+# * Environment configuration - db2set
+# * Database manager configuration - Instance
+# * Database configuration
+# * Bufferpools
+# * Tablespaces and its bufferpools
+# * TODO Schemas
+# * TODO Tables per schema and its tablespace
+# * TODO Automatic maintenance
+#
+# This scripts uses git. If using the default directory, then each time the sever 
+# is restarted the git history is lost.
 #
 # Based on this blog written by Ian Bjorhovde:
 # http://www.idug.org/p/bl/et/blogaid=571
 #
-# Here comes the documentation
+# # 'check_database_size' command definition
+# define command {
+#         command_name    check_diff_db_conf
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -t 20 -C "scripts/check_diff_db_conf -i '$ARG1$' -d '$ARG2$'"
+# }
+# define service{
+#         host_name               db2sever
+#         service_description     Database configuration
+#         check_command           check_diff_db_conf!/home/db2inst1!sample
+#         use                     generic-service
+# }
 #
-# TODO Nagios usage.
+# When using NRPE:
 #
-# TODO Nagios with NRPE.
+# In the database server:
+#
+# command[check_database_size]=/home/nagios/scripts/check_diff_db_conf -i /home/db2inst1 -d sample
+#
+# Then modify the path according to your script location, instance home dir,
+# database, refresh rate and thresholds.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     Database size
+#         check_command           check_nrpe_1arg!check_database_size
+#         use                     generic-service
+# }
 #
 # Parameters:
 # -c | --critical : TODO What is critical.
 # -d | --database : Database name.
+# -D | --directory : TODO Directory to create the history (Default is /tmp)
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
@@ -60,7 +95,7 @@
 #   as UNKNOWN states.
 #
 # Author: Andres Gomez Casanova
-# Version: v1.3 2015-10-15
+# Version: v1.0 2016-12-19
 
 # Flag for debugging.
 #set -xv
@@ -71,13 +106,13 @@ export LANG=en_US
 # Version of this script.
 function print_revision {
   echo Andres Gomez Casanova - AngocA
-  echo v1.3 2015-10-15
+  echo v1.0 2016-12-19
 }
 # Function to show the help
 function print_usage {
   # TODO Add arguments.
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][-K] | -h | -V }
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][-K][-D directory] | -h | -V }
 [-T][-v]
 __EOT
 }
@@ -88,13 +123,14 @@ function print_help {
   # Max 80 chars width.
   /bin/cat <<__EOT
 -------------------------------------------------------------------------------
-TODO Add a global description.
-TODO Add arguments in detail.
+Checks changes in the database configuration.
 -c | --critical INTEGER
    TODO What is critical.
    TODO Default 2.
 -d | --database STRING
    Database name.
+-D | --directory STRING
+   Directory where the history is created. By default is /tmp
 -h | --help
    Shows the current documentation.
 -i | --instance STRING
@@ -193,10 +229,10 @@ if [[ "${OS:0:5}" == "Linux" ]] ; then
   # http://stackoverflow.com/questions/402377
 
   # TODO Add the arguments here. One char in -o, multiple char in -long.
-  TEMP=$(getopt -o c:d:hi:KTvVw: --long critical:,database:,help,instance:,mk,trace,verbose,version,warning: \
+  TEMP=$(getopt -o c:d:D:hi:KTvVw: --long critical:,database:,directory:,help,instance:,mk,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
 elif [[ "${OS:0:3}" == "AIX" ]] ; then
-  set -- $(getopt c:d:hi:KTvVw: ${*})
+  set -- $(getopt c:d:D:hi:KTvVw: ${*})
 elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
   echo "This plugin is not yet supported in your platform."
   echo "Please create a ticket in GitHub if you want to enable your current platform."
@@ -235,6 +271,7 @@ if [[ ${CONTINUE} == true ]] ; then
   LOG=/tmp/${APPL_NAME}.log
   INSTANCE_HOME=
   DATABASE_NAME=
+  HISTORY_DIRECTORY=/tmp
   WARNING_THRES=1
   CRITICAL_THRES=2
   if [[ "${OS:0:5}" == "Linux" ]] ; then
@@ -242,6 +279,7 @@ if [[ ${CONTINUE} == true ]] ; then
       case "${1}" in
         -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -D | --directory ) HISTORY_DIRECTORY=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -h | --help ) HELP=true ; shift ;;
         -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -K | --mk ) CHECK_MK=true ; shift ;;
@@ -249,7 +287,6 @@ if [[ ${CONTINUE} == true ]] ; then
         -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V | --version ) VERSION=true ; shift ;;
         -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        # TODO Validate any new argument.
         -- ) shift ; break ;;
         * ) break ;;
       esac
@@ -259,6 +296,7 @@ if [[ ${CONTINUE} == true ]] ; then
       case "${1}" in
         -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -d) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -D) HISTORY_DIRECTORY=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -h) HELP=true ; shift ;;
         -i) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -K) CHECK_MK=true ; shift ;;
@@ -362,13 +400,14 @@ fi
 
 if [[ ${CONTINUE} == true ]] ; then
   # Defines the directory and files that have the configuration.
-  DIR=/tmp/${APPL_NAME}/${INSTANCE_HOME//\//}_${DATABASE_NAME}
+  DIR=${HISTORY_DIRECTORY}/${APPL_NAME}/${INSTANCE_HOME//\//}_${DATABASE_NAME}
   FILE1=${DIR}/db2set.log
   FILE2=${DIR}/dbm.log
   FILE3=${DIR}/db_${DATABASE_NAME}.log
-  FILE4=${DIR}/sysctl.log
-  FILE5=${DIR}/passwd.log
-  FILE6=${DIR}/group.log
+  FILE4=${DIR}/bufferpools.log
+  FILE5=${DIR}/tablespaces.log
+  FILE6=${DIR}/schemas.log
+  FILE7=${DIR}/tables.log
  
   # Creates directory
   if [[ ! -d ${DIR} ]] ; then
@@ -381,14 +420,16 @@ if [[ ${CONTINUE} == true ]] ; then
     db2set -all > ${FILE1}
     db2 get dbm cfg > ${FILE2}
     db2 get db cfg for ${DATABASE_NAME} > ${FILE3}
-    /sbin/sysctl -a > ${FILE4}
-    cat /etc/passwd > ${FILE5}
-    cat /etc/group > ${FILE6}
+    db2 connect to ${DATABASE_NAME}
+    db2 "SELECT BUFFERPOOLID, BPNAME, PAGESIZE, NUMBLOCKPAGES, BLOCKSIZE FROM SYSCAT.BUFFERPOOLS ORDER BY BUFFERPOOLID" > ${FILE4}
+    db2 "SELECT TBSPACEID, TBSPACE, PAGESIZE, TBSPACETYPE, DATATYPE, EXTENTSIZE, PREFETCHSIZE, OVERHEAD, TRANSFERRATE, BUFFERPOOLID FROM SYSCAT.TABLESPACES ORDER BY TBSPACEID" > ${FILE5}
+    db2 "SELECT SCHEMANAME FROM SYSCAT.SCHEMATA ORDER BY SCHEMANAME" > ${FILE6}
+    db2 "SELECT TABLEID, TABSCHEMA, TABNAME, TYPE, BASE_TABSCHEMA, BASE_TABNAME, COLCOUNT, TBSPACE, INDEX_TBSPACE, LONG_TBSPACE, PARENTS, CHILDREN, SELFREFS, KEYINDEXID, CHECKCOUNT, PCTFREE, APPEND_MODE, REFRESH, LOCKSIZE, VOLATILE, COMPRESSION, ACCESS_MODE, CODEPAGE, ONROLLBACK FROM SYSCAT.TABLES ORDERY BY TABLEID" > ${FILE7}
 
-    git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} > /dev/null
+    git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} > /dev/null
     git config user.email "${USER}@${HOSTNAME}" > /dev/null
     git config user.name "Nagios User - ${USERNAME}" > /dev/null
-    git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} -m "Initial commit" > /dev/null
+    git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} -m "Initial commit" > /dev/null
 
     OUTPUT="First execution, nothing to compare"
     PERFORMANCE="Changes=0"
@@ -400,27 +441,32 @@ if [[ ${CONTINUE} == true ]] ; then
     db2set -all > ${FILE1}
     db2 get dbm cfg > ${FILE2}
     db2 get db cfg for ${DATABASE_NAME} > ${FILE3}
-    /sbin/sysctl -a > ${FILE4}
-    cat /etc/passwd > ${FILE5}
-    cat /etc/group > ${FILE6}
+    db2 connect to ${DATABASE_NAME}
+    db2 "SELECT BUFFERPOOLID, BPNAME, PAGESIZE, NUMBLOCKPAGES, BLOCKSIZE FROM SYSCAT.BUFFERPOOLS ORDER BY BUFFERPOOLID" > ${FILE4}
+    db2 "SELECT TBSPACEID, TBSPACE, PAGESIZE, TBSPACETYPE, DATATYPE, EXTENTSIZE, PREFETCHSIZE, OVERHEAD, TRANSFERRATE, BUFFERPOOLID FROM SYSCAT.TABLESPACES ORDER BY TBSPACEID" > ${FILE5}
+    db2 "SELECT SCHEMANAME FROM SYSCAT.SCHEMATA ORDER BY SCHEMANAME" > ${FILE6}
+    db2 "SELECT TABLEID, TABSCHEMA, TABNAME, TYPE, BASE_TABSCHEMA, BASE_TABNAME, COLCOUNT, TBSPACE, INDEX_TBSPACE, LONG_TBSPACE, PARENTS, CHILDREN, SELFREFS, KEYINDEXID, CHECKCOUNT, PCTFREE, APPEND_MODE, REFRESH, LOCKSIZE, VOLATILE, COMPRESSION, ACCESS_MODE, CODEPAGE, ONROLLBACK FROM SYSCAT.TABLES ORDERY BY TABLEID" > ${FILE7}
  
     # Gets and sets changes in Git
     DIFF_FILE1=$(git diff ${FILE1})
     DIFF_FILE2=$(git diff ${FILE2})
     DIFF_FILE3=$(git diff ${FILE3})
-    DIFF_FILE3=$(git diff ${FILE4})
-    DIFF_FILE3=$(git diff ${FILE5})
-    DIFF_FILE3=$(git diff ${FILE6})
+    DIFF_FILE4=$(git diff ${FILE4})
+    DIFF_FILE5=$(git diff ${FILE5})
+    DIFF_FILE6=$(git diff ${FILE6})
+    DIFF_FILE7=$(git diff ${FILE7})
     git commit ${FILE1} -m "Changes in Registry values $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
     git commit ${FILE2} -m "Changes in Database Manager Configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
     git commit ${FILE3} -m "Changes in Database Configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
-    git commit ${FILE4} -m "Changes in Kernel $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE4} -m "Changes in passwd file $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE4} -m "Changes in group file $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE4} -m "Changes in bufferpools $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE5} -m "Changes in schemas $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE6} -m "Changes in tablespaces and its bufferpools $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE7} -m "Changes in tables and its tablespaces $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
  
     if [[ "${DIFF_FILE1}" == "" && "${DIFF_FILE2}" == ""
         && "${DIFF_FILE3}" == "" && "${DIFF_FILE4}" == "" 
-        && "${DIFF_FILE5}" == "" && "${DIFF_FILE6}" == "" ]] ; then
+        && "${DIFF_FILE5}" == "" && "${DIFF_FILE6}" == ""
+        && "${DIFF_FILE7}" == "" ]] ; then
       OUTPUT="No changes in the configuration"
       PERFORMANCE=1
       RETURN=${OK}
@@ -435,6 +481,7 @@ if [[ ${CONTINUE} == true ]] ; then
         echo -E ${DIFF_FILE4}
         echo -E ${DIFF_FILE5}
         echo -E ${DIFF_FILE6}
+        echo -E ${DIFF_FILE7}
       fi
  
       if [[ "${DIFF_FILE1}" != "" ]] ; then
@@ -453,17 +500,22 @@ if [[ ${CONTINUE} == true ]] ; then
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE4}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in the Kernel Configuration - "
+        OUTPUT="${OUTPUT}Changes in bufferpools - "
         PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE5}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in passwd file - "
+        OUTPUT="${OUTPUT}Changes in tablespaces and its bufferpools - "
         PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE6}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in group file - "
+        OUTPUT="${OUTPUT}Changes in schemas - "
+        PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE7}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in tables and its tablespaces - "
         PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
         RETURN=${WARNING}
       fi
