@@ -50,7 +50,7 @@
 #
 # In the database server:
 #
-# command[check_database_size]=/home/nagios/scripts/check_database_siza -i /home/db2inst1 -d sample -r 720
+# command[check_database_size]=/home/nagios/scripts/check_database_size -i /home/db2inst1 -d sample -r 720
 #
 # Then modify the path according to your script location, instance home dir,
 # database, refresh rate and thresholds.
