@@ -212,7 +212,6 @@ if [[ "${OS:0:5}" == "Linux" ]] ; then
   # The following requires GNU getopt. See the following discussion.
   # http://stackoverflow.com/questions/402377
 
-  # TODO Add the arguments here. One char in -o, multiple char in -long.
   TEMP=$(getopt -o c:d:D:hi:KTvVw: --long critical:,database:,directory:,help,instance:,mk,trace,verbose,version,warning: \
                -n ${APPL_NAME} -- "${@}")
 elif [[ "${OS:0:3}" == "AIX" ]] ; then
