@@ -397,6 +397,14 @@ if [[ ${CONTINUE} == true ]] ; then
   FILE5=${DIR}/tablespaces.log
   FILE6=${DIR}/schemas.log
   FILE7=${DIR}/tables.log
+  FILENAME8=runstats.xml
+  FILE8=${DIR}/${FILENAME8}
+  FILENAME9=reorg.xml
+  FILE9=${DIR}/${FILENAME9}
+  FILENAME10=backups.xml
+  FILE10=${DIR}/${FILENAME10}
+  FILENAME11=window.xml
+  FILE11=${DIR}/${FILENAME11}
  
   # Creates directory
   if [[ ! -d ${DIR} ]] ; then
@@ -423,15 +431,23 @@ if [[ ${CONTINUE} == true ]] ; then
   db2 "SELECT TBSPACEID, TBSPACE, PAGESIZE, TBSPACETYPE, DATATYPE, EXTENTSIZE, PREFETCHSIZE, OVERHEAD, TRANSFERRATE, BUFFERPOOLID FROM SYSCAT.TABLESPACES ORDER BY TBSPACEID" > ${FILE5}
   db2 "SELECT SCHEMANAME FROM SYSCAT.SCHEMATA ORDER BY SCHEMANAME" > ${FILE6}
   db2 "SELECT TABLEID, TABSCHEMA, TABNAME, TYPE, STATUS, BASE_TABSCHEMA, BASE_TABNAME, COLCOUNT, TBSPACE, INDEX_TBSPACE, LONG_TBSPACE, PARENTS, CHILDREN, SELFREFS, KEYINDEXID, CHECKCOUNT, PCTFREE, APPEND_MODE, REFRESH, LOCKSIZE, VOLATILE, COMPRESSION, ACCESS_MODE, CODEPAGE, ONROLLBACK FROM SYSCAT.TABLES ORDERY BY TABLEID" > ${FILE7}
+  db2 "call sysproc.automaint_get_policyfile( 'AUTO_RUNSTATS', '${FILENAME8}' )"
+  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME8} ${FILE8}
+  db2 "call sysproc.automaint_get_policyfile( 'AUTO_REORG', '${FILENAME9}' )"
+  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME9} ${FILE9}
+  db2 "call sysproc.automaint_get_policyfile( 'AUTO_BACKUP', '${FILENAME10}' )"
+  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME10} ${FILE10}
+  db2 "call sysproc.automaint_get_policyfile( 'MAINTENANCE_WINDOW', '${FILENAME11}' )"
+  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME11} ${FILE11}
 
   if [[ -n ${FIRST_EXEC} ]] ; then
     if [[ ${VERBOSE} -ge 1 ]] ; then
       echo "Adding files"
     fi
-    git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} > /dev/null
+    git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} ${FILE8} ${FILE9} ${FILE10} ${FILE11} > /dev/null
     git config user.email "${USER}@${HOSTNAME}" > /dev/null
     git config user.name "Nagios User - ${USERNAME}" > /dev/null
-    git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} -m "Initial commit" > /dev/null
+    git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} ${FILE8} ${FILE9} ${FILE10} ${FILE11} -m "Initial commit" > /dev/null
 
     OUTPUT="First execution, nothing to compare"
     PERFORMANCE="'Changes'=0"
@@ -448,6 +464,10 @@ if [[ ${CONTINUE} == true ]] ; then
     DIFF_FILE5=$(git diff ${FILE5})
     DIFF_FILE6=$(git diff ${FILE6})
     DIFF_FILE7=$(git diff ${FILE7})
+    DIFF_FILE7=$(git diff ${FILE8})
+    DIFF_FILE7=$(git diff ${FILE9})
+    DIFF_FILE7=$(git diff ${FILE10})
+    DIFF_FILE7=$(git diff ${FILE11})
     git commit ${FILE1} -m "Changes in registry values $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
     git commit ${FILE2} -m "Changes in database manager configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
     git commit ${FILE3} -m "Changes in database configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
@@ -455,11 +475,17 @@ if [[ ${CONTINUE} == true ]] ; then
     git commit ${FILE5} -m "Changes in schemas $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
     git commit ${FILE6} -m "Changes in tablespaces and its bufferpools $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
     git commit ${FILE7} -m "Changes in tables and its tablespaces $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE8} -m "Changes in automatic runstats $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE9} -m "Changes in automatic reorgs $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE10} -m "Changes in automatic backups $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE11} -m "Changes in maintenance window $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
  
     if [[ "${DIFF_FILE1}" == "" && "${DIFF_FILE2}" == ""
         && "${DIFF_FILE3}" == "" && "${DIFF_FILE4}" == "" 
         && "${DIFF_FILE5}" == "" && "${DIFF_FILE6}" == ""
-        && "${DIFF_FILE7}" == "" ]] ; then
+        && "${DIFF_FILE7}" == "" && "${DIFF_FILE8}" == ""
+        && "${DIFF_FILE9}" == "" && "${DIFF_FILE10}" == ""
+        && "${DIFF_FILE11}" == "" ]] ; then
       OUTPUT="No changes in the configuration"
       PERFORMANCE="'Changes'=1"
       RETURN=${OK}
@@ -475,6 +501,10 @@ if [[ ${CONTINUE} == true ]] ; then
         echo -E ${DIFF_FILE5}
         echo -E ${DIFF_FILE6}
         echo -E ${DIFF_FILE7}
+        echo -E ${DIFF_FILE8}
+        echo -E ${DIFF_FILE9}
+        echo -E ${DIFF_FILE10}
+        echo -E ${DIFF_FILE11
       fi
  
       if [[ "${DIFF_FILE1}" != "" ]] ; then
@@ -509,6 +539,26 @@ if [[ ${CONTINUE} == true ]] ; then
       fi
       if [[ "${DIFF_FILE7}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in tables and its tablespaces - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE8}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in automatic runstats - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE9}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in automatic reorgs - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE10" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in automatic backups - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE11" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in maintenance window - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
