@@ -18,15 +18,8 @@
 # limitations under the License.
 ###############################################################################
 
-# Checks modifications in the database configuration. This includes:
-# * Environment configuration - db2set
-# * Database manager configuration - Instance
-# * Database configuration
-# * Bufferpools
-# * Tablespaces and its bufferpools
-# * TODO Schemas
-# * TODO Tables per schema and its tablespace
-# * TODO Automatic maintenance
+# Checks modifications in the database security. This includes all tables with
+# AUTH name.
 #
 # This scripts uses git. If using the default directory, then each time the sever 
 # is restarted the git history is lost.
@@ -36,13 +29,13 @@
 #
 # # 'check_database_size' command definition
 # define command {
-#         command_name    check_diff_db_conf
-#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -t 20 -C "scripts/check_diff_db_conf -i '$ARG1$' -d '$ARG2$'"
+#         command_name    check_diff_db_sec
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -t 20 -C "scripts/check_diff_db_sec -i '$ARG1$' -d '$ARG2$'"
 # }
 # define service{
 #         host_name               db2sever
-#         service_description     Database configuration
-#         check_command           check_diff_db_conf!/home/db2inst1!sample
+#         service_description     Database security
+#         check_command           check_diff_db_sec!/home/db2inst1!sample
 #         use                     generic-service
 # }
 #
@@ -50,7 +43,7 @@
 #
 # In the database server:
 #
-# command[check_database_size]=/home/nagios/scripts/check_diff_db_conf -i /home/db2inst1 -d sample
+# command[check_diff_db_sec]=/home/nagios/scripts/check_diff_db_sec -i /home/db2inst1 -d sample
 #
 # Then modify the path according to your script location, instance home dir,
 # database, refresh rate and thresholds.
@@ -59,15 +52,14 @@
 #
 # define service{
 #         host_name               db2server
-#         service_description     Database size
-#         check_command           check_nrpe_1arg!check_database_size
+#         service_description     Database security
+#         check_command           check_nrpe_1arg!check_diff_db_sec
 #         use                     generic-service
 # }
 #
 # Parameters:
-# -c | --critical : TODO What is critical.
 # -d | --database : Database name.
-# -D | --directory : TODO Directory to create the history (Default is /tmp)
+# -D | --directory : Directory to create the history (Default is /tmp)
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
@@ -75,7 +67,6 @@
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
 # -V | --version : Show the current version of this script.
-# -w | --warning : TODO What is warning.
 #
 # In AIX, the long name options are not supported.
 #
@@ -110,9 +101,8 @@ function print_revision {
 }
 # Function to show the help
 function print_usage {
-  # TODO Add arguments.
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory -d databaseName [-c][-w][-K][-D directory] | -h | -V }
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-K][-D directory] | -h | -V }
 [-T][-v]
 __EOT
 }
@@ -123,10 +113,7 @@ function print_help {
   # Max 80 chars width.
   /bin/cat <<__EOT
 -------------------------------------------------------------------------------
-Checks changes in the database configuration.
--c | --critical INTEGER
-   TODO What is critical.
-   TODO Default 2.
+Checks changes in the database security.
 -d | --database STRING
    Database name.
 -D | --directory STRING
@@ -143,9 +130,6 @@ Checks changes in the database configuration.
    Executes the script in verbose mode (multiple times).
 -V | --version
    Shows the current version of this script.
--w | --warning INTEGER
-   TODO What is warning.
-   TODO Default 1.
 
 In AIX, the long name options are not supported.
 __EOT
