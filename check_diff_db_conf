@@ -416,7 +416,7 @@ if [[ ${CONTINUE} == true ]] ; then
     fi
     mkdir -p ${DIR}
     cd ${DIR}
-    git init
+    git init > /dev/null
     FIRST_EXEC=true
   else
     if [[ ${VERBOSE} -ge 1 ]] ; then
