@@ -417,15 +417,23 @@ if [[ ${CONTINUE} == true ]] ; then
     mkdir -p ${DIR}
     cd ${DIR}
     git init
-    db2set -all > ${FILE1}
-    db2 get dbm cfg > ${FILE2}
-    db2 get db cfg for ${DATABASE_NAME} > ${FILE3}
-    db2 connect to ${DATABASE_NAME}
-    db2 "SELECT BUFFERPOOLID, BPNAME, PAGESIZE, NUMBLOCKPAGES, BLOCKSIZE FROM SYSCAT.BUFFERPOOLS ORDER BY BUFFERPOOLID" > ${FILE4}
-    db2 "SELECT TBSPACEID, TBSPACE, PAGESIZE, TBSPACETYPE, DATATYPE, EXTENTSIZE, PREFETCHSIZE, OVERHEAD, TRANSFERRATE, BUFFERPOOLID FROM SYSCAT.TABLESPACES ORDER BY TBSPACEID" > ${FILE5}
-    db2 "SELECT SCHEMANAME FROM SYSCAT.SCHEMATA ORDER BY SCHEMANAME" > ${FILE6}
-    db2 "SELECT TABLEID, TABSCHEMA, TABNAME, TYPE, BASE_TABSCHEMA, BASE_TABNAME, COLCOUNT, TBSPACE, INDEX_TBSPACE, LONG_TBSPACE, PARENTS, CHILDREN, SELFREFS, KEYINDEXID, CHECKCOUNT, PCTFREE, APPEND_MODE, REFRESH, LOCKSIZE, VOLATILE, COMPRESSION, ACCESS_MODE, CODEPAGE, ONROLLBACK FROM SYSCAT.TABLES ORDERY BY TABLEID" > ${FILE7}
+    FIRST_EXEC=true
+  else
+    cd ${DIR}
+    FIRST_EXEC=false
+  fi
 
+  # Redirects the configuration to the files
+  db2set -all > ${FILE1}
+  db2 get dbm cfg > ${FILE2}
+  db2 get db cfg for ${DATABASE_NAME} > ${FILE3}
+  db2 connect to ${DATABASE_NAME} > /dev/null
+  db2 "SELECT BUFFERPOOLID, BPNAME, PAGESIZE, NUMBLOCKPAGES, BLOCKSIZE FROM SYSCAT.BUFFERPOOLS ORDER BY BUFFERPOOLID" > ${FILE4}
+  db2 "SELECT TBSPACEID, TBSPACE, PAGESIZE, TBSPACETYPE, DATATYPE, EXTENTSIZE, PREFETCHSIZE, OVERHEAD, TRANSFERRATE, BUFFERPOOLID FROM SYSCAT.TABLESPACES ORDER BY TBSPACEID" > ${FILE5}
+  db2 "SELECT SCHEMANAME FROM SYSCAT.SCHEMATA ORDER BY SCHEMANAME" > ${FILE6}
+  db2 "SELECT TABLEID, TABSCHEMA, TABNAME, TYPE, BASE_TABSCHEMA, BASE_TABNAME, COLCOUNT, TBSPACE, INDEX_TBSPACE, LONG_TBSPACE, PARENTS, CHILDREN, SELFREFS, KEYINDEXID, CHECKCOUNT, PCTFREE, APPEND_MODE, REFRESH, LOCKSIZE, VOLATILE, COMPRESSION, ACCESS_MODE, CODEPAGE, ONROLLBACK FROM SYSCAT.TABLES ORDERY BY TABLEID" > ${FILE7}
+
+  if [[ ${FIRST_EXEC} ]] ; then
     git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} > /dev/null
     git config user.email "${USER}@${HOSTNAME}" > /dev/null
     git config user.name "Nagios User - ${USERNAME}" > /dev/null
@@ -435,18 +443,6 @@ if [[ ${CONTINUE} == true ]] ; then
     PERFORMANCE="Changes=0"
     RETURN=${OK}
   else
- 
-    # Redirects the configuration to the files
-    cd ${DIR}
-    db2set -all > ${FILE1}
-    db2 get dbm cfg > ${FILE2}
-    db2 get db cfg for ${DATABASE_NAME} > ${FILE3}
-    db2 connect to ${DATABASE_NAME}
-    db2 "SELECT BUFFERPOOLID, BPNAME, PAGESIZE, NUMBLOCKPAGES, BLOCKSIZE FROM SYSCAT.BUFFERPOOLS ORDER BY BUFFERPOOLID" > ${FILE4}
-    db2 "SELECT TBSPACEID, TBSPACE, PAGESIZE, TBSPACETYPE, DATATYPE, EXTENTSIZE, PREFETCHSIZE, OVERHEAD, TRANSFERRATE, BUFFERPOOLID FROM SYSCAT.TABLESPACES ORDER BY TBSPACEID" > ${FILE5}
-    db2 "SELECT SCHEMANAME FROM SYSCAT.SCHEMATA ORDER BY SCHEMANAME" > ${FILE6}
-    db2 "SELECT TABLEID, TABSCHEMA, TABNAME, TYPE, BASE_TABSCHEMA, BASE_TABNAME, COLCOUNT, TBSPACE, INDEX_TBSPACE, LONG_TBSPACE, PARENTS, CHILDREN, SELFREFS, KEYINDEXID, CHECKCOUNT, PCTFREE, APPEND_MODE, REFRESH, LOCKSIZE, VOLATILE, COMPRESSION, ACCESS_MODE, CODEPAGE, ONROLLBACK FROM SYSCAT.TABLES ORDERY BY TABLEID" > ${FILE7}
- 
     # Gets and sets changes in Git
     DIFF_FILE1=$(git diff ${FILE1})
     DIFF_FILE2=$(git diff ${FILE2})
@@ -455,9 +451,9 @@ if [[ ${CONTINUE} == true ]] ; then
     DIFF_FILE5=$(git diff ${FILE5})
     DIFF_FILE6=$(git diff ${FILE6})
     DIFF_FILE7=$(git diff ${FILE7})
-    git commit ${FILE1} -m "Changes in Registry values $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE2} -m "Changes in Database Manager Configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
-    git commit ${FILE3} -m "Changes in Database Configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
+    git commit ${FILE1} -m "Changes in registry values $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE2} -m "Changes in database manager configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
+    git commit ${FILE3} -m "Changes in database configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
     git commit ${FILE4} -m "Changes in bufferpools $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
     git commit ${FILE5} -m "Changes in schemas $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
     git commit ${FILE6} -m "Changes in tablespaces and its bufferpools $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
