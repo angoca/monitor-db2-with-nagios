@@ -59,7 +59,7 @@
 #
 # Parameters:
 # -d | --database : Database name.
-# -D | --directory : TODO Directory to create the history (Default is /tmp)
+# -D | --directory : Directory to create the history (Default is /tmp)
 # -h | --help : Show the help of this script.
 # -i | --instance : Home directory of the instance. Usually it is
 #   /home/db2inst1.
