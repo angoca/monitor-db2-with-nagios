@@ -411,7 +411,7 @@ if [[ ${CONTINUE} == true ]] ; then
  
   # Creates directory
   if [[ ! -d ${DIR} ]] ; then
-    if [[ ${VERBOSE} -ge 2 ]] ; then
+    if [[ ${VERBOSE} -ge 1 ]] ; then
       echo "Directory ${DIR} does not exist"
     fi
     mkdir -p ${DIR}
@@ -419,8 +419,10 @@ if [[ ${CONTINUE} == true ]] ; then
     git init
     FIRST_EXEC=true
   else
+    if [[ ${VERBOSE} -ge 1 ]] ; then
+      echo "Directory does exist: ${DIR}"
+    fi
     cd ${DIR}
-    FIRST_EXEC=false
   fi
 
   # Redirects the configuration to the files
@@ -433,7 +435,10 @@ if [[ ${CONTINUE} == true ]] ; then
   db2 "SELECT SCHEMANAME FROM SYSCAT.SCHEMATA ORDER BY SCHEMANAME" > ${FILE6}
   db2 "SELECT TABLEID, TABSCHEMA, TABNAME, TYPE, BASE_TABSCHEMA, BASE_TABNAME, COLCOUNT, TBSPACE, INDEX_TBSPACE, LONG_TBSPACE, PARENTS, CHILDREN, SELFREFS, KEYINDEXID, CHECKCOUNT, PCTFREE, APPEND_MODE, REFRESH, LOCKSIZE, VOLATILE, COMPRESSION, ACCESS_MODE, CODEPAGE, ONROLLBACK FROM SYSCAT.TABLES ORDERY BY TABLEID" > ${FILE7}
 
-  if [[ ${FIRST_EXEC} ]] ; then
+  if [[ -n ${FIRST_EXEC} ]] ; then
+    if [[ ${VERBOSE} -ge 1 ]] ; then
+      echo "Adding files"
+    fi
     git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} > /dev/null
     git config user.email "${USER}@${HOSTNAME}" > /dev/null
     git config user.name "Nagios User - ${USERNAME}" > /dev/null
@@ -443,6 +448,9 @@ if [[ ${CONTINUE} == true ]] ; then
     PERFORMANCE="Changes=0"
     RETURN=${OK}
   else
+    if [[ ${VERBOSE} -ge 1 ]] ; then
+      echo "Looking for differences"
+    fi
     # Gets and sets changes in Git
     DIFF_FILE1=$(git diff ${FILE1})
     DIFF_FILE2=$(git diff ${FILE2})
@@ -464,7 +472,7 @@ if [[ ${CONTINUE} == true ]] ; then
         && "${DIFF_FILE5}" == "" && "${DIFF_FILE6}" == ""
         && "${DIFF_FILE7}" == "" ]] ; then
       OUTPUT="No changes in the configuration"
-      PERFORMANCE=1
+      PERFORMANCE="Changes=1"
       RETURN=${OK}
     else
       if [[ ${VERBOSE} -ge 1 ]] ; then
@@ -482,39 +490,40 @@ if [[ ${CONTINUE} == true ]] ; then
  
       if [[ "${DIFF_FILE1}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in the Registry values - "
-        PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE2}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in the Database Manager Configuration - "
-        PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE3}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in the Database Configuration - "
-        PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE4}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in bufferpools - "
-        PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE5}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in tablespaces and its bufferpools - "
-        PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE6}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in schemas - "
-        PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE7}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in tables and its tablespaces - "
-        PERFORMANCE="Changes=$((${PERFORMANCE} + 1))"
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
+      PERFORMANCE="Changes=${PERFORMANCE_VALUE}"
     fi
   fi
   PERF_MK=${PERFORMANCE}
