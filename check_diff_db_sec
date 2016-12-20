@@ -401,13 +401,20 @@ fi
 if [[ ${CONTINUE} == true ]] ; then
   # Defines the directory and files that have the configuration.
   DIR=${HISTORY_DIRECTORY}/${APPL_NAME}/${INSTANCE_HOME//\//}_${DATABASE_NAME}
-  FILE1=${DIR}/db2set.log
-  FILE2=${DIR}/dbm.log
-  FILE3=${DIR}/db_${DATABASE_NAME}.log
-  FILE4=${DIR}/bufferpools.log
-  FILE5=${DIR}/tablespaces.log
-  FILE6=${DIR}/schemas.log
-  FILE7=${DIR}/tables.log
+  FILE1=${DIR}/columns.log
+  FILE2=${DIR}/db.log
+  FILE3=${DIR}/index.log
+  FILE4=${DIR}/module.log
+  FILE5=${DIR}/package.log
+  FILE6=${DIR}/role.log
+  FILE7=${DIR}/routine.log
+  FILE8=${DIR}/schema.log
+  FILE9=${DIR}/sequence.log
+  FILE10=${DIR}/table.log
+  FILE11=${DIR}/tablespace.log
+  FILE12=${DIR}/variable.log
+  FILE13=${DIR}/workload.log
+  FILE14=${DIR}/xsrobject.log
  
   # Creates directory
   if [[ ! -d ${DIR} ]] ; then
@@ -426,23 +433,29 @@ if [[ ${CONTINUE} == true ]] ; then
   fi
 
   # Redirects the configuration to the files
-  db2set -all > ${FILE1}
-  db2 get dbm cfg > ${FILE2}
-  db2 get db cfg for ${DATABASE_NAME} > ${FILE3}
-  db2 connect to ${DATABASE_NAME} > /dev/null
-  db2 "SELECT BUFFERPOOLID, BPNAME, PAGESIZE, NUMBLOCKPAGES, BLOCKSIZE FROM SYSCAT.BUFFERPOOLS ORDER BY BUFFERPOOLID" > ${FILE4}
-  db2 "SELECT TBSPACEID, TBSPACE, PAGESIZE, TBSPACETYPE, DATATYPE, EXTENTSIZE, PREFETCHSIZE, OVERHEAD, TRANSFERRATE, BUFFERPOOLID FROM SYSCAT.TABLESPACES ORDER BY TBSPACEID" > ${FILE5}
-  db2 "SELECT SCHEMANAME FROM SYSCAT.SCHEMATA ORDER BY SCHEMANAME" > ${FILE6}
-  db2 "SELECT TABLEID, TABSCHEMA, TABNAME, TYPE, STATUS, BASE_TABSCHEMA, BASE_TABNAME, COLCOUNT, TBSPACE, INDEX_TBSPACE, LONG_TBSPACE, PARENTS, CHILDREN, SELFREFS, KEYINDEXID, CHECKCOUNT, PCTFREE, APPEND_MODE, REFRESH, LOCKSIZE, VOLATILE, COMPRESSION, ACCESS_MODE, CODEPAGE, ONROLLBACK FROM SYSCAT.TABLES ORDERY BY TABLEID" > ${FILE7}
+  db2 "SELECT * FROM SYSCAT.COLAUTH" > ${FILE1}
+  db2 "SELECT * FROM SYSCAT.DBAUTH" > ${FILE2}
+  db2 "SELECT * FROM SYSCAT.INDEXAUTH" > ${FILE3}
+  db2 "SELECT * FROM SYSCAT.MODULEAUTH" > ${FILE4}
+  db2 "SELECT * FROM SYSCAT.PACKAGEAUTH" > ${FILE5}
+  db2 "SELECT * FROM SYSCAT.ROLEAUTH" > ${FILE6}
+  db2 "SELECT * FROM SYSCAT.ROUTINEAUTH" > ${FILE7}
+  db2 "SELECT * FROM SYSCAT.SCHEMAAUTH" > ${FILE8}
+  db2 "SELECT * FROM SYSCAT.SEQUENCEAUTH" > ${FILE9}
+  db2 "SELECT * FROM SYSCAT.TABAUTH" > ${FILE10}
+  db2 "SELECT * FROM SYSCAT.TBSPACEAUTH" > ${FILE11}
+  db2 "SELECT * FROM SYSCAT.VARIABLEAUTH" > ${FILE12}
+  db2 "SELECT * FROM SYSCAT.WORKLOADAUTH" > ${FILE13}
+  db2 "SELECT * FROM SYSCAT.XSROBJECTAUTH" > ${FILE14}
 
   if [[ -n ${FIRST_EXEC} ]] ; then
     if [[ ${VERBOSE} -ge 1 ]] ; then
       echo "Adding files"
     fi
-    git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} > /dev/null
+    git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} ${FILE8} ${FILE9} ${FILE10} ${FILE11} ${FILE12} ${FILE13} ${FILE14}> /dev/null
     git config user.email "${USER}@${HOSTNAME}" > /dev/null
     git config user.name "Nagios User - ${USERNAME}" > /dev/null
-    git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} -m "Initial commit" > /dev/null
+    git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} ${FILE8} ${FILE9} ${FILE10} ${FILE11} ${FILE12} ${FILE13} ${FILE14} -m "Initial commit" > /dev/null
 
     OUTPUT="First execution, nothing to compare"
     PERFORMANCE="'Changes'=0"
@@ -459,18 +472,35 @@ if [[ ${CONTINUE} == true ]] ; then
     DIFF_FILE5=$(git diff ${FILE5})
     DIFF_FILE6=$(git diff ${FILE6})
     DIFF_FILE7=$(git diff ${FILE7})
-    git commit ${FILE1} -m "Changes in registry values $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE2} -m "Changes in database manager configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
-    git commit ${FILE3} -m "Changes in database configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
-    git commit ${FILE4} -m "Changes in bufferpools $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE5} -m "Changes in schemas $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE6} -m "Changes in tablespaces and its bufferpools $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE7} -m "Changes in tables and its tablespaces $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    DIFF_FILE8=$(git diff ${FILE8})
+    DIFF_FILE9=$(git diff ${FILE9})
+    DIFF_FILE10=$(git diff ${FILE10})
+    DIFF_FILE11=$(git diff ${FILE11})
+    DIFF_FILE12=$(git diff ${FILE12})
+    DIFF_FILE13=$(git diff ${FILE13})
+    DIFF_FILE14=$(git diff ${FILE14})
+    git commit ${FILE1} -m "Changes in columns $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE2} -m "Changes in database $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
+    git commit ${FILE3} -m "Changes in index $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
+    git commit ${FILE4} -m "Changes in module $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE5} -m "Changes in package $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE6} -m "Changes in role $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE7} -m "Changes in routine $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE8} -m "Changes in schema $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE9} -m "Changes in sequence $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE10} -m "Changes in table $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE11} -m "Changes in tablespace $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE12} -m "Changes in variable $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE13} -m "Changes in workload $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    git commit ${FILE14} -m "Changes in xsrobject $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
  
     if [[ "${DIFF_FILE1}" == "" && "${DIFF_FILE2}" == ""
         && "${DIFF_FILE3}" == "" && "${DIFF_FILE4}" == "" 
         && "${DIFF_FILE5}" == "" && "${DIFF_FILE6}" == ""
-        && "${DIFF_FILE7}" == "" ]] ; then
+        && "${DIFF_FILE7}" == "" && "${DIFF_FILE8}" == ""
+        && "${DIFF_FILE9}" == "" && "${DIFF_FILE10}" == ""
+        && "${DIFF_FILE11}" == "" && "${DIFF_FILE12}" == ""
+        && "${DIFF_FILE13}" == "" && "${DIFF_FILE14}" == "" ]] ; then
       OUTPUT="No changes in the configuration"
       PERFORMANCE="'Changes'=1"
       RETURN=${OK}
@@ -486,40 +516,82 @@ if [[ ${CONTINUE} == true ]] ; then
         echo -E ${DIFF_FILE5}
         echo -E ${DIFF_FILE6}
         echo -E ${DIFF_FILE7}
+        echo -E ${DIFF_FILE8}
+        echo -E ${DIFF_FILE9}
+        echo -E ${DIFF_FILE10}
+        echo -E ${DIFF_FILE11}
+        echo -E ${DIFF_FILE12}
+        echo -E ${DIFF_FILE13}
+        echo -E ${DIFF_FILE14}
       fi
  
       if [[ "${DIFF_FILE1}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in the Registry values - "
+        OUTPUT="${OUTPUT}Changes in column  - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE2}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in the Database Manager Configuration - "
+        OUTPUT="${OUTPUT}Changes in db - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE3}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in the Database Configuration - "
+        OUTPUT="${OUTPUT}Changes in index - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE4}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in bufferpools - "
+        OUTPUT="${OUTPUT}Changes in module - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE5}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in tablespaces and its bufferpools - "
+        OUTPUT="${OUTPUT}Changes in package - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE6}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in schemas - "
+        OUTPUT="${OUTPUT}Changes in role - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
       if [[ "${DIFF_FILE7}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in tables and its tablespaces - "
+        OUTPUT="${OUTPUT}Changes in routine - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE8}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in schema - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE9}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in sequence - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE10}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in table - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE11}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in tablespace - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE12}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in variable - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE13}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in workload - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      if [[ "${DIFF_FILE14}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in xsrobject - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
