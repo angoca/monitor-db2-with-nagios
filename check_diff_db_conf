@@ -32,6 +32,10 @@
 # This scripts uses git. If using the default directory, then each time the sever 
 # is restarted the git history is lost.
 #
+# In order to run this script, the user need execution privileges on procedure
+# SYSPROC.AUTOMAINT_GET_POLICYFILE:
+# db2 grant execute on procedure SYSPROC.AUTOMAINT_GET_POLICYFILE to user nagios
+#
 # Based on this blog written by Ian Bjorhovde:
 # http://www.idug.org/p/bl/et/blogaid=571
 #
@@ -416,6 +420,7 @@ if [[ ${CONTINUE} == true ]] ; then
     mkdir -p ${DIR}
     cd ${DIR}
     git init > /dev/null
+    touch ${FILE8} ${FILE9} ${FILE10} ${FILE11}
     FIRST_EXEC=true
   else
     if [[ ${VERBOSE} -ge 1 ]] ; then
@@ -433,14 +438,14 @@ if [[ ${CONTINUE} == true ]] ; then
   db2 "SELECT TBSPACEID, TBSPACE, PAGESIZE, TBSPACETYPE, DATATYPE, EXTENTSIZE, PREFETCHSIZE, OVERHEAD, TRANSFERRATE, BUFFERPOOLID FROM SYSCAT.TABLESPACES ORDER BY TBSPACEID" > ${FILE5}
   db2 "SELECT SCHEMANAME FROM SYSCAT.SCHEMATA ORDER BY SCHEMANAME" > ${FILE6}
   db2 "SELECT TABLEID, TABSCHEMA, TABNAME, TYPE, STATUS, BASE_TABSCHEMA, BASE_TABNAME, COLCOUNT, TBSPACE, INDEX_TBSPACE, LONG_TBSPACE, PARENTS, CHILDREN, SELFREFS, KEYINDEXID, CHECKCOUNT, PCTFREE, APPEND_MODE, REFRESH, LOCKSIZE, VOLATILE, COMPRESSION, ACCESS_MODE, CODEPAGE, ONROLLBACK FROM SYSCAT.TABLES ORDERY BY TABLEID" > ${FILE7}
-  db2 "call sysproc.automaint_get_policyfile( 'AUTO_RUNSTATS', '${FILENAME8}' )"
-  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME8} ${FILE8}
-  db2 "call sysproc.automaint_get_policyfile( 'AUTO_REORG', '${FILENAME9}' )"
-  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME9} ${FILE9}
-  db2 "call sysproc.automaint_get_policyfile( 'AUTO_BACKUP', '${FILENAME10}' )"
-  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME10} ${FILE10}
-  db2 "call sysproc.automaint_get_policyfile( 'MAINTENANCE_WINDOW', '${FILENAME11}' )"
-  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME11} ${FILE11}
+  db2 "call sysproc.automaint_get_policyfile( 'AUTO_RUNSTATS', '${FILENAME8}' )" > /dev/null
+  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME8} ${FILE8} 2> /dev/null
+  db2 "call sysproc.automaint_get_policyfile( 'AUTO_REORG', '${FILENAME9}' )" > /dev/null
+  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME9} ${FILE9} 2> /dev/null
+  db2 "call sysproc.automaint_get_policyfile( 'AUTO_BACKUP', '${FILENAME10}' )" > /dev/null
+  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME10} ${FILE10} 2> /dev/null
+  db2 "call sysproc.automaint_get_policyfile( 'MAINTENANCE_WINDOW', '${FILENAME11}' )" > /dev/null
+  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME11} ${FILE11} 2> /dev/null
   db2look -e -d ${DATABASE_NAME} -l -o ${FILE12} 2> /dev/null
   cat ${FILE12} | tail -n +3 > ${FILE12}
 
@@ -514,6 +519,7 @@ if [[ ${CONTINUE} == true ]] ; then
         echo -E ${DIFF_FILE12}
       fi
  
+      PERFORMANCE_VALUE=1
       if [[ "${DIFF_FILE1}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in the Registry values - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
@@ -559,17 +565,17 @@ if [[ ${CONTINUE} == true ]] ; then
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
-      if [[ "${DIFF_FILE10" != "" ]] ; then
+      if [[ "${DIFF_FILE10}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in automatic backups - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
-      if [[ "${DIFF_FILE11" != "" ]] ; then
+      if [[ "${DIFF_FILE11}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in maintenance window - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
-      if [[ "${DIFF_FILE12" != "" ]] ; then
+      if [[ "${DIFF_FILE12}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in DDL - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}

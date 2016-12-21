@@ -367,6 +367,7 @@ if [[ ${CONTINUE} == true ]] ; then
         echo -E ${DIFF_FILE3}
       fi
  
+      PERFORMANCE_VALUE=1
       if [[ "${DIFF_FILE1}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in the kernel - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"

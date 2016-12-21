@@ -508,6 +508,7 @@ if [[ ${CONTINUE} == true ]] ; then
         echo -E ${DIFF_FILE14}
       fi
  
+      PERFORMANCE_VALUE=1
       if [[ "${DIFF_FILE1}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in column  - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
