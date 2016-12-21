@@ -1,0 +1,483 @@
+#! /usr/bin/env bash
+
+###############################################################################
+# Monitor DB2 with Nagios
+# Copyright 2013,2014,2015,2016 Andres Gomez Casanova
+# https://github.com/angoca/monitor-db2-with-nagios
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+###############################################################################
+
+# Checks modifications in the structure of the objects - DDL with the db2look
+# command.
+#
+# This scripts uses git. If using the default directory, then each time the sever 
+# is restarted the git history is lost.
+#
+# The db2look could fail due to lack of bind in the sqllib/bnd directory:
+# db2 "bind db2lkfun.bnd BLOCKING ALL GRANT PUBLIC sqlerror continue"
+# db2 "bind db2look.bnd BLOCKING ALL GRANT PUBLIC sqlerror continue"
+# db2 grant execute on function SYSPROC.MON_GET_CONTAINER to user nagios
+#
+# Based on this blog written by Ian Bjorhovde:
+# http://www.idug.org/p/bl/et/blogaid=571
+#
+# # 'check_database_size' command definition
+# define command {
+#         command_name    check_diff_db_conf
+#         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -t 20 -C "scripts/check_diff_db_conf -i '$ARG1$' -d '$ARG2$'"
+# }
+# define service{
+#         host_name               db2sever
+#         service_description     Database configuration
+#         check_command           check_diff_db_conf!/home/db2inst1!sample
+#         use                     generic-service
+# }
+#
+# When using NRPE:
+#
+# In the database server:
+#
+# command[check_diff_db_conf]=/home/nagios/scripts/check_diff_db_conf -i /home/db2inst1 -d sample
+#
+# Then modify the path according to your script location, instance home dir,
+# database, refresh rate and thresholds.
+#
+# In the Nagios server:
+#
+# define service{
+#         host_name               db2server
+#         service_description     Database configuration
+#         check_command           check_nrpe_1arg!check_diff_db_conf
+#         use                     generic-service
+# }
+#
+# Parameters:
+# -d | --database : Database name.
+# -D | --directory : Directory to create the history (Default is /tmp)
+# -h | --help : Show the help of this script.
+# -i | --instance : Home directory of the instance. Usually it is
+#   /home/db2inst1.
+# -K | --mk : Change the output for Check_MK.
+# -T | --trace : Trace mode. Writes output in /tmp.
+# -v | --verbose : Execute the program in verbose mode.
+# -V | --version : Show the current version of this script.
+#
+# In AIX, the long name options are not supported.
+#
+# The exit codes are the standard for Nagios.
+#
+# 0 The plugin was able to check the service and it appeared to be functioning
+#   properly.
+# 1 The plugin was able to check the service, but it appeared to be above some
+#   "warning" threshold or did not appear to be working properly.
+# 2 The plugin detected that either the service was not running or it was above
+#   some "critical" threshold.
+# 3 Invalid command line arguments were supplied to the plugin or low-level
+#   failures internal to the plugin (such as unable to fork, or open a tcp
+#   socket) that prevent it from performing the specified operation.
+#   Higher-level errors (such as name resolution errors, socket timeouts, etc)
+#   are outside of the control of plugins and should generally NOT be reported
+#   as UNKNOWN states.
+#
+# Author: Andres Gomez Casanova
+# Version: v1.0 2016-12-19
+
+# Flag for debugging.
+#set -xv
+
+# Locale to print messages in English. Prevent language problems.
+export LANG=en_US
+
+# Version of this script.
+function print_revision {
+  echo Andres Gomez Casanova - AngocA
+  echo v1.0 2016-12-19
+}
+# Function to show the help
+function print_usage {
+  /bin/cat <<__EOT
+Usage: ${1} { -i instanceHomeDirectory -d databaseName [-K][-D directory] | -h | -V }
+[-T][-v]
+__EOT
+}
+
+function print_help {
+  print_revision
+  print_usage ${1}
+  # Max 80 chars width.
+  /bin/cat <<__EOT
+-------------------------------------------------------------------------------
+Checks changes in the database configuration.
+-d | --database STRING
+   Database name.
+-D | --directory STRING
+   Directory where the history is created. By default is /tmp
+-h | --help
+   Shows the current documentation.
+-i | --instance STRING
+   Instance home directory. It is usually /home/db2inst1.
+-K | --mk
+   Changes the output to be compatible with Check_MK.
+-T | --trace
+   Trace mode: writes date and output in /tmp.
+-v | --verbose
+   Executes the script in verbose mode (multiple times).
+-V | --version
+   Shows the current version of this script.
+
+In AIX, the long name options are not supported.
+__EOT
+}
+
+# Variable to control the flow execution. Prevent Spaghetti code.
+CONTINUE=true
+
+# Nagios return codes
+OK=0
+WARNING=1
+CRITICAL=2
+UNKNOWN=3
+# This is the returned code.
+RETURN=${UNKNOWN}
+
+# Nagios Output
+# Text output 80 chars | Optional Perf Data Line 1
+# Long text Line 1
+# Long text Line 2 | Optional Perf Data Line 2
+# Optional Perf Data Line 3
+OUTPUT=
+PERFORMANCE=
+LONG_OUTPUT=
+LONG_PERFORMANCE=
+PERF_MK="-"
+
+APPL_NAME=$(basename ${0})
+
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Started ${APPL_NAME} $@" >> /tmp/${APPL_NAME}.log
+
+# Checks the lock file does not exist.
+# The lock file is the way the command was called with its parameters
+# without spaces.
+COPY_ARGS=("${@}") 
+LOCK_FILE=
+for VALUE in "${COPY_ARGS[@]}" ; do
+  LOCK_FILE="${LOCK_FILE}${VALUE}"
+done
+LOCK_FILE=${LOCK_FILE//\//}
+LOCK_FILE=${LOCK_FILE//\\/}
+LOCK_FILE=${LOCK_FILE//\:/}
+LOCK_FILE=${LOCK_FILE//\*/}
+LOCK_FILE=${LOCK_FILE//\|/}
+LOCK_FILE="/tmp/${APPL_NAME}${LOCK_FILE}.lock"
+if [[ ! -r ${LOCK_FILE} ]] ; then
+  echo $$ > ${LOCK_FILE}
+  LOCKED=true
+else
+  # If it exist, then check if the process is running.
+  EXIST=$(ps -ef | grep $(cat ${LOCK_FILE}) | grep ${APPL_NAME})
+  # If process is not running, delete it.
+  if [[ ${EXIST} == "" ]] ; then
+    rm ${LOCK_FILE}
+    if [[ ! -r ${LOCK_FILE} ]] ; then
+      echo $$ > ${LOCK_FILE}
+      LOCKED=true
+    else
+      OUTPUT="The lock file cannot be replaced: ${LOCK_FILE}"
+      CONTINUE=false
+      RETURN=${UNKNOWN}
+    fi
+  else
+    OUTPUT="An instance of the script with the same parameters is already running."
+    CONTINUE=false
+    RETURN=${UNKNOWN}
+  fi
+fi
+
+if [[ ${#} -eq 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
+
+# Checks the operating system. geopt works different in AIX than in Linux.
+OS=$(uname)
+
+if [[ "${OS:0:5}" == "Linux" ]] ; then
+  # The following requires GNU getopt. See the following discussion.
+  # http://stackoverflow.com/questions/402377
+  TEMP=$(getopt -o c:d:D:hi:KTvVw: --long critical:,database:,directory:,help,instance:,mk,trace,verbose,version,warning: \
+               -n ${APPL_NAME} -- "${@}")
+elif [[ "${OS:0:3}" == "AIX" ]] ; then
+  set -- $(getopt c:d:D:hi:KTvVw: ${*})
+elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
+  echo "This plugin is not yet supported in your platform."
+  echo "Please create a ticket in GitHub if you want to enable your current platform."
+  echo "https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+elif [[ "${OS:0:6}" == "CYGWIN" ]] ; then
+  echo "This plugin is not supported in Cygwin"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+else
+  echo "The platform is unknown: ${OS}"
+  echo "Please create a ticket in GitHub: https://github.com/angoca/monitor-db2-with-nagios/issues"
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
+
+if [[ ${?} -ne 0 ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ "${OS}" == "Linux" ]] ; then
+    # Note the quotes around ${TEMP}: they are essential!
+    eval set -- "${TEMP}"
+  fi
+  HELP=false
+  VERSION=false
+  CHECK_MK=false
+  # Verbosity level
+  VERBOSE=0
+  # Trace activated
+  TRACE=false
+  LOG=/tmp/${APPL_NAME}.log
+  INSTANCE_HOME=
+  DATABASE_NAME=
+  HISTORY_DIRECTORY=/tmp
+  WARNING_THRES=1
+  CRITICAL_THRES=2
+  if [[ "${OS:0:5}" == "Linux" ]] ; then
+    while true; do
+      case "${1}" in
+        -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -D | --directory ) HISTORY_DIRECTORY=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -h | --help ) HELP=true ; shift ;;
+        -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -K | --mk ) CHECK_MK=true ; shift ;;
+        -T | --trace ) TRACE=true ; shift ;;
+        -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+        -V | --version ) VERSION=true ; shift ;;
+        -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -- ) shift ; break ;;
+        * ) break ;;
+      esac
+    done
+  elif [[ "${OS:0:3}" = "AIX" ]] ; then
+    while [[ $1 != -- ]] ; do
+      case "${1}" in
+        -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -d) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -D) HISTORY_DIRECTORY=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -h) HELP=true ; shift ;;
+        -i) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        -K) CHECK_MK=true ; shift ;;
+        -T) TRACE=true ; shift ;;
+        -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
+        -V) VERSION=true ; shift ;;
+        -w) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
+        * ) break ;;
+      esac
+    done
+  fi
+fi
+
+if [[ ${TRACE} == true ]] ; then
+  echo ">>>>>" >> ${LOG}
+  date >> ${LOG}
+  echo "Instance at ${INSTANCE_HOME}" >> ${LOG}
+  echo "PID ${$}" >> ${LOG}
+fi
+
+ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
+ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
+ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
+ECHO="${ECHO}, check_mk:${CHECK_MK}"
+
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo ${ECHO}
+fi
+
+if [[ ${TRACE} == true ]] ; then
+  echo "PARAMS:${ECHO}" >> ${LOG}
+fi
+
+if [[ ${CONTINUE} == true && ${HELP} == true ]] ; then
+  print_help ${APPL_NAME}
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
+
+if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
+  print_revision ${APPL_NAME}
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
+
+if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
+
+if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
+  print_usage ${APPL_NAME}
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
+
+if [[ ${CONTINUE} == true
+    && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
+    || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
+    || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
+    || ${WARNING_THRES} -ge ${CRITICAL_THRES} ) ]] ; then
+  print_usage ${APPL_NAME}
+  echo "Warning threshold should be less than critical threshold."
+  echo "Threshold should be greater than 0."
+  RETURN=${UNKNOWN}
+  CONTINUE=false
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
+    # Load the DB2 profile.
+    . ${INSTANCE_HOME}/sqllib/db2profile
+    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
+  else
+    OUTPUT="Instance directory is invalid."
+    RETURN=${UNKNOWN}
+    CONTINUE=false
+  fi
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
+  COMMAND_DATABASE="db2 list db directory"
+  if [[ ${VERBOSE} -ge 2 ]] ; then
+    echo "COMMAND: ${COMMAND_DATABASE}"
+  fi
+  DATABASE=$(${COMMAND_DATABASE})
+  if [[ ${TRACE} == true ]] ; then
+    echo "RESULT:'${DATABASE}'" >> ${LOG}
+  fi
+  DATABASE=$(printf '%s\n' "${DATABASE}" | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
+  if [[ ${VERBOSE} -ge 3 ]] ; then
+    echo "RESULT:'${DATABASE}'"
+  fi
+  if [[ ${DATABASE} == "" ]] ; then
+    OUTPUT="The database ${DATABASE_NAME} is not catalogued."
+    RETURN=${UNKNOWN}
+    CONTINUE=false
+  fi
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
+  # Defines the directory and files that have the configuration.
+  DIR=${HISTORY_DIRECTORY}/${APPL_NAME}/${INSTANCE_HOME//\//}_${DATABASE_NAME}
+  FILE1=${DIR}/ddl.log
+ 
+  # Creates directory
+  if [[ ! -d ${DIR} ]] ; then
+    if [[ ${VERBOSE} -ge 1 ]] ; then
+      echo "Directory ${DIR} does not exist"
+    fi
+    mkdir -p ${DIR}
+    cd ${DIR}
+    git init > /dev/null
+    FIRST_EXEC=true
+  else
+    if [[ ${VERBOSE} -ge 1 ]] ; then
+      echo "Directory does exist: ${DIR}"
+    fi
+    cd ${DIR}
+  fi
+
+  # Redirects the configuration to the files
+  db2look -e -d ${DATABASE_NAME} -l -o ${FILE1} 2> /dev/null
+  cat ${FILE12} | tail -n +3 > ${FILE1}
+
+  if [[ -n ${FIRST_EXEC} ]] ; then
+    if [[ ${VERBOSE} -ge 1 ]] ; then
+      echo "Adding files"
+    fi
+    git add ${FILE1} > /dev/null
+    git config user.email "${USER}@${HOSTNAME}" > /dev/null
+    git config user.name "Nagios User - ${USERNAME}" > /dev/null
+    git commit ${FILE1} -m "Initial commit" > /dev/null
+
+    OUTPUT="First execution, nothing to compare"
+    PERFORMANCE="'Changes'=0"
+    RETURN=${OK}
+  else
+    if [[ ${VERBOSE} -ge 1 ]] ; then
+      echo "Looking for differences"
+    fi
+    # Gets and sets changes in Git
+    DIFF_FILE1=$(git diff ${FILE1})
+    git commit ${FILE1} -m "Changes in DDL $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+ 
+    if [[ "${DIFF_FILE1}" == "" ]] ; then
+      OUTPUT="No changes in the configuration"
+      PERFORMANCE="'Changes'=1"
+      RETURN=${OK}
+    else
+      if [[ ${VERBOSE} -ge 1 ]] ; then
+        echo "There were changes in the configuration"
+      fi
+      if [[ ${VERBOSE} -ge 2 ]] ; then
+        echo -E ${DIFF_FILE1}
+      fi
+ 
+      PERFORMANCE_VALUE=1
+      if [[ "${DIFF_FILE1}" != "" ]] ; then
+        OUTPUT="${OUTPUT}Changes in DDL - "
+        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
+        RETURN=${WARNING}
+      fi
+      PERFORMANCE="'Changes'=${PERFORMANCE_VALUE}"
+    fi
+  fi
+  PERF_MK=${PERFORMANCE}
+fi
+
+# Prints the output.
+if [[ ${OUTPUT} == "" ]] ; then
+  OUTPUT="Note: The test was not executed."
+fi
+# Builds the output.
+if [[ ${CHECK_MK} == true ]] ; then
+  echo "${RETURN} diffDBConf${TYPE}-${INSTANCE_NAME}-${DATABASE_NAME} ${PERF_MK} ${OUTPUT}"
+else
+  echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
+fi
+# Returns the error code.
+if [[ ${VERBOSE} -ge 2 ]] ; then
+  echo "Return code: ${RETURN}"
+fi
+if [[ ${TRACE} == true ]] ; then
+  echo -e "OUTPUT:${OUTPUT}\nPERF:${PERFORMANCE}\nLONG_OUT:${LONG_OUTPUT}\nLONGPERF:${LONG_PERFORMANCE}\nRET_CODE:${RETURN}" >> ${LOG}
+  date >> ${LOG}
+  echo -e "<<<<<\n" >> ${LOG}
+fi
+
+if [[ ${LOCKED} == true && -r ${LOCK_FILE} ]] ; then
+  rm ${LOCK_FILE}
+fi
+
+echo "$(date +"%Y-%m-%d-%H.%M.%S") $$ Ended ${APPL_NAME} ${COPY_ARGS[@]}" >> /tmp/${APPL_NAME}.log
+
+exit ${RETURN}
