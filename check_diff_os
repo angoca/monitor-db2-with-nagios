@@ -191,12 +191,6 @@ else
   fi
 fi
 
-if [[ ${#} -eq 0 ]] ; then
-  print_usage ${APPL_NAME}
-  RETURN=${UNKNOWN}
-  CONTINUE=false
-fi
-
 # Checks the operating system. geopt works different in AIX than in Linux.
 OS=$(uname)
 
@@ -284,7 +278,7 @@ if [[ ${TRACE} == true ]] ; then
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
-ECHO="${ECHO}, check_mk:${CHECK_MK}, directory:${HISTORY_DIRECTORY}""
+ECHO="${ECHO}, check_mk:${CHECK_MK}, directory:${HISTORY_DIRECTORY}"
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo ${ECHO}
@@ -330,7 +324,7 @@ if [[ ${CONTINUE} == true ]] ; then
   fi
 
   # Redirects the os configuration to the files
-  /sbin/sysctl -a > ${FILE1}
+  cat /etc/sysctl.conf > ${FILE1}
   cat /etc/passwd > ${FILE2}
   cat /etc/group > ${FILE3}
 
