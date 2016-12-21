@@ -450,7 +450,7 @@ if [[ ${CONTINUE} == true ]] ; then
   cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME10} ${FILE10} 2> /dev/null
   db2 "call sysproc.automaint_get_policyfile( 'MAINTENANCE_WINDOW', '${FILENAME11}' )" > /dev/null
   cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME11} ${FILE11} 2> /dev/null
-  db2look -e -d ${DATABASE_NAME} -l -o ${FILE12} 2> /dev/null
+  # db2look -e -d ${DATABASE_NAME} -l -o ${FILE12} 2> /dev/null
   cat ${FILE12} | tail -n +3 > ${FILE12}
 
   if [[ -n ${FIRST_EXEC} ]] ; then
