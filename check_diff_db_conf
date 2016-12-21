@@ -27,7 +27,6 @@
 # * Schemas
 # * Tables per schema and its tablespace
 # * Automatic maintenance
-# * DDL - db2look
 #
 # This scripts uses git. If using the default directory, then each time the sever 
 # is restarted the git history is lost.
@@ -35,10 +34,6 @@
 # In order to run this script, the user need execution privileges on procedure
 # SYSPROC.AUTOMAINT_GET_POLICYFILE:
 # db2 grant execute on procedure SYSPROC.AUTOMAINT_GET_POLICYFILE to user nagios
-# Also, the db2look could fail due to lack of bind in the sqllib/bnd directory:
-# db2 "bind db2lkfun.bnd BLOCKING ALL GRANT PUBLIC sqlerror continue"
-# db2 "bind db2look.bnd BLOCKING ALL GRANT PUBLIC sqlerror continue"
-# db2 grant execute on function SYSPROC.MON_GET_CONTAINER to user nagios
 #
 # Based on this blog written by Ian Bjorhovde:
 # http://www.idug.org/p/bl/et/blogaid=571
@@ -414,7 +409,6 @@ if [[ ${CONTINUE} == true ]] ; then
   FILE10=${DIR}/${FILENAME10}
   FILENAME11=window.xml
   FILE11=${DIR}/${FILENAME11}
-  FILE12=${DIR}/ddl.log
  
   # Creates directory
   if [[ ! -d ${DIR} ]] ; then
@@ -450,17 +444,15 @@ if [[ ${CONTINUE} == true ]] ; then
   cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME10} ${FILE10} 2> /dev/null
   db2 "call sysproc.automaint_get_policyfile( 'MAINTENANCE_WINDOW', '${FILENAME11}' )" > /dev/null
   cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME11} ${FILE11} 2> /dev/null
-  # db2look -e -d ${DATABASE_NAME} -l -o ${FILE12} 2> /dev/null
-  cat ${FILE12} | tail -n +3 > ${FILE12}
 
   if [[ -n ${FIRST_EXEC} ]] ; then
     if [[ ${VERBOSE} -ge 1 ]] ; then
       echo "Adding files"
     fi
-    git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} ${FILE8} ${FILE9} ${FILE10} ${FILE11} ${FILE12} > /dev/null
+    git add ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} ${FILE8} ${FILE9} ${FILE10} ${FILE11} > /dev/null
     git config user.email "${USER}@${HOSTNAME}" > /dev/null
     git config user.name "Nagios User - ${USERNAME}" > /dev/null
-    git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} ${FILE8} ${FILE9} ${FILE10} ${FILE11} ${FILE12} -m "Initial commit" > /dev/null
+    git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} ${FILE8} ${FILE9} ${FILE10} ${FILE11} -m "Initial commit" > /dev/null
 
     OUTPUT="First execution, nothing to compare"
     PERFORMANCE="'Changes'=0"
@@ -481,7 +473,6 @@ if [[ ${CONTINUE} == true ]] ; then
     DIFF_FILE9=$(git diff ${FILE9})
     DIFF_FILE10=$(git diff ${FILE10})
     DIFF_FILE11=$(git diff ${FILE11})
-    DIFF_FILE12=$(git diff ${FILE12})
     git commit ${FILE1} -m "Changes in registry values $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
     git commit ${FILE2} -m "Changes in database manager configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
     git commit ${FILE3} -m "Changes in database configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
@@ -493,14 +484,13 @@ if [[ ${CONTINUE} == true ]] ; then
     git commit ${FILE9} -m "Changes in automatic reorgs $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
     git commit ${FILE10} -m "Changes in automatic backups $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
     git commit ${FILE11} -m "Changes in maintenance window $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE12} -m "Changes in DDL $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
  
     if [[ "${DIFF_FILE1}" == "" && "${DIFF_FILE2}" == ""
         && "${DIFF_FILE3}" == "" && "${DIFF_FILE4}" == "" 
         && "${DIFF_FILE5}" == "" && "${DIFF_FILE6}" == ""
         && "${DIFF_FILE7}" == "" && "${DIFF_FILE8}" == ""
         && "${DIFF_FILE9}" == "" && "${DIFF_FILE10}" == ""
-        && "${DIFF_FILE11}" == "" && "${DIFF_FILE12}" == "" ]] ; then
+        && "${DIFF_FILE11}" == "" ]] ; then
       OUTPUT="No changes in the configuration"
       PERFORMANCE="'Changes'=1"
       RETURN=${OK}
@@ -520,7 +510,6 @@ if [[ ${CONTINUE} == true ]] ; then
         echo -E ${DIFF_FILE9}
         echo -E ${DIFF_FILE10}
         echo -E ${DIFF_FILE11}
-        echo -E ${DIFF_FILE12}
       fi
  
       PERFORMANCE_VALUE=1
@@ -576,11 +565,6 @@ if [[ ${CONTINUE} == true ]] ; then
       fi
       if [[ "${DIFF_FILE11}" != "" ]] ; then
         OUTPUT="${OUTPUT}Changes in maintenance window - "
-        PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
-        RETURN=${WARNING}
-      fi
-      if [[ "${DIFF_FILE12}" != "" ]] ; then
-        OUTPUT="${OUTPUT}Changes in DDL - "
         PERFORMANCE_VALUE="$((${PERFORMANCE_VALUE} + 1))"
         RETURN=${WARNING}
       fi
