@@ -35,6 +35,10 @@
 # In order to run this script, the user need execution privileges on procedure
 # SYSPROC.AUTOMAINT_GET_POLICYFILE:
 # db2 grant execute on procedure SYSPROC.AUTOMAINT_GET_POLICYFILE to user nagios
+# Also, the db2look could fail due to lack of bind in the sqllib/bnd directory:
+# db2 "bind db2lkfun.bnd BLOCKING ALL GRANT PUBLIC sqlerror continue"
+# db2 "bind db2look.bnd BLOCKING ALL GRANT PUBLIC sqlerror continue"
+# db2 grant execute on function SYSPROC.MON_GET_CONTAINER to user nagios
 #
 # Based on this blog written by Ian Bjorhovde:
 # http://www.idug.org/p/bl/et/blogaid=571
