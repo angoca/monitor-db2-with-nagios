@@ -27,7 +27,7 @@
 # Based on this blog written by Ian Bjorhovde:
 # http://www.idug.org/p/bl/et/blogaid=571
 #
-# # 'check_database_size' command definition
+# # 'check_diff_os' command definition
 # define command {
 #         command_name    check_diff_os
 #         command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -l nagios -t 20 -C "scripts/check_diff_os -i '$ARG1$' -d '$ARG2$'"
@@ -43,10 +43,9 @@
 #
 # In the database server:
 #
-# command[check_database_size]=/home/nagios/scripts/check_diff_os -i /home/db2inst1 -d sample
+# command[check_diff_os]=/home/nagios/scripts/check_diff_os -i /home/db2inst1 -d sample
 #
-# Then modify the path according to your script location, instance home dir,
-# database, refresh rate and thresholds.
+# Then modify the path according to your script location, refresh rate and thresholds.
 #
 # In the Nagios server:
 #
@@ -58,11 +57,8 @@
 # }
 #
 # Parameters:
-# -d | --database : Database name.
 # -D | --directory : Directory to create the history (Default is /tmp)
 # -h | --help : Show the help of this script.
-# -i | --instance : Home directory of the instance. Usually it is
-#   /home/db2inst1.
 # -K | --mk : Change the output for Check_MK.
 # -T | --trace : Trace mode. Writes output in /tmp.
 # -v | --verbose : Execute the program in verbose mode.
@@ -102,7 +98,7 @@ function print_revision {
 # Function to show the help
 function print_usage {
   /bin/cat <<__EOT
-Usage: ${1} { -i instanceHomeDirectory -d databaseName [-K][-D directory] | -h | -V }
+Usage: ${1} { [-K][-D directory] | -h | -V }
 [-T][-v]
 __EOT
 }
@@ -114,14 +110,10 @@ function print_help {
   /bin/cat <<__EOT
 -------------------------------------------------------------------------------
 Checks changes in the OS configuration and security.
--d | --database STRING
-   Database name.
 -D | --directory STRING
    Directory where the history is created. By default is /tmp
 -h | --help
    Shows the current documentation.
--i | --instance STRING
-   Instance home directory. It is usually /home/db2inst1.
 -K | --mk
    Changes the output to be compatible with Check_MK.
 -T | --trace
@@ -213,10 +205,10 @@ if [[ "${OS:0:5}" == "Linux" ]] ; then
   # http://stackoverflow.com/questions/402377
 
   # TODO Add the arguments here. One char in -o, multiple char in -long.
-  TEMP=$(getopt -o c:d:D:hi:KTvVw: --long critical:,database:,directory:,help,instance:,mk,trace,verbose,version,warning: \
+  TEMP=$(getopt -o D:hKTvV --long directory:,help,mk,trace,verbose,version \
                -n ${APPL_NAME} -- "${@}")
 elif [[ "${OS:0:3}" == "AIX" ]] ; then
-  set -- $(getopt c:d:D:hi:KTvVw: ${*})
+  set -- $(getopt D:hKTvV ${*})
 elif [[ "${OS:0:6}" == "Darwin" || "${OS:0:5}" == "SunOS" || "${OS:0:5}" == "HP-UX" ]] ; then
   echo "This plugin is not yet supported in your platform."
   echo "Please create a ticket in GitHub if you want to enable your current platform."
@@ -253,24 +245,18 @@ if [[ ${CONTINUE} == true ]] ; then
   # Trace activated
   TRACE=false
   LOG=/tmp/${APPL_NAME}.log
-  INSTANCE_HOME=
-  DATABASE_NAME=
   HISTORY_DIRECTORY=/tmp
   WARNING_THRES=1
   CRITICAL_THRES=2
   if [[ "${OS:0:5}" == "Linux" ]] ; then
     while true; do
       case "${1}" in
-        -c | --critical ) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        -d | --database ) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -D | --directory ) HISTORY_DIRECTORY=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -h | --help ) HELP=true ; shift ;;
-        -i | --instance ) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -K | --mk ) CHECK_MK=true ; shift ;;
         -T | --trace ) TRACE=true ; shift ;;
         -v | --verbose ) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V | --version ) VERSION=true ; shift ;;
-        -w | --warning ) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -- ) shift ; break ;;
         * ) break ;;
       esac
@@ -278,16 +264,12 @@ if [[ ${CONTINUE} == true ]] ; then
   elif [[ "${OS:0:3}" = "AIX" ]] ; then
     while [[ $1 != -- ]] ; do
       case "${1}" in
-        -c) CRITICAL_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
-        -d) DATABASE_NAME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -D) HISTORY_DIRECTORY=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -h) HELP=true ; shift ;;
-        -i) INSTANCE_HOME=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         -K) CHECK_MK=true ; shift ;;
         -T) TRACE=true ; shift ;;
         -v) VERBOSE=$(( ${VERBOSE} + 1 )) ; shift ;;
         -V) VERSION=true ; shift ;;
-        -w) WARNING_THRES=$(echo ${2} | cut -d' ' -f1) ; shift 2 ;;
         * ) break ;;
       esac
     done
@@ -302,9 +284,7 @@ if [[ ${TRACE} == true ]] ; then
 fi
 
 ECHO="help:${HELP}, version:${VERSION}, verbose:${VERBOSE}"
-ECHO="${ECHO}, directory:${INSTANCE_HOME}, database:${DATABASE_NAME}"
-ECHO="${ECHO}, warning:${WARNING_THRES}, critical:${CRITICAL_THRES}"
-ECHO="${ECHO}, check_mk:${CHECK_MK}"
+ECHO="${ECHO}, check_mk:${CHECK_MK}, directory:${HISTORY_DIRECTORY}""
 
 if [[ ${VERBOSE} -ge 2 ]] ; then
   echo ${ECHO}
@@ -326,65 +306,9 @@ if [[ ${CONTINUE} == true && ${VERSION} == true ]] ; then
   CONTINUE=false
 fi
 
-if [[ ${CONTINUE} == true && ${INSTANCE_HOME} == "" ]] ; then
-  print_usage ${APPL_NAME}
-  RETURN=${UNKNOWN}
-  CONTINUE=false
-fi
-
-if [[ ${CONTINUE} == true && ${DATABASE_NAME} == "" ]] ; then
-  print_usage ${APPL_NAME}
-  RETURN=${UNKNOWN}
-  CONTINUE=false
-fi
-
-if [[ ${CONTINUE} == true
-    && ( ${WARNING_THRES} == "" || ${CRITICAL_THRES} == ""
-    || ! ${WARNING_THRES} =~ ^[0-9]+$ || ! ${CRITICAL_THRES} =~ ^[0-9]+$
-    || ${WARNING_THRES} -le 0 || ${CRITICAL_THRES} -le 0
-    || ${WARNING_THRES} -ge ${CRITICAL_THRES} ) ]] ; then
-  print_usage ${APPL_NAME}
-  echo "Warning threshold should be less than critical threshold."
-  echo "Threshold should be greater than 0."
-  RETURN=${UNKNOWN}
-  CONTINUE=false
-fi
-
-if [[ ${CONTINUE} == true ]] ; then
-  if [[ -d ${INSTANCE_HOME} && -e ${INSTANCE_HOME}/sqllib/db2profile ]] ; then
-    # Load the DB2 profile.
-    . ${INSTANCE_HOME}/sqllib/db2profile
-    INSTANCE_NAME=$(db2 get instance | awk '/instance/ {print $7}')
-  else
-    OUTPUT="Instance directory is invalid."
-    RETURN=${UNKNOWN}
-    CONTINUE=false
-  fi
-fi
-
-if [[ ${CONTINUE} == true ]] ; then
-  COMMAND_DATABASE="db2 list db directory"
-  if [[ ${VERBOSE} -ge 2 ]] ; then
-    echo "COMMAND: ${COMMAND_DATABASE}"
-  fi
-  DATABASE=$(${COMMAND_DATABASE})
-  if [[ ${TRACE} == true ]] ; then
-    echo "RESULT:'${DATABASE}'" >> ${LOG}
-  fi
-  DATABASE=$(printf '%s\n' "${DATABASE}" | awk '/Database alias/ {print $4}' | grep -iw ${DATABASE_NAME})
-  if [[ ${VERBOSE} -ge 3 ]] ; then
-    echo "RESULT:'${DATABASE}'"
-  fi
-  if [[ ${DATABASE} == "" ]] ; then
-    OUTPUT="The database ${DATABASE_NAME} is not catalogued."
-    RETURN=${UNKNOWN}
-    CONTINUE=false
-  fi
-fi
-
 if [[ ${CONTINUE} == true ]] ; then
   # Defines the directory and files that have the configuration.
-  DIR=${HISTORY_DIRECTORY}/${APPL_NAME}/${INSTANCE_HOME//\//}_${DATABASE_NAME}
+  DIR=${HISTORY_DIRECTORY}/${APPL_NAME}
   FILE1=${DIR}/sysctl.log
   FILE2=${DIR}/passwd.log
   FILE3=${DIR}/group.log
@@ -476,7 +400,7 @@ if [[ ${OUTPUT} == "" ]] ; then
 fi
 # Builds the output.
 if [[ ${CHECK_MK} == true ]] ; then
-  echo "${RETURN} connectionsQty${TYPE}-${INSTANCE_NAME}-${DATABASE_NAME} ${PERF_MK} ${OUTPUT}"
+  echo "${RETURN} diffOs${TYPE} ${PERF_MK} ${OUTPUT}"
 else
   echo -e "${OUTPUT}|${PERFORMANCE}\n${LONG_OUTPUT}|${LONG_PERFORMANCE}"
 fi
