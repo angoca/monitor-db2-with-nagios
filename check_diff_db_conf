@@ -430,7 +430,7 @@ if [[ ${CONTINUE} == true ]] ; then
   # Redirects the configuration to the files
   db2set -all > ${FILE1}
   db2 get dbm cfg > ${FILE2}
-  db2 get db cfg for ${DATABASE_NAME} | grep -v 'First active log file' > ${FILE3}
+  db2 get db cfg for ${DATABASE_NAME} | grep -v 'First active log file' | grep -v AUTOMATIC > ${FILE3}
   db2 connect to ${DATABASE_NAME} > /dev/null
   db2 "SELECT BUFFERPOOLID, BPNAME, PAGESIZE, NUMBLOCKPAGES, BLOCKSIZE FROM SYSCAT.BUFFERPOOLS ORDER BY BUFFERPOOLID" > ${FILE4}
   db2 "SELECT TBSPACEID, TBSPACE, PAGESIZE, TBSPACETYPE, DATATYPE, EXTENTSIZE, PREFETCHSIZE, OVERHEAD, TRANSFERRATE, BUFFERPOOLID FROM SYSCAT.TABLESPACES ORDER BY TBSPACEID" > ${FILE5}
