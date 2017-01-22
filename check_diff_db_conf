@@ -427,24 +427,59 @@ if [[ ${CONTINUE} == true ]] ; then
     cd ${DIR}
   fi
 
+  # Deletes previous files
+  rm ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} ${FILE8} ${FILE9} ${FILE10} ${FILE11} 2> /dev/null
   # Redirects the configuration to the files
   db2set -all > ${FILE1}
   db2 get dbm cfg > ${FILE2}
   db2 get db cfg for ${DATABASE_NAME} | grep -v 'First active log file' | grep -v AUTOMATIC | grep -v "All committed transactions have been written to disk" > ${FILE3}
   db2 connect to ${DATABASE_NAME} > /dev/null
+  if [[ ${?} -ne 0 ]] ; then
+    OUTPUT="Problem while connecting to the database"
+    RETURN=${UNKNOWN}
+    CONTINUE=false
+  fi
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
   db2 "SELECT BUFFERPOOLID, BPNAME, PAGESIZE, NUMBLOCKPAGES, BLOCKSIZE FROM SYSCAT.BUFFERPOOLS ORDER BY BUFFERPOOLID" > ${FILE4}
   db2 "SELECT TBSPACEID, TBSPACE, PAGESIZE, TBSPACETYPE, DATATYPE, EXTENTSIZE, PREFETCHSIZE, OVERHEAD, TRANSFERRATE, BUFFERPOOLID FROM SYSCAT.TABLESPACES ORDER BY TBSPACEID" > ${FILE5}
   db2 "SELECT SCHEMANAME FROM SYSCAT.SCHEMATA ORDER BY SCHEMANAME" > ${FILE6}
   db2 "SELECT TABLEID, TABSCHEMA, TABNAME, TYPE, STATUS, BASE_TABSCHEMA, BASE_TABNAME, COLCOUNT, TBSPACE, INDEX_TBSPACE, LONG_TBSPACE, PARENTS, CHILDREN, SELFREFS, KEYINDEXID, CHECKCOUNT, PCTFREE, APPEND_MODE, REFRESH, LOCKSIZE, VOLATILE, COMPRESSION, ACCESS_MODE, CODEPAGE, ONROLLBACK FROM SYSCAT.TABLES ORDER BY TABLEID" > ${FILE7}
   db2 "call sysproc.automaint_get_policyfile( 'AUTO_RUNSTATS', '${FILENAME8}' )" > /dev/null
-  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME8} ${FILE8} 2> /dev/null
+  if [[ $(find ${INSTANCE_HOME}/sqllib/tmp -name ${FILENAME8} -mmin -5) != "" ]] ; then
+    cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME8} ${FILE8} 2> /dev/null
+  else
+    OUTPUT="${OUTPUT}File ${FILENAME8} is too old. "
+  fi
   db2 "call sysproc.automaint_get_policyfile( 'AUTO_REORG', '${FILENAME9}' )" > /dev/null
-  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME9} ${FILE9} 2> /dev/null
+  if [[ $(find ${INSTANCE_HOME}/sqllib/tmp -name ${FILENAME9} -mmin -5) != "" ]] ; then
+    cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME9} ${FILE9} 2> /dev/null
+  else
+    OUTPUT="${OUTPUT}File ${FILENAME9} is too old. "
+  fi
   db2 "call sysproc.automaint_get_policyfile( 'AUTO_BACKUP', '${FILENAME10}' )" > /dev/null
-  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME10} ${FILE10} 2> /dev/null
+  if [[ $(find ${INSTANCE_HOME}/sqllib/tmp -name ${FILENAME10} -mmin -5) != "" ]] ; then
+    cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME10} ${FILE10} 2> /dev/null
+  else
+    OUTPUT="${OUTPUT}File ${FILENAME10} is too old. "
+  fi
   db2 "call sysproc.automaint_get_policyfile( 'MAINTENANCE_WINDOW', '${FILENAME11}' )" > /dev/null
-  cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME11} ${FILE11} 2> /dev/null
+  if [[ $(find ${INSTANCE_HOME}/sqllib/tmp -name ${FILENAME11} -mmin -5) != "" ]] ; then
+    cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME11} ${FILE11} 2> /dev/null
+  else
+    OUTPUT="${OUTPUT}File ${FILENAME11} is too old. "
+  fi
 
+  db2 connect > /dev/null
+  if [[ ${?} -ne 0 ]] ; then
+    OUTPUT="${OUTPUT}Problem with database connection"
+    RETURN=${UNKNOWN}
+    CONTINUE=false
+  fi
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
   if [[ -n ${FIRST_EXEC} ]] ; then
     if [[ ${VERBOSE} -ge 1 ]] ; then
       echo "Adding files"
@@ -454,7 +489,7 @@ if [[ ${CONTINUE} == true ]] ; then
     git config user.name "Nagios User - ${USERNAME}" > /dev/null
     git commit ${FILE1} ${FILE2} ${FILE3} ${FILE4} ${FILE5} ${FILE6} ${FILE7} ${FILE8} ${FILE9} ${FILE10} ${FILE11} -m "Initial commit" > /dev/null
 
-    OUTPUT="First execution, nothing to compare"
+    OUTPUT="${OUTPUT}First execution, nothing to compare"
     PERFORMANCE="'Changes'=0"
     RETURN=${OK}
   else
@@ -491,7 +526,7 @@ if [[ ${CONTINUE} == true ]] ; then
         && "${DIFF_FILE7}" == "" && "${DIFF_FILE8}" == ""
         && "${DIFF_FILE9}" == "" && "${DIFF_FILE10}" == ""
         && "${DIFF_FILE11}" == "" ]] ; then
-      OUTPUT="No changes in the configuration"
+      OUTPUT="${OUTPUT}No changes in the configuration"
       PERFORMANCE="'Changes'=1"
       RETURN=${OK}
     else
