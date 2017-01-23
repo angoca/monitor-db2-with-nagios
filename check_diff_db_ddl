@@ -408,7 +408,8 @@ if [[ ${CONTINUE} == true ]] ; then
 
   # Redirects the configuration to the files
   db2look -e -d ${DATABASE_NAME} -l -o ${FILE1} 2> /dev/null
-  cat ${FILE1} | tail -n +3 > ${FILE1}
+  cat ${FILE1} | tail -n +3 > ${FILE1}_tmp
+  mv ${FILE1}_tmp ${FILE1}
 
   if [[ -n ${FIRST_EXEC} ]] ; then
     if [[ ${VERBOSE} -ge 1 ]] ; then
