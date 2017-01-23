@@ -415,6 +415,15 @@ if [[ ${CONTINUE} == true ]] ; then
     cd ${DIR}
   fi
 
+  db2 connect to ${DATABASE_NAME} > /dev/null
+  if [[ ${?} -ne 0 ]] ; then
+    OUTPUT="Problem while connecting to the database"
+    RETURN=${UNKNOWN}
+    CONTINUE=false
+  fi
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
   # Redirects the configuration to the files
   db2 "SELECT * FROM SYSCAT.COLAUTH" > ${FILE1}
   db2 "SELECT * FROM SYSCAT.DBAUTH" > ${FILE2}
@@ -431,6 +440,15 @@ if [[ ${CONTINUE} == true ]] ; then
   db2 "SELECT * FROM SYSCAT.WORKLOADAUTH" > ${FILE13}
   db2 "SELECT * FROM SYSCAT.XSROBJECTAUTH" > ${FILE14}
 
+  db2 connect > /dev/null
+  if [[ ${?} -ne 0 ]] ; then
+    OUTPUT="${OUTPUT}Problem with database connection"
+    RETURN=${UNKNOWN}
+    CONTINUE=false
+  fi
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
   if [[ -n ${FIRST_EXEC} ]] ; then
     if [[ ${VERBOSE} -ge 1 ]] ; then
       echo "Adding files"
