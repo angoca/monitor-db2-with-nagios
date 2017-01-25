@@ -406,10 +406,20 @@ if [[ ${CONTINUE} == true ]] ; then
     cd ${DIR}
   fi
 
+  rm ${FILE1}
   # Redirects the configuration to the files
   db2look -e -d ${DATABASE_NAME} -l -o ${FILE1} 2> /dev/null
-  cat ${FILE1} | tail -n +3 > ${FILE1}_tmp
-  mv ${FILE1}_tmp ${FILE1}
+  if [[ -r ${FILE1} ]] ; then
+    cat ${FILE1} | tail -n +3 | grep -v -E "ALTER SEQUENCE .* RESTART WITH" > ${FILE1}_tmp
+    mv ${FILE1}_tmp ${FILE1}
+  else
+    OUTPUT="The file was not generated"
+    RETURN=${UNKNOWN}
+    CONTINUE=false
+  fi
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
 
   if [[ -n ${FIRST_EXEC} ]] ; then
     if [[ ${VERBOSE} -ge 1 ]] ; then
