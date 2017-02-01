@@ -508,18 +508,88 @@ if [[ ${CONTINUE} == true ]] ; then
     DIFF_FILE9=$(git diff ${FILE9})
     DIFF_FILE10=$(git diff ${FILE10})
     DIFF_FILE11=$(git diff ${FILE11})
-    git commit ${FILE1} -m "Changes in registry values $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE2} -m "Changes in database manager configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
-    git commit ${FILE3} -m "Changes in database configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
-    git commit ${FILE4} -m "Changes in bufferpools $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE5} -m "Changes in schemas $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE6} -m "Changes in tablespaces and its bufferpools $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE7} -m "Changes in tables and its tablespaces $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE8} -m "Changes in automatic runstats $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE9} -m "Changes in automatic reorgs $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE10} -m "Changes in automatic backups $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
-    git commit ${FILE11} -m "Changes in maintenance window $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
- 
+    if [[ -r ${FILE1} ]] ; then
+      git commit ${FILE1} -m "Changes in registry values $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    else
+      OUTPUT="${OUTPUT}Problem with file ${FILE1}, it was not created. "
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+    if [[ -r ${FILE2} ]] ; then
+      git commit ${FILE2} -m "Changes in database manager configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
+    else
+      OUTPUT="${OUTPUT}Problem with file ${FILE2}, it was not created. "
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+    if [[ -r ${FILE3} ]] ; then
+      git commit ${FILE3} -m "Changes in database configuration $(date +'%Y-%m-%d-%H.%M.%S')" > /dev/null
+    else
+      OUTPUT="${OUTPUT}Problem with file ${FILE3}, it was not created. "
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+    if [[ -r ${FILE4} ]] ; then
+      git commit ${FILE4} -m "Changes in bufferpools $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    else
+      OUTPUT="${OUTPUT}Problem with file ${FILE4}, it was not created. "
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+    if [[ -r ${FILE5} ]] ; then
+      git commit ${FILE5} -m "Changes in schemas $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    else
+      OUTPUT="${OUTPUT}Problem with file ${FILE5}, it was not created. "
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+    if [[ -r ${FILE6} ]] ; then
+      git commit ${FILE6} -m "Changes in tablespaces and its bufferpools $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    else
+      OUTPUT="${OUTPUT}Problem with file ${FILE6}, it was not created. "
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+    if [[ -r ${FILE7} ]] ; then
+      git commit ${FILE7} -m "Changes in tables and its tablespaces $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    else
+      OUTPUT="${OUTPUT}Problem with file ${FILE7}, it was not created. "
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+    if [[ -r ${FILE8} ]] ; then
+      git commit ${FILE8} -m "Changes in automatic runstats $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    else
+      OUTPUT="${OUTPUT}Problem with file ${FILE8}, it was not created. "
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+    if [[ -r ${FILE9} ]] ; then
+      git commit ${FILE9} -m "Changes in automatic reorgs $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    else
+      OUTPUT="${OUTPUT}Problem with file ${FILE9}, it was not created. "
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+    if [[ -r ${FILE10} ]] ; then
+      git commit ${FILE10} -m "Changes in automatic backups $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    else
+      OUTPUT="${OUTPUT}Problem with file ${FILE10}, it was not created. "
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+    if [[ -r ${FILE11} ]] ; then
+      git commit ${FILE11} -m "Changes in maintenance window $(date +'%Y-%m-%d-%H.%M.%S')" >/dev/null
+    else
+      OUTPUT="${OUTPUT}Problem with file ${FILE11}, it was not created. "
+      RETURN=${UNKNOWN}
+      CONTINUE=false
+    fi
+  fi
+fi
+
+if [[ ${CONTINUE} == true ]] ; then
+  if [[ -z ${FIRST_EXEC} ]] ; then
     if [[ "${DIFF_FILE1}" == "" && "${DIFF_FILE2}" == ""
         && "${DIFF_FILE3}" == "" && "${DIFF_FILE4}" == "" 
         && "${DIFF_FILE5}" == "" && "${DIFF_FILE6}" == ""
