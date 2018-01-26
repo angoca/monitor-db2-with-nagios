@@ -31,7 +31,7 @@
 # This scripts uses git. If using the default directory, then each time the sever 
 # is restarted the git history is lost.
 #
-# In order to run this script, the user need execution privileges on procedure
+# In order to run this script, the user needs execution privileges on procedure
 # SYSPROC.AUTOMAINT_GET_POLICYFILE:
 # db2 grant execute on procedure SYSPROC.AUTOMAINT_GET_POLICYFILE to user nagios
 #
@@ -450,24 +450,36 @@ if [[ ${CONTINUE} == true ]] ; then
   if [[ $(find ${INSTANCE_HOME}/sqllib/tmp -name ${FILENAME8} -mmin -5) != "" ]] ; then
     cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME8} ${FILE8} 2> /dev/null
   else
+    if [ ! -r ${FILE8} ] ; then
+      echo "Nothing" > ${FILE8}
+    fi
     OUTPUT="${OUTPUT}File ${FILENAME8} is too old. "
   fi
   db2 "call sysproc.automaint_get_policyfile( 'AUTO_REORG', '${FILENAME9}' )" > /dev/null
   if [[ $(find ${INSTANCE_HOME}/sqllib/tmp -name ${FILENAME9} -mmin -5) != "" ]] ; then
     cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME9} ${FILE9} 2> /dev/null
   else
+    if [ ! -r ${FILE9} ] ; then
+      echo "Nothing" > ${FILE9}
+    fi
     OUTPUT="${OUTPUT}File ${FILENAME9} is too old. "
   fi
   db2 "call sysproc.automaint_get_policyfile( 'AUTO_BACKUP', '${FILENAME10}' )" > /dev/null
   if [[ $(find ${INSTANCE_HOME}/sqllib/tmp -name ${FILENAME10} -mmin -5) != "" ]] ; then
     cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME10} ${FILE10} 2> /dev/null
   else
+    if [ ! -r ${FILE10} ] ; then
+      echo "Nothing" > ${FILE10}
+    fi
     OUTPUT="${OUTPUT}File ${FILENAME10} is too old. "
   fi
   db2 "call sysproc.automaint_get_policyfile( 'MAINTENANCE_WINDOW', '${FILENAME11}' )" > /dev/null
   if [[ $(find ${INSTANCE_HOME}/sqllib/tmp -name ${FILENAME11} -mmin -5) != "" ]] ; then
     cp ${INSTANCE_HOME}/sqllib/tmp/${FILENAME11} ${FILE11} 2> /dev/null
   else
+    if [ ! -r ${FILE11} ] ; then
+      echo "Nothing" > ${FILE11}
+    fi
     OUTPUT="${OUTPUT}File ${FILENAME11} is too old. "
   fi
 
