@@ -400,13 +400,13 @@ FROM TABLE (SYSPROC.ADMIN_GET_DBP_MEM_USAGE()) AS T;"
 
     SELECT_ERROR=$(echo ${RESULT} | grep SQL0551)
     if [[ ${CONN_ERROR} == "error" ]] ; then
-      LONG_OUTPUT=${RESULT}
+      LONG_OUTPUT="${LONG_OUTPUT}-${RESULT}"
       unset RESULT
       if [[ ${VERBOSE} -ge 2 ]] ; then
         echo "Connection error at ${DATABASE}"
       fi
     elif [[ ${SELECT_ERROR} != "" ]] ; then
-      LONG_OUTPUT=${RESULT}
+      LONG_OUTPUT="${LONG_OUTPUT}-${RESULT}"
       unset RESULT
       if [[ ${VERBOSE} -ge 2 ]] ; then
         echo "Lack of permissions at ${DATABASE}"
